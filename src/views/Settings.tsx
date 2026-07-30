@@ -1,9 +1,9 @@
 /**
  * Settings (§3.8) and Activity (§3.5).
  *
- * The Activity section states the platform truth rather than pretending:
- * Wayland cannot report the frontmost window at all, so Linux ships with
- * Activity disabled and a sentence explaining why.
+ * Every control here does something. Where a feature is deferred — Activity is
+ * the only one — the section says so plainly instead of showing a switch that
+ * does nothing or pointing at a screen that has no switch on it.
  */
 
 import { useEffect, useState } from "react";
@@ -45,6 +45,7 @@ export function Settings() {
   const setSpan = useApp((s) => s.setSpan);
   const setOverlay = useApp((s) => s.setOverlay);
   const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
 
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const [integrity, setIntegrity] = useState<IntegrityReport | null>(null);
@@ -178,29 +179,34 @@ export function Settings() {
       <Section title="Activity">
         <Field
           label="Window tracking"
-          hint="App-level tracking and window-title tracking are separate switches, and titles stay off even when apps are on."
+          hint="When it lands: app-level tracking and window-title tracking as separate switches, titles off even when apps are on, a per-app exclusion list, and a retention setting with a visible next-purge date."
         >
+          {/* No switch here, so the copy must not imply one. Activity is the
+              feature furthest from the loop and the only one Wayland cannot do
+              at all (§3.5, §9.6) — it is deferred, and saying so is cheaper
+              than a toggle that does nothing. */}
           <p className="caption">
-            {navigator.platform.toLowerCase().includes("linux")
-              ? "Activity tracking isn't available on Wayland. It works on X11 sessions."
-              : "Activity tracking is off. It is opt-in, sampled locally, and never leaves this machine."}
+            Not in this build. Nothing is sampled, and no window titles are read.
           </p>
         </Field>
       </Section>
 
       <Section title="Data">
-        <Field label="Export" hint="JSON round-trips exactly, ids included. CSV ships tasks and sessions. ICS is export-only.">
+        <Field label="Export" hint="Written to your Downloads folder. JSON round-trips exactly, ids included. CSV ships tasks and sessions. ICS is export-only.">
           <div className="row">
             {(["json", "csv", "ics"] as const).map((f) => (
               <button
                 key={f}
                 className="btn"
-                onClick={() =>
-                  void run(
+                onClick={async () => {
+                  const result = await run(
                     () => ipc.exportData(f, `fruit-export.${f}`, fmt.tz()),
                     "Couldn't export.",
-                  )
-                }
+                  );
+                  // Naming the file is the whole point: an export you can't
+                  // find is an export you don't trust.
+                  if (result) toast(`Exported to ${result.paths.join(", ")}`);
+                }}
               >
                 Export {f.toUpperCase()}
               </button>
@@ -250,8 +256,10 @@ export function Settings() {
 export function Activity() {
   return (
     <Empty>
-      Activity tracking is off. Turn it on in Settings → Activity. It is opt-in, sampled locally,
-      and never leaves this machine.
+      Activity tracking isn't in this build — there's nothing to switch on yet. It sits furthest
+      from the plan–track–reconcile loop and can't work at all under Wayland, so it was deferred.
+      Everything Fruit knows about your time comes from the timer and from sessions you add by
+      hand.
     </Empty>
   );
 }

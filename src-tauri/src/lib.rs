@@ -292,11 +292,28 @@ fn set_setting(state: State<'_, AppState>, key: String, value: Value) -> Res<()>
 
 #[tauri::command]
 fn export_data(
+    app: AppHandle,
     state: State<'_, AppState>,
     format: ExportFormat,
     path: PathBuf,
     tz: String,
 ) -> Res<ExportSummary> {
+    // A bare filename would land in the process's working directory — which on
+    // Windows is wherever the exe was launched from, and nowhere a person would
+    // look. Export is a trust feature (§6.12); "where did it go?" defeats it.
+    let path = if path.is_absolute() {
+        path
+    } else {
+        app.path()
+            .download_dir()
+            .or_else(|_| app.path().document_dir())
+            .or_else(|_| app.path().home_dir())
+            .unwrap_or_else(|_| data_dir(&app))
+            .join(&path)
+    };
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
     with(&state, |s| s.export_to(format, &path, &tz))
 }
 
