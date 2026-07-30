@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Fruit's entire IPC surface. §7.3: the capability file lists only the §6.8 commands — no sql:*, no broad fs:*. File dialogs return scoped paths, and every write goes through a typed, validated Rust command.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-set-title",
+    "core:window:allow-is-visible",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "notification:default",
+    "opener:allow-reveal-item-in-dir"
+  ]
+}

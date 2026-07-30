@@ -1,0 +1,306 @@
+@import "tailwindcss";
+
+/* ══════════════════════════════════════════════════════════════════════
+   Fruit design system — §5
+   Fruit should not look like a productivity app. It should look like an
+   instrument: ruled lines, graduated scales, and the visible offset between
+   two traces. Every value below is from the spec; nothing is invented here,
+   and no component may introduce a literal colour (I1).
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ─── §5.3 Typography ────────────────────────────────────────────────────
+   Bundled locally as woff2. An offline-first app must never reference a font
+   CDN — it silently falls back to system faces on a machine with no network,
+   which is the exact machine this app is built for (I7).
+   The files are OFL and fetched by `npm run fonts`; see src/assets/fonts/README.md.
+   If they are absent the stacks below degrade to system faces rather than
+   reaching out to the network. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("../assets/fonts/SpaceGrotesk-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("../assets/fonts/SpaceGrotesk-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../assets/fonts/InstrumentSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../assets/fonts/InstrumentSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("../assets/fonts/InstrumentSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Commit Mono";
+  src: url("../assets/fonts/CommitMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Commit Mono";
+  src: url("../assets/fonts/CommitMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+/* ─── §5.2 Colour tokens · dark is primary ───────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  --ink: #0e1116; /* blue-black: neutral black reads dead under a cyan accent */
+  --surface: #151a21;
+  --raised: #1d242d;
+  --line: #262e39;
+  --rule: #1f2630;
+  --paper: #e3e7ec; /* not #FFF: pure white halates at 14px */
+  --muted: #8b95a3;
+  --faint: #5a6472;
+
+  /* The drift axis. Cool is planned, warm is actual. There is deliberately
+     no red in the drift system at all — overrun is a continuation, not an alarm. */
+  --plot: #56c2d6;
+  --track: #e9a63c;
+  --over: #e2603c;
+  --done: #6ebe8c;
+  --danger: #d9455f; /* destructive only; crimson so it never reads as overrun */
+
+  --scrim: rgb(0 0 0 / 0.4);
+  --overlay-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  color-scheme: dark;
+}
+
+/* ─── §5.9 Light theme · semantic hues darken to hold 4.5:1 ──────────── */
+:root[data-theme="light"] {
+  --ink: #f5f6f8;
+  --surface: #ffffff;
+  --raised: #edeff3;
+  --line: #dadee5;
+  --rule: #e4e7ec;
+  --paper: #12161c;
+  --muted: #5b6572;
+  --faint: #96a0ae;
+  --plot: #0e7c90;
+  --track: #b4741a;
+  --over: #c2451f;
+  --done: #2f8b57;
+  --danger: #c22943;
+
+  --scrim: rgb(0 0 0 / 0.25);
+  --overlay-shadow: 0 8px 24px rgb(15 20 28 / 0.16);
+  color-scheme: light;
+}
+
+/* §5.2 Tailwind v4 mapping. Utilities resolve to the same variables, so a
+   `text-muted` and a hand-written rule can never drift apart. */
+@theme {
+  --color-ink: var(--ink);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-rule: var(--rule);
+  --color-paper: var(--paper);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-plot: var(--plot);
+  --color-track: var(--track);
+  --color-over: var(--over);
+  --color-done: var(--done);
+  --color-danger: var(--danger);
+}
+
+:root {
+  /* §5.4 Space — 4px base. Nothing between; if a layout needs 14px, the
+     layout is wrong. */
+  --s-2: 2px;
+  --s-4: 4px;
+  --s-6: 6px;
+  --s-8: 8px;
+  --s-12: 12px;
+  --s-16: 16px;
+  --s-20: 20px;
+  --s-24: 24px;
+  --s-32: 32px;
+  --s-40: 40px;
+  --s-48: 48px;
+
+  /* §5.4 Radius — tight, because plates are not cards. */
+  --r-plate: 2px;
+  --r-panel: 4px;
+  --r-sheet: 6px;
+
+  /* §5.3 Type. All rem, so OS text scaling works (I5). */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-ui: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-data: "Commit Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --t-display-xl: 4.5rem;
+  --t-display: 1.5rem;
+  --t-title: 1.125rem;
+  --t-body: 0.875rem;
+  --t-label: 0.8125rem;
+  --t-caption: 0.75rem;
+  --t-data: 0.8125rem;
+  --t-micro: 0.6875rem;
+
+  /* §5.5 Motion */
+  --m-fast: 120ms;
+  --m-settle: 240ms;
+  --m-sheet: 180ms;
+  --e-out: ease-out;
+  --e-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* §5.8 Layout arithmetic, so the breakpoints are checkable */
+  --rail-w: 52px;
+  --sidebar-w: 260px;
+  --sidebar-collapsed-w: 48px;
+  --detail-w: 360px;
+  --topbar-h: 48px;
+  --gutter-w: 48px;
+  --hour-h: 56px; /* Cmd +/− scales 32–120px, persisted */
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Base
+   ══════════════════════════════════════════════════════════════════════ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-ui);
+  font-size: var(--t-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* Every number that changes in place gets tabular figures. Without it the
+   timer visibly jitters once a second as glyph widths shift, and that one
+   detail is the difference between "polished" and "someone's side project" (I4). */
+.data,
+.tabular,
+input[type="time"],
+input[type="date"] {
+  font-family: var(--font-data);
+  font-size: var(--t-data);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.micro {
+  font-family: var(--font-data);
+  font-size: var(--t-micro);
+  font-weight: 500;
+  /* Hour labels and drift badges are numerals that change in place, so they
+     get tabular figures for the same reason the timer does. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: var(--t-display);
+  line-height: 1.2;
+}
+
+.title {
+  font-size: var(--t-title);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.label {
+  font-size: var(--t-label);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.caption {
+  font-size: var(--t-caption);
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+/* §4.7 — a visible focus indicator on every interactive element: a 2px `plot`
+   ring at 2px offset, never only a hover state. */
+:focus-visible {
+  outline: 2px solid var(--plot);
+  outline-offset: 2px;
+  border-radius: var(--r-plate);
+}
+
+/* §5.4 Elevation — exactly two levels. Flat, and Overlay. There is no third,
+   no card shadow, and no hover lift. */
+.overlay {
+  box-shadow: var(--overlay-shadow);
+}
+
+/* §4.7 — prefers-reduced-motion removes the pulsing dots, the drift settle,
+   the glow and the grain; state changes become instant (I6). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* First paint before React mounts (§3.10) — real chrome, not a spinner. */
+.boot-shell {
+  display: flex;
+  height: 100%;
+}
+.boot-rail {
+  width: var(--rail-w);
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+.boot-main {
+  flex: 1;
+  background: var(--ink);
+}
+
+/* Screen-reader-only text, for the accessible names in §4.7. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

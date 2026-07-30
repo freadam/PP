@@ -1,0 +1,866 @@
+{
+  "get_backlog": {
+    "groups": [
+      {
+        "count": 0,
+        "estimateSec": 0,
+        "key": "overdue",
+        "label": "Overdue",
+        "taskIds": []
+      },
+      {
+        "count": 1,
+        "estimateSec": 900,
+        "key": "today",
+        "label": "Today",
+        "taskIds": [
+          "019fb501-ee13-7611-b38e-11f3d338a32a"
+        ]
+      },
+      {
+        "count": 0,
+        "estimateSec": 0,
+        "key": "week",
+        "label": "This week",
+        "taskIds": []
+      },
+      {
+        "count": 4,
+        "estimateSec": 4620,
+        "key": "no-date",
+        "label": "No date",
+        "taskIds": [
+          "019fb501-ee19-7d13-b236-a81895280775",
+          "019fb501-ee14-70f1-993c-05f87a5a5b6e",
+          "019fb501-ee15-7143-bfed-74efe92b1fb7",
+          "019fb501-ee1b-7f91-beea-2ff5c7aa0dd1"
+        ]
+      },
+      {
+        "count": 0,
+        "estimateSec": 0,
+        "key": "someday",
+        "label": "Someday",
+        "taskIds": []
+      }
+    ],
+    "tasks": [
+      {
+        "completedAt": null,
+        "createdAt": 1785448230425,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 900,
+        "id": "019fb501-ee19-7d13-b236-a81895280775",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 3,
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "sortRank": 7168.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee17-7f03-8701-16d12b600090",
+            "name": "writing"
+          }
+        ],
+        "title": "Fix the DST off-by-one",
+        "trackedSec": 0,
+        "updatedAt": 1785448230425
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230419,
+        "dueAt": 1785427200000,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 900,
+        "id": "019fb501-ee13-7611-b38e-11f3d338a32a",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 2,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 1024.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee13-7611-b38e-1201180ba6fc",
+            "name": "welcome"
+          }
+        ],
+        "title": "Read the 60-second guide",
+        "trackedSec": 0,
+        "updatedAt": 1785448230419
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230420,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 3600,
+        "id": "019fb501-ee14-70f1-993c-05f87a5a5b6e",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 2048.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee13-7611-b38e-1201180ba6fc",
+            "name": "welcome"
+          }
+        ],
+        "title": "Refactor auth module",
+        "trackedSec": 4440,
+        "updatedAt": 1785448230420
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230421,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 120,
+        "id": "019fb501-ee15-7143-bfed-74efe92b1fb7",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 3072.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [],
+        "title": "Delete this project when you're done",
+        "trackedSec": 0,
+        "updatedAt": 1785448230421
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230427,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": null,
+        "id": "019fb501-ee1b-7f91-beea-2ff5c7aa0dd1",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "sortRank": 9216.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [],
+        "title": "Production firefight",
+        "trackedSec": 2400,
+        "updatedAt": 1785448230427
+      }
+    ]
+  },
+  "get_deleted": [],
+  "get_projects": [
+    {
+      "colour": "#56C2D6",
+      "createdAt": 1785448230419,
+      "icon": null,
+      "id": "019fb501-ee13-7611-b38e-11e528152b0a",
+      "isArchived": false,
+      "kind": "personal",
+      "name": "Welcome to Fruit",
+      "openTaskCount": 3,
+      "sortRank": 1024.0,
+      "updatedAt": 1785448230419,
+      "weekTrackedSec": 4440,
+      "weeklyTargetSec": 7200
+    },
+    {
+      "colour": "#7E8CF0",
+      "createdAt": 1785448230421,
+      "icon": null,
+      "id": "019fb501-ee15-7143-bfed-74f275a8bd76",
+      "isArchived": false,
+      "kind": "work",
+      "name": "Deep work",
+      "openTaskCount": 2,
+      "sortRank": 2048.0,
+      "updatedAt": 1785448230421,
+      "weekTrackedSec": 13620,
+      "weeklyTargetSec": 36000
+    }
+  ],
+  "get_reconcile_items": [
+    {
+      "available": [
+        "accept",
+        "rescheduleRemainder",
+        "split",
+        "reviseEstimate"
+      ],
+      "blockId": "019fb501-ee14-70f1-993c-06059d3be23c",
+      "defaultAction": "accept",
+      "driftSec": 840,
+      "endsAt": 1785402000000,
+      "id": "block:019fb501-ee14-70f1-993c-06059d3be23c",
+      "kind": "overran",
+      "plannedSec": 3600,
+      "sessionId": null,
+      "startsAt": 1785398400000,
+      "suggestedDurationSec": 840,
+      "suggestedSlot": 1785481200000,
+      "taskId": "019fb501-ee14-70f1-993c-05f87a5a5b6e",
+      "title": "Refactor auth module",
+      "trackedSec": 4440
+    },
+    {
+      "available": [
+        "moveToTomorrow",
+        "drop",
+        "markDone",
+        "leaveUnscheduled"
+      ],
+      "blockId": "019fb501-ee19-7d13-b236-a829c3b7c7b4",
+      "defaultAction": "moveToTomorrow",
+      "driftSec": -900,
+      "endsAt": 1785399300000,
+      "id": "block:019fb501-ee19-7d13-b236-a829c3b7c7b4",
+      "kind": "neverStarted",
+      "plannedSec": 900,
+      "sessionId": null,
+      "startsAt": 1785398400000,
+      "suggestedDurationSec": 900,
+      "suggestedSlot": 1785481200000,
+      "taskId": "019fb501-ee19-7d13-b236-a81895280775",
+      "title": "Fix the DST off-by-one",
+      "trackedSec": 0
+    }
+  ],
+  "get_reports": {
+    "calibration": {
+      "buckets": [
+        {
+          "bucket": "<=15m",
+          "isReportable": false,
+          "medianRatio": 0.0,
+          "n": 0
+        },
+        {
+          "bucket": "30m",
+          "isReportable": false,
+          "medianRatio": 0.3833333333333333,
+          "n": 2
+        },
+        {
+          "bucket": "1h",
+          "isReportable": false,
+          "medianRatio": 1.0,
+          "n": 1
+        },
+        {
+          "bucket": "2h",
+          "isReportable": false,
+          "medianRatio": 1.1555555555555554,
+          "n": 1
+        },
+        {
+          "bucket": "3h+",
+          "isReportable": false,
+          "medianRatio": 0.0,
+          "n": 0
+        }
+      ],
+      "headline": "4 of 5 estimates tracked so far. Calibration starts at five.",
+      "overallMedian": 0.75,
+      "sampleCount": 4,
+      "worstBucket": null
+    },
+    "from": "2026-06-29",
+    "projectWeeks": [
+      {
+        "plannedSec": 13500,
+        "projectColour": "#7E8CF0",
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "projectName": "Deep work",
+        "trackedSec": 13620,
+        "weekStart": "2026-07-27"
+      },
+      {
+        "plannedSec": 900,
+        "projectColour": "#8B95A3",
+        "projectId": null,
+        "projectName": "Inbox",
+        "trackedSec": 0,
+        "weekStart": "2026-07-27"
+      },
+      {
+        "plannedSec": 3600,
+        "projectColour": "#56C2D6",
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "projectName": "Welcome to Fruit",
+        "trackedSec": 4440,
+        "weekStart": "2026-07-27"
+      }
+    ],
+    "streakDays": 0,
+    "to": "2026-08-02",
+    "totalPlannedSec": 18000,
+    "totalTrackedSec": 18060,
+    "weeklyTargets": [
+      {
+        "paceSec": 4114,
+        "projectColour": "#56C2D6",
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "projectName": "Welcome to Fruit",
+        "targetSec": 7200,
+        "trackedSec": 4440
+      },
+      {
+        "paceSec": 20571,
+        "projectColour": "#7E8CF0",
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "projectName": "Deep work",
+        "targetSec": 36000,
+        "trackedSec": 13620
+      }
+    ]
+  },
+  "get_settings": {
+    "app.seeded": true,
+    "onboarding.railExplained": false
+  },
+  "get_tags": [
+    {
+      "colour": null,
+      "id": "019fb501-ee16-7092-b821-c29ef812ee42",
+      "name": "dev"
+    },
+    {
+      "colour": null,
+      "id": "019fb501-ee13-7611-b38e-1201180ba6fc",
+      "name": "welcome"
+    },
+    {
+      "colour": null,
+      "id": "019fb501-ee17-7f03-8701-16d12b600090",
+      "name": "writing"
+    }
+  ],
+  "get_task_detail": {
+    "blocks": [],
+    "note": "",
+    "noteUpdatedAt": null,
+    "project": {
+      "colour": "#7E8CF0",
+      "createdAt": 1785448230421,
+      "icon": null,
+      "id": "019fb501-ee15-7143-bfed-74f275a8bd76",
+      "isArchived": false,
+      "kind": "work",
+      "name": "Deep work",
+      "openTaskCount": 2,
+      "sortRank": 2048.0,
+      "updatedAt": 1785448230421,
+      "weekTrackedSec": 13620,
+      "weeklyTargetSec": 36000
+    },
+    "sessions": [
+      {
+        "blockId": null,
+        "elapsedSec": 2400,
+        "endedAt": 1785163200000,
+        "heartbeatAt": null,
+        "id": "019fb501-ee1b-7f91-beea-300f058d2bfd",
+        "isConfirmed": true,
+        "note": null,
+        "source": "manual",
+        "startedAt": 1785160800000,
+        "taskId": "019fb501-ee1b-7f91-beea-2ff5c7aa0dd1",
+        "taskTitle": "Production firefight"
+      }
+    ],
+    "subtasks": [],
+    "task": {
+      "completedAt": null,
+      "createdAt": 1785448230427,
+      "dueAt": null,
+      "dueDate": null,
+      "energy": null,
+      "estimateSec": null,
+      "id": "019fb501-ee1b-7f91-beea-2ff5c7aa0dd1",
+      "isScheduled": false,
+      "parentId": null,
+      "priority": 0,
+      "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+      "sortRank": 9216.0,
+      "status": "open",
+      "subtaskDone": 0,
+      "subtaskTotal": 0,
+      "tags": [],
+      "title": "Production firefight",
+      "trackedSec": 2400,
+      "updatedAt": 1785448230427
+    }
+  },
+  "get_tasks": {
+    "rows": [
+      {
+        "completedAt": null,
+        "createdAt": 1785448230425,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 900,
+        "id": "019fb501-ee19-7d13-b236-a81895280775",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 3,
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "sortRank": 7168.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee17-7f03-8701-16d12b600090",
+            "name": "writing"
+          }
+        ],
+        "title": "Fix the DST off-by-one",
+        "trackedSec": 0,
+        "updatedAt": 1785448230425
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230419,
+        "dueAt": 1785427200000,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 900,
+        "id": "019fb501-ee13-7611-b38e-11f3d338a32a",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 2,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 1024.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee13-7611-b38e-1201180ba6fc",
+            "name": "welcome"
+          }
+        ],
+        "title": "Read the 60-second guide",
+        "trackedSec": 0,
+        "updatedAt": 1785448230419
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230420,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 3600,
+        "id": "019fb501-ee14-70f1-993c-05f87a5a5b6e",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 2048.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [
+          {
+            "colour": null,
+            "id": "019fb501-ee13-7611-b38e-1201180ba6fc",
+            "name": "welcome"
+          }
+        ],
+        "title": "Refactor auth module",
+        "trackedSec": 4440,
+        "updatedAt": 1785448230420
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230421,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": 120,
+        "id": "019fb501-ee15-7143-bfed-74efe92b1fb7",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+        "sortRank": 3072.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [],
+        "title": "Delete this project when you're done",
+        "trackedSec": 0,
+        "updatedAt": 1785448230421
+      },
+      {
+        "completedAt": null,
+        "createdAt": 1785448230427,
+        "dueAt": null,
+        "dueDate": null,
+        "energy": null,
+        "estimateSec": null,
+        "id": "019fb501-ee1b-7f91-beea-2ff5c7aa0dd1",
+        "isScheduled": false,
+        "parentId": null,
+        "priority": 0,
+        "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+        "sortRank": 9216.0,
+        "status": "open",
+        "subtaskDone": 0,
+        "subtaskTotal": 0,
+        "tags": [],
+        "title": "Production firefight",
+        "trackedSec": 2400,
+        "updatedAt": 1785448230427
+      }
+    ],
+    "total": 5
+  },
+  "get_timer_state": {
+    "elapsedSec": 0,
+    "idleFrom": null,
+    "idleTo": null,
+    "phase": "idle",
+    "pomodoro": null,
+    "recoverySessionId": null,
+    "session": null
+  },
+  "get_unreconciled_days": [
+    "2026-07-29",
+    "2026-07-28",
+    "2026-07-27"
+  ],
+  "get_week": {
+    "days": [
+      {
+        "blocks": [
+          {
+            "block": {
+              "createdAt": 1785448230422,
+              "durationSec": 5400,
+              "id": "019fb501-ee16-7092-b821-c2a55f65494a",
+              "isFixed": false,
+              "label": null,
+              "localDate": "2026-07-27",
+              "startsAt": 1785139200000,
+              "taskId": "019fb501-ee15-7143-bfed-750b743af4af",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230422
+            },
+            "driftSec": 840,
+            "driftState": "overrun",
+            "isRunning": false,
+            "lane": 0,
+            "lanes": 2,
+            "plannedSec": 5400,
+            "projectColour": "#7E8CF0",
+            "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+            "taskStatus": "done",
+            "title": "Refactor the scheduler",
+            "trackedSec": 6240
+          },
+          {
+            "block": {
+              "createdAt": 1785448230427,
+              "durationSec": 900,
+              "id": "019fb501-ee1b-7f91-beea-2fe8b0a2bd25",
+              "isFixed": true,
+              "label": "Standup",
+              "localDate": "2026-07-27",
+              "startsAt": 1785142800000,
+              "taskId": null,
+              "tz": "Europe/London",
+              "updatedAt": 1785448230427
+            },
+            "driftSec": -900,
+            "driftState": "notStarted",
+            "isRunning": false,
+            "lane": 1,
+            "lanes": 2,
+            "plannedSec": 900,
+            "projectColour": null,
+            "projectId": null,
+            "taskStatus": null,
+            "title": "Standup",
+            "trackedSec": 0
+          }
+        ],
+        "isPast": true,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-07-27",
+        "plannedSec": 6300,
+        "trackedSec": 6240,
+        "unplannedSec": 2400
+      },
+      {
+        "blocks": [
+          {
+            "block": {
+              "createdAt": 1785448230423,
+              "durationSec": 3600,
+              "id": "019fb501-ee17-7f03-8701-16e10f32b230",
+              "isFixed": false,
+              "label": null,
+              "localDate": "2026-07-28",
+              "startsAt": 1785232800000,
+              "taskId": "019fb501-ee17-7f03-8701-16cc1bbd6e46",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230423
+            },
+            "driftSec": 0,
+            "driftState": "onEstimate",
+            "isRunning": false,
+            "lane": 0,
+            "lanes": 1,
+            "plannedSec": 3600,
+            "projectColour": "#7E8CF0",
+            "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+            "taskStatus": "done",
+            "title": "Write the migration guide",
+            "trackedSec": 3600
+          }
+        ],
+        "isPast": true,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-07-28",
+        "plannedSec": 3600,
+        "trackedSec": 3600,
+        "unplannedSec": 0
+      },
+      {
+        "blocks": [
+          {
+            "block": {
+              "createdAt": 1785448230424,
+              "durationSec": 1800,
+              "id": "019fb501-ee18-7122-acc6-1cabb74b044a",
+              "isFixed": false,
+              "label": null,
+              "localDate": "2026-07-29",
+              "startsAt": 1785326400000,
+              "taskId": "019fb501-ee18-7122-acc6-1c974858598c",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230424
+            },
+            "driftSec": -900,
+            "driftState": "underrunPast",
+            "isRunning": false,
+            "lane": 0,
+            "lanes": 1,
+            "plannedSec": 1800,
+            "projectColour": "#7E8CF0",
+            "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+            "taskStatus": "done",
+            "title": "Review the drift rail spec",
+            "trackedSec": 900
+          }
+        ],
+        "isPast": true,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-07-29",
+        "plannedSec": 1800,
+        "trackedSec": 900,
+        "unplannedSec": 0
+      },
+      {
+        "blocks": [
+          {
+            "block": {
+              "createdAt": 1785448230420,
+              "durationSec": 3600,
+              "id": "019fb501-ee14-70f1-993c-06059d3be23c",
+              "isFixed": false,
+              "label": null,
+              "localDate": "2026-07-30",
+              "startsAt": 1785398400000,
+              "taskId": "019fb501-ee14-70f1-993c-05f87a5a5b6e",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230420
+            },
+            "driftSec": 840,
+            "driftState": "overrun",
+            "isRunning": false,
+            "lane": 0,
+            "lanes": 2,
+            "plannedSec": 3600,
+            "projectColour": "#56C2D6",
+            "projectId": "019fb501-ee13-7611-b38e-11e528152b0a",
+            "taskStatus": "open",
+            "title": "Refactor auth module",
+            "trackedSec": 4440
+          },
+          {
+            "block": {
+              "createdAt": 1785448230425,
+              "durationSec": 900,
+              "id": "019fb501-ee19-7d13-b236-a829c3b7c7b4",
+              "isFixed": false,
+              "label": null,
+              "localDate": "2026-07-30",
+              "startsAt": 1785398400000,
+              "taskId": "019fb501-ee19-7d13-b236-a81895280775",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230425
+            },
+            "driftSec": -900,
+            "driftState": "notStarted",
+            "isRunning": false,
+            "lane": 1,
+            "lanes": 2,
+            "plannedSec": 900,
+            "projectColour": "#7E8CF0",
+            "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+            "taskStatus": "open",
+            "title": "Fix the DST off-by-one",
+            "trackedSec": 0
+          }
+        ],
+        "isPast": false,
+        "isReconciled": false,
+        "isToday": true,
+        "localDate": "2026-07-30",
+        "plannedSec": 4500,
+        "trackedSec": 4440,
+        "unplannedSec": 0
+      },
+      {
+        "blocks": [
+          {
+            "block": {
+              "createdAt": 1785448230426,
+              "durationSec": 1800,
+              "id": "019fb501-ee1a-7bf1-8dec-c204c024201c",
+              "isFixed": true,
+              "label": null,
+              "localDate": "2026-07-31",
+              "startsAt": 1785492000000,
+              "taskId": "019fb501-ee1a-7bf1-8dec-c1f46a6e5f68",
+              "tz": "Europe/London",
+              "updatedAt": 1785448230426
+            },
+            "driftSec": -1320,
+            "driftState": "inProgress",
+            "isRunning": false,
+            "lane": 0,
+            "lanes": 1,
+            "plannedSec": 1800,
+            "projectColour": "#7E8CF0",
+            "projectId": "019fb501-ee15-7143-bfed-74f275a8bd76",
+            "taskStatus": "done",
+            "title": "Answer support mail",
+            "trackedSec": 480
+          }
+        ],
+        "isPast": false,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-07-31",
+        "plannedSec": 1800,
+        "trackedSec": 480,
+        "unplannedSec": 0
+      },
+      {
+        "blocks": [],
+        "isPast": false,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-08-01",
+        "plannedSec": 0,
+        "trackedSec": 0,
+        "unplannedSec": 0
+      },
+      {
+        "blocks": [],
+        "isPast": false,
+        "isReconciled": false,
+        "isToday": false,
+        "localDate": "2026-08-02",
+        "plannedSec": 0,
+        "trackedSec": 0,
+        "unplannedSec": 0
+      }
+    ],
+    "from": "2026-07-27",
+    "now": 1785448230428,
+    "to": "2026-08-02",
+    "tz": "Europe/London"
+  },
+  "parse_capture": {
+    "chips": [
+      {
+        "creates": true,
+        "display": "dev",
+        "from": 14,
+        "kind": "project",
+        "raw": "#dev",
+        "to": 18
+      },
+      {
+        "creates": false,
+        "display": "45m",
+        "from": 19,
+        "kind": "estimate",
+        "raw": "~45m",
+        "to": 23
+      },
+      {
+        "creates": false,
+        "display": "medium",
+        "from": 24,
+        "kind": "priority",
+        "raw": "!!",
+        "to": 26
+      },
+      {
+        "creates": false,
+        "display": "2026-07-31 09:00",
+        "from": 27,
+        "kind": "due",
+        "raw": "^tomorrow 9am",
+        "to": 40
+      }
+    ],
+    "dueAt": 1785484800000,
+    "dueDate": null,
+    "estimateSec": 2700,
+    "priority": 2,
+    "projectCreates": true,
+    "projectId": null,
+    "projectName": "dev",
+    "raw": "Fix login bug #dev ~45m !! ^tomorrow 9am",
+    "tags": [],
+    "title": "Fix login bug"
+  },
+  "search": {
+    "hits": [],
+    "query": "draft"
+  }
+}

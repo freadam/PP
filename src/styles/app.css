@@ -1,0 +1,1155 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Components — §5.7. Every colour resolves to a §5.2 token (I1).
+   ══════════════════════════════════════════════════════════════════════ */
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  padding: var(--s-6) var(--s-8);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--faint);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-6);
+  height: 28px;
+  padding: 0 var(--s-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--raised);
+  font-size: var(--t-label);
+  transition: border-color var(--m-fast) var(--e-out);
+}
+.btn:hover {
+  border-color: var(--muted);
+}
+.btn-primary {
+  border-color: var(--plot);
+  color: var(--plot);
+}
+.btn-danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.btn[aria-pressed="true"] {
+  border-color: var(--plot);
+  color: var(--plot);
+}
+
+.kbd {
+  display: inline-block;
+  padding: 1px var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  font-family: var(--font-data);
+  font-size: var(--t-micro);
+  color: var(--muted);
+}
+
+/* ─── Shell ──────────────────────────────────────────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100%;
+}
+
+.shell-body {
+  display: flex;
+  min-height: 0;
+  /* The page body must never scroll horizontally (§5.8). */
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ink);
+}
+
+/* §5.7 Top bar — 48px: 44px cannot hold 14px text with 12px padding plus a
+   20px control. */
+.topbar {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  padding: 0 var(--s-12);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  font-family: var(--font-display);
+  font-weight: 500;
+}
+
+.badge-offline {
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  padding: 1px var(--s-4);
+}
+
+.topbar-centre {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--s-12);
+  min-width: 0;
+}
+
+/* §5.7 Nav rail — 52px, 20px icons, 40px targets, 2px `plot` indicator. */
+.rail-nav {
+  width: var(--rail-w);
+  flex: none;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: var(--s-8);
+  gap: var(--s-4);
+}
+
+.rail-item {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  border-radius: var(--r-panel);
+  transition: color var(--m-fast) var(--e-out);
+}
+.rail-item:hover {
+  color: var(--paper);
+}
+.rail-item[aria-current="page"] {
+  color: var(--plot);
+}
+.rail-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: var(--plot);
+}
+.rail-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track);
+}
+
+/* §5.7 Sidebar — 260px default, 200–400 resizable, collapses below 1130px. */
+.sidebar {
+  width: var(--sidebar-w);
+  flex: none;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: var(--s-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-16);
+}
+.sidebar[data-collapsed="true"] {
+  width: var(--sidebar-collapsed-w);
+  padding: var(--s-8) var(--s-4);
+  align-items: center;
+}
+
+.sidebar-group-title {
+  color: var(--muted);
+  margin-bottom: var(--s-6);
+}
+
+.sidebar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  width: 100%;
+  padding: var(--s-4) var(--s-6);
+  border-radius: var(--r-plate);
+  text-align: left;
+  color: var(--paper);
+}
+.sidebar-row:hover {
+  background: var(--raised);
+}
+.sidebar-row[aria-selected="true"] {
+  background: var(--raised);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+.sidebar-row .count {
+  margin-left: auto;
+  color: var(--faint);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: none;
+}
+
+/* Weekly-target bar — the same plot/track encoding, one dimension. */
+.target-bar {
+  height: 2px;
+  background: var(--line);
+  position: relative;
+  margin-top: var(--s-4);
+}
+.target-bar > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--track);
+}
+.target-bar > b {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--plot);
+}
+
+/* ─── §5.6 The drift rail ─────────────────────────────────────────────
+   Two parallel traces on the plate's left edge. A fill bar shows a ratio;
+   this product is about a *gap*, so the gap is the visible object. */
+
+.rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  pointer-events: none;
+}
+
+/* Plot trace: x=0, 1px, full height, dashed 3-3, --plot @ 35%. Always full
+   height — it is what you intended, whatever happened. */
+.rail .plot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--plot) 35%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+  background-size: 1px 6px;
+}
+
+/* After the day is over, the unfilled plot becomes the "never happened"
+   trace: dotted, --faint. Texture carries the state, not just colour (I3). */
+.rail[data-state="underrunPast"] .plot,
+.rail[data-state="notStarted"][data-past="true"] .plot {
+  background-image: linear-gradient(
+    to bottom,
+    var(--faint) 0 1px,
+    transparent 1px 4px
+  );
+  background-size: 1px 4px;
+}
+
+/* Track trace: x=3, 3px, from the top, h = min(1, tracked/planned) × H. */
+.rail .track {
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 3px;
+  background: var(--track);
+}
+
+/* Overrun tail: continues below the plate into the 8px gutter, bounded at
+   24px so it can never collide with the next block — v1's bubble could. */
+.rail .tail {
+  position: absolute;
+  left: 3px;
+  top: 100%;
+  width: 3px;
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--over) 0 1px,
+    transparent 1px 3px
+  );
+  background-color: color-mix(in srgb, var(--over) 30%, transparent);
+}
+
+/* Invisible 10px column spanning both traces; hover or focus reveals a readout. */
+.rail-hit {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: -24px;
+  width: 10px;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.rail-readout {
+  position: absolute;
+  left: 12px;
+  top: 0;
+  z-index: 5;
+  white-space: nowrap;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  padding: var(--s-4) var(--s-6);
+  box-shadow: var(--overlay-shadow);
+  pointer-events: none;
+}
+
+/* The one orchestrated moment (§5.5): rails grow from zero on mount,
+   staggered 12ms by vertical order. It reads as an instrument taking a
+   reading. Nothing else on the planner animates. */
+@media (prefers-reduced-motion: no-preference) {
+  .rail-settle .track,
+  .rail-settle .tail {
+    animation: rail-grow var(--m-settle) var(--e-settle) both;
+    animation-delay: var(--settle-delay, 0ms);
+  }
+}
+@keyframes rail-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.rail .track,
+.rail .tail {
+  transform-origin: top;
+}
+
+/* Compact horizontal form for task rows — 40px wide, 2px traces. Same
+   encoding at a different scale, which is what makes it a language. */
+.rail-compact {
+  /* A span is inline by default, and width/height do not apply to inline
+     boxes — the traces would collapse to nothing. */
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 8px;
+  flex: none;
+}
+.rail-compact .plot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  height: 1px;
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--plot) 35%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+  background-size: 6px 1px;
+}
+.rail-compact .track {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  height: 2px;
+  background: var(--track);
+}
+.rail-compact .tail {
+  position: absolute;
+  top: 4px;
+  height: 2px;
+  background-image: repeating-linear-gradient(45deg, var(--over) 0 1px, transparent 1px 3px);
+  background-color: color-mix(in srgb, var(--over) 30%, transparent);
+}
+
+/* Full-width horizontal bars in Reports — third scale, same encoding. */
+.rail-bar {
+  display: block;
+  position: relative;
+  height: 14px;
+  background: var(--rule);
+  border-radius: var(--r-plate);
+  overflow: hidden;
+}
+.rail-bar .plot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 1px dashed var(--plot);
+}
+.rail-bar .track {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  background: var(--track);
+}
+.rail-bar .tail {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  background-image: repeating-linear-gradient(45deg, var(--over) 0 1px, transparent 1px 3px);
+  background-color: color-mix(in srgb, var(--over) 30%, transparent);
+}
+
+.badge-drift {
+  color: var(--over);
+  /* `micro` is uppercase for badges and kind labels; a duration is not a label,
+     and "+14M" reads as megabytes. */
+  text-transform: none;
+}
+.badge-drift[data-under="true"] {
+  color: var(--faint);
+}
+
+/* ─── Planner ────────────────────────────────────────────────────────── */
+
+.planner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.planner-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  padding: var(--s-8) var(--s-12);
+  border-bottom: 1px solid var(--line);
+}
+
+.planner-daynames {
+  display: grid;
+  border-bottom: 1px solid var(--line);
+  padding-left: var(--gutter-w);
+}
+
+.dayname {
+  padding: var(--s-6) var(--s-8);
+  border-left: 1px solid var(--rule);
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-6);
+}
+.dayname[data-today="true"] {
+  background: var(--surface);
+}
+.dayname .num {
+  color: var(--paper);
+}
+.dayname .totals {
+  margin-left: auto;
+  color: var(--faint);
+}
+
+.planner-scroll {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.planner-grid {
+  position: relative;
+  display: grid;
+  padding-left: var(--gutter-w);
+}
+
+/* §5.1 The grid is a graduated scale: heavy rule at the hour, hairline at the
+   quarter, numerals set in the gutter like a chart axis. */
+.hour-rows {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.hour-row {
+  position: relative;
+  border-top: 1px solid var(--rule);
+}
+.hour-row .q {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dotted var(--rule);
+  opacity: 0.6;
+}
+.hour-label {
+  position: absolute;
+  left: 0;
+  top: -0.6em;
+  width: var(--gutter-w);
+  padding-right: var(--s-8);
+  text-align: right;
+  color: var(--faint);
+}
+
+.day-col {
+  position: relative;
+  border-left: 1px solid var(--rule);
+  min-width: 0;
+}
+/* The current-day column is subtly lifted. */
+.day-col[data-today="true"] {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.day-col[data-past="true"] {
+  background: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+/* §1.5 — the now cursor is a hairline `paper` cursor with a gutter indicator,
+   minute-aligned. Red is reserved for destructive actions only. */
+.now-cursor {
+  position: absolute;
+  left: calc(var(--gutter-w) * -1);
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--paper);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 3;
+}
+.now-cursor::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--gutter-w) - 10px);
+  top: -3px;
+  border-left: 6px solid var(--paper);
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+}
+
+/* §5.7 Block plate — `raised` fill, 1px `line`, 2px radius, no shadow.
+   A calendar of soft cards says "your day is fine". A chart of ruled plates
+   says "here is the record". */
+.plate {
+  position: absolute;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  padding: var(--s-4) var(--s-6) var(--s-4) 12px;
+  /* Deliberately NOT `overflow: hidden`: the overrun tail has to continue
+     below the plate into the gutter (§5.6). Text is clipped per-line instead. */
+  overflow: visible;
+  text-align: left;
+  display: block;
+  color: var(--paper);
+}
+/* Project colour appears only as a 2px top border, so it never competes with
+   the drift traces. */
+.plate::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--project-colour, transparent);
+}
+.plate[data-selected="true"] {
+  border-color: var(--plot);
+  box-shadow: inset 0 0 0 1px var(--plot);
+}
+.plate[data-fixed="true"] {
+  border-style: solid;
+  border-left: 2px solid var(--muted);
+}
+.plate[data-running="true"] {
+  border-color: var(--track);
+}
+.plate[data-warn="true"] {
+  background: color-mix(in srgb, var(--over) 12%, var(--raised));
+}
+.plate .plate-title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plate .plate-time {
+  display: block;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plate .plate-footer {
+  position: absolute;
+  right: var(--s-6);
+  bottom: var(--s-2);
+}
+/* Below 28px there is room for nothing but a colour bar. */
+.plate[data-tiny="true"] {
+  padding: 0 0 0 12px;
+}
+
+.plate-drag-ghost {
+  opacity: 0.4;
+}
+
+.drop-plate {
+  position: absolute;
+  border: 1px dashed var(--plot);
+  background: color-mix(in srgb, var(--plot) 10%, transparent);
+  border-radius: var(--r-plate);
+  pointer-events: none;
+  padding: var(--s-2) var(--s-6) 0 12px;
+  color: var(--plot);
+  z-index: 4;
+}
+
+/* ─── Tasks ──────────────────────────────────────────────────────────── */
+
+.task-list {
+  overflow: auto;
+  flex: 1;
+}
+
+.group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-8);
+  padding: var(--s-12) var(--s-16) var(--s-4);
+  color: var(--muted);
+  position: sticky;
+  top: 0;
+  background: var(--ink);
+  z-index: 1;
+}
+.group-head .total {
+  margin-left: auto;
+  color: var(--faint);
+}
+
+/* §5.7 Task row — 36px, `raised` on hover, 1px `line` bottom. No hover-only
+   controls: hover-only destructive controls are unreachable by keyboard. */
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: 36px;
+  padding: 0 var(--s-16);
+  border-bottom: 1px solid var(--line);
+  width: 100%;
+  text-align: left;
+}
+.task-row:hover {
+  background: var(--raised);
+}
+.task-row[data-selected="true"] {
+  background: var(--raised);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+.task-row[data-done="true"] .task-title {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.task-title {
+  /* A <button> centres its text by default, which is wrong for a title. */
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.task-meta {
+  color: var(--muted);
+  flex: none;
+}
+
+.check {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--muted);
+  border-radius: var(--r-plate);
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.check[data-checked="true"] {
+  border-color: var(--done);
+  color: var(--done);
+}
+
+.priority-mark {
+  width: 3px;
+  height: 14px;
+  flex: none;
+  border-radius: 1px;
+}
+.priority-mark[data-p="3"] {
+  background: var(--over);
+}
+.priority-mark[data-p="2"] {
+  background: var(--track);
+}
+.priority-mark[data-p="1"] {
+  background: var(--muted);
+}
+
+/* §5.7 Tag pill — 20px, `micro`, `raised` fill, 1px `line`, colour as a 4px dot. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-4);
+  height: 20px;
+  padding: 0 var(--s-6);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  color: var(--muted);
+}
+.tag i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--plot);
+}
+
+.due-chip {
+  color: var(--muted);
+}
+.due-chip[data-overdue="true"] {
+  color: var(--over);
+}
+
+/* ─── Capture ────────────────────────────────────────────────────────── */
+
+.capture {
+  padding: var(--s-12) var(--s-16);
+  border-bottom: 1px solid var(--line);
+}
+.capture input {
+  width: 100%;
+  height: 32px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-6);
+  margin-top: var(--s-6);
+  align-items: center;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: 1px var(--s-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  color: var(--muted);
+}
+.chip[data-kind="project"] {
+  color: var(--plot);
+  border-color: color-mix(in srgb, var(--plot) 40%, var(--line));
+}
+.chip[data-kind="estimate"] {
+  color: var(--track);
+  border-color: color-mix(in srgb, var(--track) 40%, var(--line));
+}
+.chip[data-kind="due"] {
+  color: var(--paper);
+}
+.chip[data-creates="true"]::after {
+  content: "create";
+  color: var(--faint);
+}
+
+/* ─── Timer chip & pomodoro (§5.7) ───────────────────────────────────── */
+
+.timer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: 32px;
+  padding: 0 var(--s-8);
+  background: var(--raised);
+  border: 1px solid var(--track); /* the semantic colour already says "tracking" */
+  border-radius: 999px;
+  max-width: 320px;
+}
+.timer-chip[data-idle="true"] {
+  border-color: var(--line);
+  color: var(--muted);
+}
+.timer-chip .chip-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pomodoro {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-6);
+}
+.pomo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--faint);
+}
+.pomo-dot[data-state="done"] {
+  background: var(--track);
+  border-color: var(--track);
+}
+.pomo-dot[data-state="current"] {
+  background: color-mix(in srgb, var(--track) 40%, transparent);
+  border-color: var(--track);
+}
+/* The long-break dot is a square, so shape carries the distinction. */
+.pomo-dot[data-long="true"] {
+  border-radius: 0;
+}
+
+/* ─── Overlays: sheet, palette, toast (§5.7) ─────────────────────────── */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 40;
+}
+
+.sheet {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 360px;
+  max-width: 100vw;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  animation: sheet-in var(--m-sheet) var(--e-settle);
+}
+@keyframes sheet-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  padding: var(--s-12);
+  border-bottom: 1px solid var(--line);
+}
+.sheet-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--s-12);
+}
+
+.modal {
+  position: fixed;
+  left: 50%;
+  top: 12vh;
+  transform: translateX(-50%);
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sheet);
+  z-index: 41;
+  animation: sheet-in var(--m-sheet) var(--e-settle);
+}
+.modal-wide {
+  width: 680px;
+}
+
+.palette-input {
+  width: 100%;
+  height: 44px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  background: transparent;
+  padding: 0 var(--s-16);
+}
+.palette-list {
+  max-height: 50vh;
+  overflow: auto;
+  padding: var(--s-4);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  width: 100%;
+  padding: var(--s-6) var(--s-12);
+  border-radius: var(--r-plate);
+  text-align: left;
+}
+.palette-item[data-active="true"] {
+  background: var(--raised);
+}
+.palette-item mark {
+  background: none;
+  color: var(--plot);
+}
+.palette-item .hint {
+  margin-left: auto;
+  color: var(--faint);
+}
+
+.toast-stack {
+  position: fixed;
+  bottom: var(--s-20);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  z-index: 50;
+}
+.toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  min-width: 320px;
+  max-width: 520px;
+  padding: var(--s-8) var(--s-12);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--overlay-shadow);
+}
+.toast[data-tone="danger"] {
+  border-color: var(--danger);
+}
+/* Countdown as a 1px `plot` hairline along the bottom edge, paused on hover
+   or focus (§4.6, U5). */
+.toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--plot);
+  animation: toast-countdown 8s linear forwards;
+}
+.toast:hover .toast-progress,
+.toast:focus-within .toast-progress {
+  animation-play-state: paused;
+}
+@keyframes toast-countdown {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* §5.7 Empty state — centred, caption, one sentence with an inline key hint. */
+.empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: var(--s-32);
+  text-align: center;
+}
+.empty p {
+  max-width: 42ch;
+  color: var(--muted);
+}
+
+/* ─── Focus mode (§3.4) ──────────────────────────────────────────────── */
+
+.focus {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  color: var(--paper);
+  overflow: hidden;
+}
+/* Four gradients, bound to the Pomodoro phase so a break is recognisable
+   peripherally from across the room. Dark in both themes — a full-screen
+   light field defeats the purpose. */
+.focus[data-bg="desk"] {
+  background: radial-gradient(120% 90% at 20% 10%, #23303c 0%, #0e1116 60%);
+}
+.focus[data-bg="terrain"] {
+  background: radial-gradient(120% 90% at 80% 0%, #2a2f24 0%, #0e1116 62%);
+}
+.focus[data-bg="water"] {
+  background: radial-gradient(120% 90% at 50% 100%, #12313a 0%, #0e1116 62%);
+}
+.focus[data-bg="night"] {
+  background: radial-gradient(120% 90% at 50% 20%, #191c2c 0%, #0b0d12 66%);
+}
+/* Every gradient ships with a validated scrim — the glowing-text-over-gradient
+   treatment in v1 would not have held 4.5:1 (I2). */
+.focus::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.28);
+  pointer-events: none;
+}
+.focus-inner {
+  position: relative;
+  text-align: center;
+  display: grid;
+  gap: var(--s-12);
+  justify-items: center;
+}
+.focus-clock {
+  font-family: var(--font-display);
+  font-size: var(--t-display-xl);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.focus-controls {
+  position: fixed;
+  bottom: var(--s-32);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--s-8);
+  transition: opacity var(--m-fast) var(--e-out);
+}
+.focus-controls[data-hidden="true"] {
+  opacity: 0;
+}
+.focus-esc {
+  position: fixed;
+  top: var(--s-20);
+  right: var(--s-24);
+  color: var(--muted);
+  transition: opacity 600ms var(--e-out);
+}
+
+/* ─── Reconcile (§3.7) ───────────────────────────────────────────────── */
+
+.reconcile-item {
+  padding: var(--s-16);
+  border-bottom: 1px solid var(--line);
+}
+.reconcile-verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-8);
+  margin-top: var(--s-12);
+}
+.reconcile-foot {
+  display: flex;
+  gap: var(--s-16);
+  padding: var(--s-8) var(--s-16);
+  color: var(--faint);
+  border-top: 1px solid var(--line);
+}
+
+/* ─── Reports (§3.6) ─────────────────────────────────────────────────── */
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: var(--s-16);
+  margin-bottom: var(--s-16);
+}
+.panel h2 {
+  margin: 0 0 var(--s-8);
+  font-size: var(--t-label);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.bucket-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 92px;
+  align-items: center;
+  gap: var(--s-12);
+  padding: var(--s-6) 0;
+}
+.bucket-row[data-reportable="false"] {
+  color: var(--faint);
+}
+
+.scroll-y {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.view-pad {
+  padding: var(--s-16);
+  overflow: auto;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+}
+.spread {
+  justify-content: space-between;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* §5.8 — the sidebar auto-collapses below 1130px so seven day columns still
+   clear the 110px minimum legible width:
+     52 (rail) + 48 (collapsed sidebar) + 48 (gutter) + 7 × 110 = 918 ≤ 960. */
+@media (max-width: 1129px) {
+  /* At this width the day totals wrap and fight the date. Drop them; the
+     numbers are still one keystroke away in Reports. */
+  .dayname .totals,
+  .badge-offline {
+    display: none;
+  }
+}

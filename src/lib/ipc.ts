@@ -1,0 +1,216 @@
+/**
+ * The only place the renderer talks to the backend (§6.8).
+ *
+ * Every call is a typed, intent-based command. There are no SQL strings here,
+ * and the capability file lists exactly the commands below — a strictly smaller
+ * surface than a webview holding `sql:allow-execute` next to a markdown renderer.
+ *
+ * Outside a Tauri window (`npm run dev` in a browser) this falls back to a
+ * **fixture** produced by the real Rust code — see `src/dev/fixtures.json` and
+ * `cargo run --bin dump-fixtures`. It is a recording, not a second
+ * implementation: writes are refused with an explanatory error rather than
+ * being simulated, because a JS reimplementation of the command layer is
+ * exactly the drift this architecture exists to prevent.
+ */
+
+import type {
+  BacklogView,
+  CapturePreview,
+  CollisionPolicy,
+  DayReview,
+  DeletedRow,
+  IdleActionKind,
+  IntegrityReport,
+  LocalDate,
+  Millis,
+  NewBlock,
+  NewTask,
+  Page,
+  ProjectRow,
+  ReconcileAction,
+  ReconcileItem,
+  RecoveryActionKind,
+  ReportBundle,
+  SearchResults,
+  SessionRow,
+  Status,
+  TagRow,
+  TaskDetail,
+  TaskPatch,
+  TaskQuery,
+  TaskRow,
+  TimerState,
+  UndoToken,
+  WeekView,
+  WireError,
+} from "./types";
+import type { BlockRow } from "./types";
+
+type Args = Record<string, unknown>;
+
+export const isDesktop = (): boolean =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+export class CommandError extends Error {
+  code: string;
+  constructor(wire: WireError) {
+    super(wire.message);
+    this.code = wire.code;
+    this.name = "CommandError";
+  }
+}
+
+let fixtures: Record<string, unknown> | null = null;
+
+async function loadFixtures(): Promise<Record<string, unknown>> {
+  if (!fixtures) {
+    fixtures = (await import("../dev/fixtures.json")).default as Record<string, unknown>;
+  }
+  return fixtures;
+}
+
+async function call<T>(command: string, args: Args = {}): Promise<T> {
+  if (isDesktop()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    try {
+      return (await invoke(command, args)) as T;
+    } catch (raw) {
+      if (raw && typeof raw === "object" && "code" in raw && "message" in raw) {
+        throw new CommandError(raw as WireError);
+      }
+      throw new CommandError({ code: "unknown", message: String(raw) });
+    }
+  }
+
+  const data = await loadFixtures();
+  if (command in data) return structuredClone(data[command]) as T;
+  throw new CommandError({
+    code: "fixture",
+    // §3.10 error copy: what failed · why · the action.
+    message: `Can't ${command.replace(/_/g, " ")} in browser preview. This build has no backend attached. Run \`npm run app\` for the real thing.`,
+  });
+}
+
+/** Events pushed from Rust — the renderer never polls (§6.8). */
+export async function listen<T>(event: string, handler: (payload: T) => void): Promise<() => void> {
+  if (!isDesktop()) return () => {};
+  const { listen: tauriListen } = await import("@tauri-apps/api/event");
+  const un = await tauriListen<T>(event, (e) => handler(e.payload));
+  return un;
+}
+
+/* ─── read ─────────────────────────────────────────────────────────────── */
+
+export const getWeek = (from: LocalDate, to: LocalDate, tz: string) =>
+  call<WeekView>("get_week", { range: { from, to }, tz });
+
+export const getBacklog = (tz: string, projectId?: string | null, unscheduledOnly = false) =>
+  call<BacklogView>("get_backlog", { filter: { projectId, unscheduledOnly }, tz });
+
+export const getTasks = (query: TaskQuery) => call<Page<TaskRow>>("get_tasks", { query });
+
+export const getTaskDetail = (id: string) => call<TaskDetail>("get_task_detail", { id });
+
+export const getProjects = (tz: string) => call<ProjectRow[]>("get_projects", { tz });
+
+export const getTags = () => call<TagRow[]>("get_tags", {});
+
+export const getReports = (from: LocalDate, to: LocalDate, tz: string, projectId?: string | null) =>
+  call<ReportBundle>("get_reports", { range: { from, to }, filter: { tz, projectId } });
+
+export const getReconcileItems = (date: LocalDate, tz: string) =>
+  call<ReconcileItem[]>("get_reconcile_items", { date, tz });
+
+export const getUnreconciledDays = (before: LocalDate) =>
+  call<LocalDate[]>("get_unreconciled_days", { before });
+
+export const search = (q: string, limit = 30) => call<SearchResults>("search", { q, limit });
+
+export const parseCapture = (text: string, tz: string) =>
+  call<CapturePreview>("parse_capture", { text, tz });
+
+export const getSettings = () => call<Record<string, unknown>>("get_settings", {});
+
+export const getDeleted = () => call<DeletedRow[]>("get_deleted", {});
+
+export const getTimerState = () => call<TimerState>("get_timer_state", {});
+
+/* ─── write ────────────────────────────────────────────────────────────── */
+
+export const createTask = (input: NewTask) => call<TaskRow>("create_task", { input });
+
+export const updateTask = (id: string, patch: TaskPatch) =>
+  call<TaskRow>("update_task", { id, patch });
+
+export const setTaskStatus = (id: string, status: Status) =>
+  call<TaskRow>("set_task_status", { id, s: status });
+
+export const deleteTask = (id: string) => call<UndoToken>("delete_task", { id });
+
+export const restore = (token: UndoToken) => call<void>("restore", { token });
+
+export const createProject = (name: string, colour?: string, weeklyTargetSec?: number | null) =>
+  call<ProjectRow>("create_project", { input: { name, colour, weeklyTargetSec } });
+
+export const deleteProject = (id: string, moveTasksToInbox: boolean) =>
+  call<UndoToken>("delete_project", { id, moveTasksToInbox });
+
+export const scheduleBlock = (input: NewBlock) => call<BlockRow>("schedule_block", { input });
+
+export const moveBlock = (id: string, startsAt: Millis, policy: CollisionPolicy = "overlap") =>
+  call<BlockRow[]>("move_block", { id, startsAt, policy });
+
+export const resizeBlock = (id: string, durationSec: number) =>
+  call<BlockRow>("resize_block", { id, durationSec });
+
+export const unscheduleBlock = (id: string) => call<UndoToken>("unschedule_block", { id });
+
+export const duplicateBlock = (id: string) => call<BlockRow>("duplicate_block", { id });
+
+export const setBlockFixed = (id: string, isFixed: boolean) =>
+  call<BlockRow>("set_block_fixed", { id, isFixed });
+
+export const startTimer = (taskId: string, blockId?: string | null) =>
+  call<TimerState>("start_timer", { taskId, blockId: blockId ?? null });
+
+export const stopTimer = () => call<TimerState>("stop_timer", {});
+
+export const resolveIdle = (kind: IdleActionKind) =>
+  call<TimerState>("resolve_idle", { action: { kind } });
+
+export const resolveRecovery = (id: string, kind: RecoveryActionKind) =>
+  call<TimerState>("resolve_recovery", { id, a: { kind } });
+
+export const addSession = (input: {
+  taskId: string;
+  blockId?: string | null;
+  startedAt: Millis;
+  endedAt: Millis;
+  note?: string | null;
+}) => call<SessionRow>("add_session", { input });
+
+export const updateSession = (
+  id: string,
+  patch: { startedAt?: Millis; endedAt?: Millis; blockId?: string | null; isConfirmed?: boolean },
+) => call<SessionRow>("update_session", { id, p: patch });
+
+export const deleteSession = (id: string) => call<UndoToken>("delete_session", { id });
+
+export const saveNote = (taskId: string, markdown: string) =>
+  call<void>("save_note", { taskId, markdown });
+
+export const applyReconcile = (date: LocalDate, actions: ReconcileAction[], tz: string) =>
+  call<DayReview>("apply_reconcile", { date, actions, tz });
+
+export const setSetting = (key: string, value: unknown) =>
+  call<void>("set_setting", { key, value });
+
+export const exportData = (format: "json" | "csv" | "ics", path: string, tz: string) =>
+  call<{ paths: string[] }>("export_data", { format, path, tz });
+
+export const importData = (path: string, mode: "merge" | "replace" | "append") =>
+  call<{ tasks: number; skipped: number }>("import_data", { path, mode });
+
+export const runIntegrityCheck = () => call<IntegrityReport>("run_integrity_check", {});
+
+export const rebuildCaches = () => call<void>("rebuild_caches", {});
