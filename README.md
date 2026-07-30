@@ -29,6 +29,7 @@ src/                   React renderer. Holds no SQL and no business logic.
   styles/tokens.css    The §5 design system, one file
   components/DriftRail.tsx   The signature, at all three scales (§5.6)
 scripts/check-ui.mjs   The UI half of §8 that a headless browser can check
+scripts/gen-icons.py   Regenerates every bundle icon from the brand mark
 ```
 
 The split between `fruit-core` and `src-tauri` is the load-bearing decision.

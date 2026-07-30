@@ -26,13 +26,21 @@
     ],
     "security": {
       "csp": "default-src 'self'; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-src 'none'",
-      "assetProtocol": { "enable": false }
+      "assetProtocol": {
+        "enable": false
+      }
     }
   },
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.png"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "category": "Productivity",
     "shortDescription": "Plan, track, and close the gap.",
     "longDescription": "Fruit is a local-first planner, tracker and reconciler. It stores everything in plain SQLite on your own disk, makes no network calls, and shows you the drift between what you planned and what you actually did."
