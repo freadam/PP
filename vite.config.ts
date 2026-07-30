@@ -7,7 +7,17 @@ import tailwind from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwind()],
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    watch: {
+      // Never watch the Rust side. `cargo` writes proc-macro DLLs into
+      // src-tauri/target while it compiles, and on Windows the watcher grabs
+      // one mid-write and dies with EBUSY — taking the whole dev command with
+      // it. Nothing under here is a frontend source file anyway.
+      ignored: ["**/src-tauri/**", "**/target/**"],
+    },
+  },
   build: {
     target: "es2022",
     // Devtools are disabled in release (§7.3); source maps stay off so the
