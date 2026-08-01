@@ -99,6 +99,7 @@ impl Store {
             duration_sec: 3600,
             tz: tz.to_string(),
             is_fixed: false,
+            rrule: None,
         })?;
 
         let session_id = new_id();

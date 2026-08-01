@@ -143,6 +143,14 @@ export function ReconcileSheet() {
               {fmt.duration(review.trackedSec)} · unplanned{" "}
               {fmt.duration(review.unplannedSec)}
             </p>
+            {/* §2.3 — the streak is stated where it is earned, once, in plain
+                caption type. It is not a badge, a flame or a thing you can
+                lose: closing the day is the habit, and this is the receipt. */}
+            {review.streakDays > 1 && (
+              <p className="caption">
+                {review.streakDays} days reconciled in a row.
+              </p>
+            )}
             <div className="row">
               <button className="btn btn-primary" autoFocus onClick={() => close(null)}>
                 Done

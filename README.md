@@ -23,8 +23,11 @@ crates/fruit-core/     Everything Fruit knows how to do. No UI, no Tauri.
   src/store/           The intent-based command layer (§6.8)
   src/parser.rs        The capture grammar (§4.4)
   src/clock.rs         Wall vs monotonic time — why sleep is never counted
+  src/rrule.rs         The RFC 5545 subset behind repeating blocks
+  src/ics.rs           Read-only calendar import
   tests/               The §8 acceptance criteria, plus query-plan guards
 src-tauri/             The shell: windows, tray, clock loop, IPC. Its own workspace.
+  src/frontmost.rs     Which app is in front, per platform — and why, where it can't
 src/                   React renderer. Holds no SQL and no business logic.
   styles/tokens.css    The §5 design system, one file
   components/DriftRail.tsx   The signature, at all three scales (§5.6)
@@ -46,7 +49,7 @@ npm run app          # the real thing: Tauri window + SQLite on disk
 
 ```bash
 npm run dev          # browser preview, reading recorded DTOs (see below)
-cargo test           # 76 tests, incl. the §8 acceptance criteria
+cargo test           # 103 tests, incl. the §8 acceptance criteria
 node scripts/check-ui.mjs      # I1, I3–I7, U10 against `npm run preview`
 ```
 
@@ -87,7 +90,34 @@ blocks the app; `Esc` defers, and a deferred day auto-accepts after seven.
 
 **Calibrate.** Trailing 30-day `tracked ÷ estimate`, bucketed by estimate size,
 median not mean, reported only at n ≥ 5. Planned-vs-tracked per project per
-week. Weekly targets with pace-to-date.
+week. Weekly targets with pace-to-date. And, if you turn it on, Activity: which
+applications were actually in front of you during the block you plotted — the
+one report that compares an intention against an *observation* rather than
+against Fruit's own record.
+
+**Repeat.** A repeating block is a series of real, individually trackable
+blocks, materialised 90 days ahead and topped up as you scroll — not a rule
+drawn over an empty calendar. Removing one always asks whether you mean this
+occurrence, this and later, or all of them. Local `.ics` files import
+read-only, as fixed blocks; re-importing the same file updates in place rather
+than doubling every meeting.
+
+### Activity, and what it promises
+
+Off until you switch it on, and every promise is a control in Settings rather
+than a sentence in a privacy policy:
+
+- Applications and window titles are **separate** switches, and titles stay off
+  when you enable applications.
+- A per-app exclusion list, plus title fragments that suppress the title while
+  still recording the app. Both are applied **before** the row is written, so an
+  excluded app cannot resurface later through a query, an export or a backup.
+- Pause survives a restart. Retention is 30 days, 90 days or forever, with the
+  next purge date on screen. "Delete everything recorded" is one button.
+- While it is sampling, the top bar says **Recording** — driven by the sampler
+  actually writing a row, not by the setting being on.
+
+Nothing leaves the machine, because nothing in Fruit ever does.
 
 ## What it doesn't do
 
@@ -99,11 +129,11 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 
 | Part | Status |
 |---|---|
-| `fruit-core` | Complete and tested — 76 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
-| Renderer | Complete for P0 + P1; verified in a headless browser (I1, I3–I7, U10) |
+| `fruit-core` | Complete and tested — 103 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
+| Renderer | Complete for P0 + P1 + P2; verified in a headless browser (I1, I3–I7, U10) across every view |
 | `src-tauri` | Compiles and runs on **Windows** (x64, MSVC). Not built on macOS or Linux yet. See below. |
-| Activity (§3.5) | P2, deliberately not built. The view says so and explains Wayland. |
-| Recurring blocks, `.ics` import | P2, not built. `rrule`/`series_id` exist in the schema. |
+| Activity (§3.5) | Built. Off by default. Sampling implemented on Windows; macOS and X11 are stubs that say so, Wayland says why it can't. |
+| Recurring blocks, `.ics` import | Built. An RFC 5545 subset — `DAILY`/`WEEKLY`/`MONTHLY` with `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT`, `UNTIL`. |
 
 `src-tauri` cannot be compiled in the container this repo was developed in —
 linking needs a system webview and there is none — so it is the one part not

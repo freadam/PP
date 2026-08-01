@@ -23,7 +23,6 @@ import type {
   IntegrityReport,
   LocalDate,
   Millis,
-  NewBlock,
   NewTask,
   Page,
   ProjectRow,
@@ -44,7 +43,15 @@ import type {
   WeekView,
   WireError,
 } from "./types";
-import type { BlockRow } from "./types";
+import type {
+  ActivityDay,
+  ActivityStatus,
+  BlockRow,
+  IcsImportSummary,
+  NewBlock,
+  RrulePreset,
+  SeriesScope,
+} from "./types";
 
 type Args = Record<string, unknown>;
 
@@ -214,3 +221,39 @@ export const importData = (path: string, mode: "merge" | "replace" | "append") =
 export const runIntegrityCheck = () => call<IntegrityReport>("run_integrity_check", {});
 
 export const rebuildCaches = () => call<void>("rebuild_caches", {});
+
+/* ─── P2: recurrence, .ics, activity ───────────────────────────────────── */
+
+export const scheduleRecurring = (input: NewBlock, rrule: string) =>
+  call<BlockRow[]>("schedule_recurring", { input, rrule });
+
+export const unscheduleSeries = (id: string, scope: SeriesScope) =>
+  call<UndoToken>("unschedule_series", { id, scope });
+
+/** Keeps series materialised as far as the planner is being asked to show. */
+export const extendSeriesTo = (through: LocalDate) =>
+  call<number>("extend_series_to", { through });
+
+/** Makes a block that already exists the seed of a series, in place. */
+export const repeatBlock = (id: string, rrule: string) =>
+  call<BlockRow[]>("repeat_block", { id, rrule });
+
+export const describeRrule = (rrule: string) => call<string>("describe_rrule", { rrule });
+
+export const getRrulePresets = () => call<RrulePreset[]>("get_rrule_presets", {});
+
+export const importIcs = (path: string, tz: string) =>
+  call<IcsImportSummary>("import_ics", { path, tz });
+
+/** The OS picker. `null` when the user cancelled — not an error. */
+export const pickIcsFile = () => call<string | null>("pick_ics_file", {});
+
+export const getActivitySettings = () => call<ActivityStatus>("get_activity_settings", {});
+
+export const setActivitySetting = (key: string, value: unknown) =>
+  call<ActivityStatus>("set_activity_setting", { key, value });
+
+export const getActivityDay = (date: LocalDate, tz: string) =>
+  call<ActivityDay>("get_activity_day", { date, tz });
+
+export const clearActivity = () => call<number>("clear_activity", {});

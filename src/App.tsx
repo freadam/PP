@@ -16,9 +16,11 @@ import { Planner } from "./views/Planner";
 import { Tasks } from "./views/Tasks";
 import { TaskDetail } from "./views/TaskDetail";
 import { Reports } from "./views/Reports";
-import { Activity, Settings } from "./views/Settings";
+import { Settings } from "./views/Settings";
+import { Activity } from "./views/Activity";
 import { Focus } from "./views/Focus";
 import { ReconcileSheet } from "./views/Reconcile";
+import { BlockDialogs } from "./components/BlockDialogs";
 import type { TimerState } from "./lib/types";
 import { BREAK_DETAIL_COLUMN, useViewportWidth } from "./lib/useViewport";
 
@@ -54,6 +56,12 @@ export default function App() {
       .then((u) => unsubs.push(u));
     void ipc
       .listen<TimerState>("timer:recovery-required", setTimer)
+      .then((u) => unsubs.push(u));
+    /* §3.5 — the recording indicator is driven by the sampler itself, not by a
+       renderer timer: it lights because a sample was actually written, which is
+       the only honest reason to tell someone they are being recorded. */
+    void ipc
+      .listen<void>("activity:sampled", () => useApp.getState().noteSample())
       .then((u) => unsubs.push(u));
     void ipc
       .listen<string>("backup:failed", (why) =>
@@ -110,6 +118,7 @@ export default function App() {
       {overlay === "focus" && <Focus />}
       {detail && detailMode === "sheet" && overlay === "detail" && <TaskDetail mode="sheet" />}
 
+      <BlockDialogs />
       <RecoveryModal />
       <IdleBanner />
       <Toasts />

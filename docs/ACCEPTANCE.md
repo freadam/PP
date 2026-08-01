@@ -36,7 +36,7 @@ node scripts/check-ui.mjs                   # I1, I3–I7, U10 (needs `npm run p
 | U7 | `kill -9` recovery trims to the last heartbeat, ±30s | `u7_recovery_trims_to_the_last_heartbeat` | ✅ |
 | U8 | First run seeds a project with one already-drifted block | `u8_first_run_seeds_a_visible_drift_rail` | ✅ |
 | U9 | Purposeful empty states; failed writes say what/why/next | Every view has one (`Empty`); `store.run()` is the single funnel that turns a `WireError` into copy | visual |
-| U10 | Focus visible on every interactive element | `check-ui.mjs` walks 40 focusable elements and asserts a ≥2px outline or a box-shadow | ✅ |
+| U10 | Focus visible on every interactive element | `check-ui.mjs` walks every visible focusable element on all five views and asserts a ≥2px outline or a box-shadow. It navigates by `G then <key>`, never a click — `:focus-visible` stops matching programmatic focus once the page has seen a mouse interaction | ✅ |
 | U11 | Reconcile never blocks; `Esc` defers; deferred days auto-accept after 7 | `u11_deferred_days_auto_accept_after_a_week` | ✅ |
 
 ## UI (I)
@@ -45,9 +45,9 @@ node scripts/check-ui.mjs                   # I1, I3–I7, U10 (needs `npm run p
 |---|---|---|---|
 | I1 | Every colour resolves to a §5.2 token | `check-ui.mjs` greps every component for a literal hex/rgb/hsl | ✅ |
 | I2 | Contrast ≥4.5:1 body, ≥3:1 graphics, both themes, **including Focus text over all four gradients** | Not automated. Every gradient ships with a validated 28% scrim (`.focus::before`), which is the mechanism §4.7 asks for, but the ratios have not been measured. **Open.** | ❌ |
-| I3 | No drift state distinguishable by colour alone | The §5.6 redundancy table is implemented as texture (dashed / solid / dotted / 45° hatch) + badge + `aria-label`; `check-ui.mjs` asserts every rail carries a text alternative | ✅ |
+| I3 | No drift state distinguishable by colour alone | The §5.6 redundancy table is implemented as texture (dashed / solid / dotted / 45° hatch) + badge + `aria-label`; `check-ui.mjs` asserts every rail and every Activity bar either carries a text alternative or is explicitly `aria-hidden` because the same fact is already text beside it | ✅ |
 | I4 | Tabular figures on every changing numeral | `check-ui.mjs` reads computed `font-variant-numeric` on `.data`, `.micro`, `.focus-clock` | ✅ |
-| I5 | Holds at 960×640, at each §5.8 breakpoint, and at 125% text | `check-ui.mjs` asserts zero horizontal overflow at 960 / 1130 / 1280 / 1490 and at 125% root font size | ✅ |
+| I5 | Holds at 960×640, at each §5.8 breakpoint, and at 125% text | `check-ui.mjs` asserts zero horizontal overflow at 960 / 1130 / 1280 / 1490 and at 125% root font size, on every view rather than only the one that opens first | ✅ |
 | I6 | `prefers-reduced-motion` disables settle, drift and transitions | `check-ui.mjs` loads with `reducedMotion: "reduce"` and asserts no element has a duration > 50ms | ✅ |
 | I7 | Fonts load from the bundle, no network request | `check-ui.mjs` fails on any request outside the origin. Note the woff2 files are **not vendored** yet (see `src/assets/fonts/README.md`) — the check proves no CDN is reached, not that the bundled faces render | ✅ / partial |
 | I8 | Tray icon legible at 16px, communicates state without a badge | The mark is the drift rail as a monogram (`src-tauri/icons/`, `BrandMark`). Legibility at 16px on a real menu bar is unverified. **Open.** | ❌ |
@@ -70,13 +70,37 @@ node scripts/check-ui.mjs                   # I1, I3–I7, U10 (needs `npm run p
 | D12 | `<img src=x onerror=…>` renders inert | `d12_notes_are_stored_verbatim_not_executed` for storage; `Markdown.tsx` never calls `dangerouslySetInnerHTML` and never parses raw HTML, so React escapes it | ✅ / structural |
 | D13 | A second launch focuses the existing window | `tauri-plugin-single-instance` wired in `lib.rs`. Needs a desktop session. **Open.** | ❌ |
 
+## P2 (§2, phase-tagged features)
+
+The spec tags recurrence, `.ics` import and Activity as P2. They are
+implemented, and here is what holds them up.
+
+| Feature | Covered by | Runs |
+|---|---|---|
+| A repeating block is a series of *real*, trackable blocks | `a_recurring_block_produces_trackable_instances` — starts a timer on an instance and asserts it carries drift like any other block | ✅ |
+| "Make this repeat" keeps the block, its task and its tracked time | `repeating_an_existing_block_keeps_its_tracked_time`; it also asserts a second rule on a live series is refused rather than silently rewriting the future | ✅ |
+| Removing an occurrence asks its scope, and undo restores the scope | `series_edits_have_an_explicit_scope` (instance / future / all, with a restore in the middle) | ✅ |
+| The repeat picker cannot offer a rule the engine refuses | `every_repeat_preset_parses_and_describes_itself` — the list is generated from `rrule::PRESETS` and served over IPC, so the renderer holds no copy | ✅ |
+| The RRULE subset is the documented one, and refuses what it can't do | 10 tests in `rrule.rs`: `BYSETPOS`, `FREQ=YEARLY` and `2MO` are errors, not silent misreadings | ✅ |
+| `.ics` events import as fixed blocks, and re-importing updates in place | `ics_import_creates_fixed_blocks_and_is_idempotent` | ✅ |
+| A repeating meeting imports as a series, using the same engine | `ics_recurring_events_expand` | ✅ |
+| Folded lines, `TZID=`, floating times and `PT1H30M` durations parse | 7 tests in `ics.rs` | ✅ |
+| Off by default; titles a separate switch; exclusions applied before the row is written | `activity_respects_the_privacy_contract` — every clause of §3.5's promise, asserted against the store rather than the UI | ✅ |
+| A run of samples becomes one span, not a row every 20 seconds | `activity_samples_coalesce_into_spans` | ✅ |
+| Correlation is deterministic when two apps tie | `activity_correlates_with_the_block_underneath_it` asserts the tie-break; without it `HashMap` seeding decided which app "you were mostly in" | ✅ |
+| Retention purges at the limit | `activity_purges_at_the_retention_limit` | ✅ |
+| The recording indicator only lights when a row was actually written | Driven by the `activity:sampled` event, emitted from `record_activity`'s `Ok(true)` arm | structural |
+| A platform that cannot sample says why | `frontmost::Support::describe()`, printed in Settings next to the switch. The Windows FFI path itself needs a Windows desktop. **Open.** | ❌ |
+
 ---
 
 ## Not verified in this environment
 
 Five criteria are honestly open: **I2** (measured contrast over the Focus
 gradients), **I8** (tray legibility on a real menu bar), **D4** (a real
-`SIGKILL` mid-write), **D13** (second-instance focus), and everything that
-depends on `src-tauri` compiling — this container has no system webview, so
-that crate has never been through a compiler. They are the first things to
-check on a machine with a desktop session.
+`SIGKILL` mid-write), **D13** (second-instance focus), and the Windows
+frontmost-window FFI, which needs a Windows desktop to exercise. This container
+has no system webview, so `src-tauri` cannot be compiled here — it has built on
+Windows (see the README), but every change to that crate since is unverified
+until it is built again. They are the first things to check on a machine with a
+desktop session.

@@ -72,8 +72,88 @@ export interface BlockRow {
   localDate: LocalDate;
   tz: string;
   isFixed: boolean;
+  /** Set on every instance of a repeating series (§2.3, P2). */
+  seriesId: string | null;
+  /** The rule itself, carried by the seed instance. */
+  rrule: string | null;
+  /** The VEVENT UID when this block came from a `.ics` file. */
+  externalUid: string | null;
   createdAt: Millis;
   updatedAt: Millis;
+}
+
+/** Which occurrences an edit to a series applies to. */
+export type SeriesScope = "instance" | "future" | "all";
+
+/**
+ * A repeat preset, described by the same Rust that parses it. The renderer
+ * holds no list of its own — a second list drifts, and the day it disagrees
+ * the picker offers a rule the engine refuses.
+ */
+export interface RrulePreset {
+  label: string;
+  rrule: string;
+  description: string;
+}
+
+// ─── activity (§3.5, P2) ───────────────────────────────────────────────
+
+export type ActivitySupport = "full" | "impossible" | "notImplemented";
+
+export interface ActivitySettings {
+  enabled: boolean;
+  /** Separate from `enabled`, and off even when apps are on. */
+  titlesEnabled: boolean;
+  paused: boolean;
+  excludedApps: string[];
+  excludedTitlePatterns: string[];
+  /** 30 / 90 / 0 for forever. */
+  retentionDays: number;
+  nextPurgeAt: Millis | null;
+}
+
+export interface ActivityStatus {
+  support: ActivitySupport;
+  /** Why this platform can or cannot do it — always shown, never implied. */
+  supportNote: string;
+  settings: ActivitySettings;
+}
+
+export interface ActivitySpanRow {
+  id: number;
+  startedAt: Millis;
+  endedAt: Millis;
+  appId: string;
+  windowTitle: string | null;
+}
+
+export interface AppTotal {
+  appId: string;
+  seconds: number;
+}
+
+export interface BlockCorrelation {
+  blockId: string;
+  title: string;
+  startsAt: Millis;
+  durationSec: number;
+  topApps: AppTotal[];
+}
+
+export interface ActivityDay {
+  localDate: LocalDate;
+  spans: ActivitySpanRow[];
+  byApp: AppTotal[];
+  correlations: BlockCorrelation[];
+  trackedSec: number;
+}
+
+export interface IcsImportSummary {
+  imported: number;
+  updated: number;
+  recurringInstances: number;
+  skipped: number;
+  note: string;
 }
 
 export interface SessionRow {
@@ -246,6 +326,8 @@ export interface DayReview {
   blocksUntouched: number;
   calibrationRatio: number | null;
   takeaway: string;
+  /** Consecutive reconciled days including this one (§2.3). */
+  streakDays: number;
 }
 
 export interface CalibrationBucket {
@@ -398,6 +480,8 @@ export interface NewBlock {
   durationSec: number;
   tz: string;
   isFixed?: boolean;
+  /** Present means "make this a series" (§2.3, P2). */
+  rrule?: string | null;
 }
 
 export interface TaskQuery {

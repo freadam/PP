@@ -141,7 +141,10 @@ export function Reports() {
                   <span className="dot" style={{ background: t.projectColour }} />
                   <span style={{ width: 150 }}>{t.projectName}</span>
                   <span className="grow">
-                    <span className="rail-bar">
+                    {/* Decorative (I3): the tracked total, the target and
+                        "behind pace" are all read out as text on this row, so a
+                        label here would repeat the same fact a third time. */}
+                    <span className="rail-bar" aria-hidden="true">
                       <span className="track" style={{ width: `${pct}%` }} />
                       {/* The pace marker is the plot line: where you should be by now. */}
                       <span className="plot" style={{ left: 0, width: `${pacePct}%` }} />

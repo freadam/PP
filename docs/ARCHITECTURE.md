@@ -156,6 +156,64 @@ ends there. Two mechanisms, but only where the boundary genuinely differs.
 Both paths remain optional. `S` then arrows schedules and nudges without a
 pointer, and the drag is never the only route to anything (§4.3, U1).
 
+## Why recurring blocks are materialised rows
+
+A repeating block could be a rule the planner draws on the fly. It is instead
+90 days of real `scheduled_block` rows sharing a `series_id`, and the reason is
+data rule 7 below: a `time_session` links to a block **by id**.
+
+A virtual occurrence has no id. So it cannot be tracked against, cannot carry
+drift, cannot appear in Reconcile, and cannot be moved without inventing an
+exception table to remember that you moved it. Every one of those is a feature
+that already works for ordinary blocks and would silently stop working for
+repeating ones — a second-class block that looks identical and does less.
+
+Real rows keep all of it, at the cost of a horizon:
+
+- `schedule_recurring` (new block) and `repeat_block` (one you already have)
+  both write a seed carrying the `rrule`, then materialise forward.
+- `extend_series_to` runs before every week load. It is idempotent — an
+  instance that already exists on a date is left alone — so scrolling past the
+  edge tops the series up instead of finding nothing there.
+- Instances are placed by the seed's **local wall clock**, not by adding
+  intervals to its instant, so a 09:00 series stays at 09:00 across a DST
+  boundary. A date whose local day cannot hold the block is skipped rather than
+  written as a block that crosses midnight.
+- Removing an occurrence always asks its scope — this one, this and later, all
+  of them. Inferring it is not a convenience; it is data loss with a friendly
+  name. The undo token restores the whole scope in one step, which is what makes
+  asking safe rather than merely careful.
+
+`.ics` import uses the same engine: a repeating meeting is a series in Fruit
+too. Imported blocks are `is_fixed` because that is what an external meeting is
+— the thing you plan *around* — and they carry the VEVENT `UID`, so
+re-importing the same calendar updates in place instead of doubling every
+meeting.
+
+## Why Activity's privacy contract lives below the IPC boundary
+
+Activity samples the frontmost application. Every promise it makes — off by
+default, titles separate from apps, a per-app exclusion list, a retention
+window — is enforced in `store::activity::record_activity`, which applies the
+filtering **on the way in**.
+
+That placement is the whole point. If the shell's sampler decided what to
+record, a bug there could write something the user excluded, and the exclusion
+would then be defeated permanently: the row exists, and it will surface in a
+query, an export or a backup long after the bug is fixed. Filtering on read
+would be worse — it would be a promise that only holds inside the UI.
+
+So the shell does one thing: ask the OS what is in front and hand it over. It
+holds no policy at all. `frontmost::Support::describe()` supplies the sentence
+Settings prints next to the switch, so a platform that cannot do this says why
+— Wayland does not let an application see the focused window, and that is
+stated rather than shown as a greyed-out control with no explanation.
+
+The recording indicator in the top bar is driven by the `activity:sampled`
+event, which fires only when a row was actually written. An indicator wired to
+the settings flag would claim to be recording while paused or while every
+sample was being excluded.
+
 ## Why the browser preview reads recorded output
 
 `npm run dev` in a browser has no backend. The tempting fix is a JavaScript

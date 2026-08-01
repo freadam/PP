@@ -83,6 +83,27 @@
   color-scheme: dark;
 }
 
+/* ─── Activity's categorical ramp (§3.5, P2) ─────────────────────────────
+   The drift axis above is *ordinal* — cool plan, warm actual — and reusing it
+   for "which app" would say a hue means overrun in one panel and Slack in the
+   next. So Activity gets its own closed set: eight hues at one lightness, no
+   ranking implied, and identical in both themes because the swatches sit on
+   their own filled bars rather than on the page. The mapping from an app name
+   to a hue is a hash in `Activity.tsx`; the colours themselves live here, so
+   `check-ui.mjs` I1 still holds — no component invents a colour. */
+:root {
+  --app-1: #3fa8bd;
+  --app-2: #c98a2e;
+  --app-3: #c9603f;
+  --app-4: #4fa374;
+  --app-5: #8b7fd4;
+  --app-6: #c2609b;
+  --app-7: #7fa440;
+  --app-8: #5b8fc4;
+  /* Ink on a filled app bar. Fixed, because the bars themselves are fixed. */
+  --app-ink: #0e1116;
+}
+
 /* ─── §5.9 Light theme · semantic hues darken to hold 4.5:1 ──────────── */
 :root[data-theme="light"] {
   --ink: #f5f6f8;

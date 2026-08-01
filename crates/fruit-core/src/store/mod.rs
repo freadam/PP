@@ -18,10 +18,12 @@ use crate::error::{AppError, Result};
 use crate::model::*;
 use crate::time::now_ms;
 
+mod activity;
 mod blocks;
 mod data;
 mod projects;
 mod reconcile;
+mod recurrence;
 mod reports;
 mod search;
 mod seed;
@@ -29,6 +31,8 @@ mod tasks;
 mod timer;
 mod week;
 
+pub use activity::{ENABLED as ACTIVITY_ENABLED, PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS};
+pub use recurrence::{IcsImportSummary, SeriesScope, HORIZON_DAYS};
 pub use timer::{IdleReport, TimerRuntime};
 
 pub struct Store {
@@ -136,6 +140,7 @@ impl Store {
             "task" => "task",
             "project" => "project",
             "block" => "scheduled_block",
+            "series" => return self.restore_series(&token.id),
             "session" => return self.restore_session(&token.id),
             other => return Err(AppError::invalid(format!("Cannot restore a {other}."))),
         };

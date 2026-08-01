@@ -1,6 +1,6 @@
 # Where this build departs from the spec
 
-Seven deviations. Each one names the spec text it changes and the reason. Most
+Nine deviations. Each one names the spec text it changes and the reason. Most
 are cases where following the spec literally would produce a broken app, or
 where the spec left a decision open (§9). Two — §5 and §6 — are changes the
 product owner asked for after seeing the build.
@@ -75,7 +75,7 @@ The spec left nine decisions open. This build had to pick; each is reversible.
 | 3. Visual direction | **The instrument** — flat plates, hairlines, no shadows, no gradient mark | The recovery path if it reads as unfinished is documented in §5.1: warm the surface tokens, raise the radius to 4px. Not shadows. |
 | 4. Now cursor | **`paper` hairline with a gutter indicator** | Red stays reserved for destructive actions. |
 | 5. Pomodoro strip | **4 dots**, long break as a square | Shape carries the distinction, so it survives at 6px. |
-| 6. Activity in 1.0 | **No, P2** | Furthest from the loop, worst platform story. The view says so plainly rather than hiding. |
+| 6. Activity in 1.0 | **Yes, built** (revised — see §8) | Deferred at first as the item furthest from the loop; built once P0 and P1 were done, because the correlation panel is what makes CALIBRATE more than a self-report. |
 | 7. Subtask depth | **Capped at 3**, as specified | Enforced in the command layer and tested. |
 | 8. Subtask estimates | **Independent, rolled up for display only** | Roll-up is shown as `3/7 · 45m of 2h`; the parent's own estimate is never silently overwritten. |
 | 9. Fonts | **Space Grotesk / Instrument Sans / Commit Mono**, referenced but not vendored | Third-party binaries are a release decision. `src/assets/fonts/README.md` explains. Never a CDN. |
@@ -137,3 +137,48 @@ On Linux it returns `None` — X11 could answer through the XScreenSaver
 extension and Wayland cannot answer at all — and the timer falls back to input
 reported by Fruit's own window. That fallback is narrower, and Settings says so
 rather than pretending, which is the same honesty §3.5 demands of Activity.
+
+---
+
+## 8. Activity was built, and §9.6 is now decided the other way
+
+**Spec §9.6** asked whether Activity ships in 1.0 and recommended deferring it —
+correctly, at the time: it is the feature furthest from the plan–track–reconcile
+loop and it has the worst platform story of anything in the spec.
+
+It is now built, because the argument for deferring it stops holding once the
+loop itself is finished. CALIBRATE otherwise compares Fruit's record against
+Fruit's record: an estimate against a timer that the same person started and
+stopped. Activity is the only place an intention meets an *observation*, and
+the sentence "you were in Slack for the hour you plotted for the refactor" is
+not reachable any other way.
+
+What the spec worried about is handled rather than argued away:
+
+- **Platform.** Only Windows can do this today, through `GetForegroundWindow`
+  and `QueryFullProcessImageNameW` — raw FFI, no new crates, no permissions.
+  macOS needs an Accessibility grant and X11 needs `_NET_ACTIVE_WINDOW`; both
+  are stubs that say they are stubs. Wayland cannot do it at all, by design, and
+  says exactly that. `Support::describe()` is printed in Settings next to the
+  switch, so a platform that cannot sample never shows a greyed-out control with
+  no explanation.
+- **Privacy.** Enforced in `store::activity`, below the IPC boundary, on the way
+  in. See `docs/ARCHITECTURE.md`.
+
+Nothing else in §9 changed.
+
+---
+
+## 9. `repeat_block` refuses to change a live rule
+
+**Spec §2.3** lists recurring blocks without saying what happens when someone
+changes the rule on a series that already exists.
+
+This build refuses: *"This block already repeats. Remove the repeat first, then
+set a new one."* Rewriting a live rule means deciding, silently, what happens to
+occurrences the user may have already moved, tracked against or reconciled —
+and there is no answer that is right in every case. Removing the series first
+makes the loss explicit, asks for its scope, and is undoable in one step.
+
+If this proves annoying in use, the fix is a rule editor that shows what it is
+about to discard — not a quiet rewrite.

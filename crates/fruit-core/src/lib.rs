@@ -22,7 +22,9 @@ pub mod db;
 pub mod error;
 pub mod ids;
 pub mod model;
+pub mod ics;
 pub mod parser;
+pub mod rrule;
 pub mod store;
 pub mod time;
 

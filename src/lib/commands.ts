@@ -129,6 +129,22 @@ export const COMMANDS: Command[] = [
     },
   },
   {
+    id: "block-repeat",
+    title: "Repeat block…",
+    group: "Planner",
+    keys: "R",
+    when: hasBlock,
+    run: () => {
+      const block = findBlock(app().selectedBlockId!);
+      if (!block) return;
+      if (block.block.seriesId) {
+        app().toast("This block already repeats. Remove the repeat first, then set a new one.");
+        return;
+      }
+      app().setBlockDialog({ kind: "repeat", blockId: block.block.id, title: block.title });
+    },
+  },
+  {
     id: "block-unschedule",
     title: "Unschedule block",
     group: "Planner",
@@ -136,6 +152,15 @@ export const COMMANDS: Command[] = [
     when: hasBlock,
     run: async () => {
       const id = app().selectedBlockId!;
+      const block = findBlock(id);
+      /* §4.3 — a series member never guesses the scope. Deleting "just this
+         one" and deleting six months of Monday stand-ups are different enough
+         that inferring which was meant is not a convenience, it's a data-loss
+         bug with a friendly name. */
+      if (block?.block.seriesId) {
+        app().setBlockDialog({ kind: "scope", blockId: id, title: block.title });
+        return;
+      }
       const token = await app().run(() => ipc.unscheduleBlock(id), "Couldn't unschedule it.");
       if (token) {
         undoableDelete(token.label, token);

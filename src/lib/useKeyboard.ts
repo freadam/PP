@@ -106,6 +106,7 @@ export function useKeyboard() {
         " ": "timer-toggle",
         t: "today",
         d: "block-duplicate",
+        r: "block-repeat",
         s: "schedule-selected",
         x: "task-complete",
         "1": app.view === "planner" ? "span-1" : "priority-1",

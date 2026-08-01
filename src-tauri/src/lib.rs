@@ -7,6 +7,7 @@
 //! Commands are intent-based, one transaction each. The renderer holds no SQL
 //! strings, and the capability file lists exactly the commands below.
 
+mod frontmost;
 mod idle;
 
 use std::path::PathBuf;
@@ -16,7 +17,10 @@ use fruit_core::clock::SystemClock;
 use fruit_core::db::IntegrityReport;
 use fruit_core::model::*;
 use fruit_core::parser::{parse, DateOrder, ParseCtx};
-use fruit_core::store::IdleReport;
+use fruit_core::store::{
+    IcsImportSummary, IdleReport, SeriesScope, ACTIVITY_ENABLED, ACTIVITY_PAUSED,
+    SAMPLE_INTERVAL_MS,
+};
 use fruit_core::{AppError, Store};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -203,6 +207,108 @@ fn resize_block(state: State<'_, AppState>, id: String, duration_sec: i64) -> Re
 #[tauri::command]
 fn unschedule_block(state: State<'_, AppState>, id: String) -> Res<UndoToken> {
     with(&state, |s| s.unschedule_block(&id))
+}
+
+/// P2 (§2.3): a repeating series. `schedule_block` routes here when the input
+/// carries a rule, so both paths share one validation.
+#[tauri::command]
+fn schedule_recurring(
+    state: State<'_, AppState>,
+    input: NewBlock,
+    rrule: String,
+) -> Res<Vec<BlockRow>> {
+    with(&state, |s| s.schedule_recurring(input, &rrule))
+}
+
+#[tauri::command]
+fn unschedule_series(
+    state: State<'_, AppState>,
+    id: String,
+    scope: SeriesScope,
+) -> Res<UndoToken> {
+    with(&state, |s| s.unschedule_series(&id, scope))
+}
+
+/// Keeps series materialised as far as the planner is being asked to show.
+#[tauri::command]
+fn extend_series_to(state: State<'_, AppState>, through: String) -> Res<usize> {
+    with(&state, |s| s.extend_series_to(&through))
+}
+
+/// Turns a block that already exists into the seed of a series, in place —
+/// it keeps its task, its duration and anything tracked against it.
+#[tauri::command]
+fn repeat_block(state: State<'_, AppState>, id: String, rrule: String) -> Res<Vec<BlockRow>> {
+    with(&state, |s| s.repeat_block(&id, &rrule))
+}
+
+#[tauri::command]
+fn describe_rrule(rrule: String) -> Res<String> {
+    Ok(fruit_core::rrule::Rrule::parse(&rrule)?.describe())
+}
+
+/// The repeat presets, described by the same code that parses them, so the
+/// picker can never offer a rule the engine would refuse.
+#[tauri::command]
+fn get_rrule_presets() -> Res<Vec<fruit_core::rrule::RrulePreset>> {
+    Ok(fruit_core::rrule::presets())
+}
+
+/// P2 (§2.3): read a local `.ics`. Read-only and offline — no URL, no
+/// account, and Fruit never writes back to a calendar (§1.4).
+#[tauri::command]
+fn import_ics(state: State<'_, AppState>, path: PathBuf, tz: String) -> Res<IcsImportSummary> {
+    with(&state, |s| s.import_ics(&path, &tz))
+}
+
+/// The OS file picker, so the renderer never has to ask anyone to type a path.
+///
+/// This is the *only* way a path enters the import: `fs:*` is not in the
+/// capability file (§7.3), so the webview cannot read a file itself — it can
+/// only hand a user-chosen path to a Rust command that knows what to do with it.
+#[tauri::command]
+fn pick_ics_file(app: AppHandle) -> Res<Option<PathBuf>> {
+    use tauri_plugin_dialog::DialogExt;
+    // Commands run off the main thread, so blocking here is safe and keeps the
+    // renderer from having to model a dialog's lifetime.
+    Ok(app
+        .dialog()
+        .file()
+        .add_filter("Calendar", &["ics"])
+        .blocking_pick_file()
+        .and_then(|f| f.into_path().ok()))
+}
+
+// ─── activity (§3.5, P2) ───────────────────────────────────────────────
+
+#[tauri::command]
+fn get_activity_settings(state: State<'_, AppState>) -> Res<ActivityStatus> {
+    let settings = with(&state, |s| s.activity_settings())?;
+    Ok(ActivityStatus {
+        support: frontmost::support(),
+        support_note: frontmost::support().describe().to_string(),
+        settings,
+    })
+}
+
+#[tauri::command]
+fn set_activity_setting(
+    state: State<'_, AppState>,
+    key: String,
+    value: Value,
+) -> Res<ActivityStatus> {
+    with(&state, |s| s.set_activity_setting(&key, value))?;
+    get_activity_settings(state)
+}
+
+#[tauri::command]
+fn get_activity_day(state: State<'_, AppState>, date: String, tz: String) -> Res<ActivityDay> {
+    with(&state, |s| s.get_activity_day(&date, &tz))
+}
+
+#[tauri::command]
+fn clear_activity(state: State<'_, AppState>) -> Res<i64> {
+    with(&state, |s| s.clear_activity())
 }
 
 #[tauri::command]
@@ -450,6 +556,10 @@ pub fn run() {
                 }
             }
             let _ = store.purge_expired();
+            match store.purge_activity() {
+                Ok(n) if n > 0 => log::info!("activity.purge.removed n={n}"),
+                _ => {}
+            }
             let _ = store.auto_accept_stale_days(&tz);
 
             // Boot found an open session? No timer may start until it is
@@ -468,7 +578,8 @@ pub fn run() {
                 last_window_input_ms: Mutex::new(fruit_core::time::now_ms()),
             });
 
-            spawn_timer_loop(handle);
+            spawn_timer_loop(handle.clone());
+            spawn_activity_loop(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -480,6 +591,18 @@ pub fn run() {
             get_tags,
             get_reports,
             get_reconcile_items,
+            schedule_recurring,
+            unschedule_series,
+            extend_series_to,
+            repeat_block,
+            describe_rrule,
+            get_rrule_presets,
+            import_ics,
+            pick_ics_file,
+            get_activity_settings,
+            set_activity_setting,
+            get_activity_day,
+            clear_activity,
             get_unreconciled_days,
             search,
             parse_capture,
@@ -530,6 +653,67 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Fruit");
+}
+
+/// What Settings needs to render the Activity section: the switches, and what
+/// this platform is actually capable of.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ActivityStatus {
+    support: frontmost::Support,
+    support_note: String,
+    settings: fruit_core::model::ActivitySettings,
+}
+
+/// Samples the frontmost application (§3.5, P2).
+///
+/// Opt-in, off by default, and it exits early on every tick when disabled — so
+/// a user who never turns it on pays one settings read every 20 seconds and
+/// nothing else. The filtering (exclusions, titles, pause) lives in
+/// `fruit-core`, so a bug here cannot record something the user excluded.
+fn spawn_activity_loop(app: AppHandle) {
+    if !frontmost::support().available() {
+        log::info!("activity.unsupported platform={}", std::env::consts::OS);
+        return;
+    }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(SAMPLE_INTERVAL_MS as u64));
+        let Some(state) = app.try_state::<AppState>() else {
+            continue;
+        };
+        let Ok(mut store) = state.store.lock() else {
+            continue;
+        };
+        let enabled = matches!(
+            store.get_setting(ACTIVITY_ENABLED),
+            Ok(Some(Value::Bool(true)))
+        );
+        let paused = matches!(
+            store.get_setting(ACTIVITY_PAUSED),
+            Ok(Some(Value::Bool(true)))
+        );
+        if !enabled || paused {
+            continue;
+        }
+        let Some(front) = frontmost::current() else {
+            continue;
+        };
+        let sample = fruit_core::model::ActivitySample {
+            app_id: front.app_id,
+            window_title: front.window_title,
+            at: fruit_core::time::now_ms(),
+        };
+        match store.record_activity(sample) {
+            // The recording indicator in the top bar is driven by this event —
+            // §3.5 requires it to be visible whenever sampling is live.
+            Ok(true) => {
+                drop(store);
+                let _ = app.emit("activity:sampled", ());
+            }
+            Ok(false) => {}
+            Err(err) => log::error!("activity.record.failed code={}", err.code()),
+        }
+    });
 }
 
 fn system_tz() -> Option<String> {

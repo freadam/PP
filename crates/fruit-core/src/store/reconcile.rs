@@ -323,6 +323,7 @@ impl Store {
                         duration_sec: remainder,
                         tz: tz.to_string(),
                         is_fixed: false,
+                        rrule: None,
                     })?;
                 }
 
@@ -361,6 +362,7 @@ impl Store {
                         duration_sec: overrun.min(43_200),
                         tz: tz.to_string(),
                         is_fixed: false,
+                        rrule: None,
                     })?;
                 }
 
@@ -400,6 +402,7 @@ impl Store {
                         duration_sec: duration,
                         tz: tz.to_string(),
                         is_fixed: false,
+                        rrule: None,
                     })?;
                     let tx = self.conn.transaction()?;
                     tx.execute(
@@ -510,10 +513,12 @@ impl Store {
                 calibration_ratio
             ],
         )?;
-        let _ = tz;
+        // Computed after the review row is written, so "today" counts.
+        let streak_days = self.reconcile_streak(tz)?;
 
         Ok(DayReview {
             takeaway: takeaway(planned_sec, tracked_sec, unplanned_sec, blocks_untouched),
+            streak_days,
             local_date: date.to_string(),
             reconciled_at: now,
             planned_sec,

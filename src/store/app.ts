@@ -15,6 +15,8 @@ import { CommandError } from "../lib/ipc";
 import * as fmt from "../lib/format";
 import { BREAK_DETAIL_COLUMN } from "../lib/useViewport";
 import type {
+  ActivityDay,
+  ActivityStatus,
   BacklogView,
   LocalDate,
   ProjectRow,
@@ -42,6 +44,20 @@ export interface TaskDrag {
   durationSec: number;
 }
 export type Overlay = null | "focus" | "reconcile" | "palette" | "detail" | "shortcuts";
+
+/**
+ * A decision a block needs before something irreversible happens (§4.3, P2).
+ *
+ * `repeat` picks a rule; `scope` asks which occurrences a removal covers.
+ * Deliberately *not* part of `Overlay`: these are questions about one block,
+ * they can appear over any view, and folding them into the overlay union would
+ * let Esc-to-dismiss logic treat "which occurrences?" as a dismissible panel.
+ */
+export interface BlockDialog {
+  kind: "repeat" | "scope";
+  blockId: string;
+  title: string;
+}
 
 export interface Toast {
   id: number;
@@ -78,6 +94,14 @@ interface AppState {
   week: WeekView | null;
   selectedBlockId: string | null;
   taskDrag: TaskDrag | null;
+  blockDialog: BlockDialog | null;
+
+  // ─── activity (§3.5, P2) ─────────────────────────────────────────────
+  activityStatus: ActivityStatus | null;
+  activityDay: ActivityDay | null;
+  activityDate: LocalDate;
+  /** When the last sample landed — drives the recording indicator's pulse. */
+  sampledAt: number;
 
   // ─── tasks ───────────────────────────────────────────────────────────
   backlog: BacklogView | null;
@@ -114,6 +138,10 @@ interface AppState {
   loadTasks: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadReports: () => Promise<void>;
+  loadActivity: () => Promise<void>;
+  setActivityDate: (d: LocalDate) => void;
+  putActivitySetting: (key: string, value: unknown) => Promise<void>;
+  noteSample: () => void;
   openDetail: (taskId: string) => Promise<void>;
   closeDetail: () => void;
   setDetailTab: (t: "note" | "sessions" | "subtasks") => void;
@@ -122,6 +150,7 @@ interface AppState {
 
   selectBlock: (id: string | null) => void;
   setTaskDrag: (d: TaskDrag | null) => void;
+  setBlockDialog: (d: BlockDialog | null) => void;
   selectTask: (id: string, mode?: "replace" | "toggle" | "range") => void;
 
   toggleTimer: (taskId: string, blockId?: string | null) => Promise<void>;
@@ -155,6 +184,12 @@ export const useApp = create<AppState>((set, get) => ({
   week: null,
   selectedBlockId: null,
   taskDrag: null,
+  blockDialog: null,
+
+  activityStatus: null,
+  activityDay: null,
+  activityDate: fmt.today(),
+  sampledAt: 0,
 
   backlog: null,
   projects: [],
@@ -196,7 +231,11 @@ export const useApp = create<AppState>((set, get) => ({
     await Promise.all([get().loadWeek(), get().loadTasks(), get().loadProjects()]);
     const timer = await ipc.getTimerState().catch(() => get().timer);
     const unreconciled = await ipc.getUnreconciledDays(fmt.today()).catch(() => []);
-    set({ timer, unreconciled, ready: true });
+    // Status only, not the day's spans: the recording indicator has to be
+    // right from the first frame, but a user who never opens Activity should
+    // not pay for a query against a table they aren't using.
+    const activityStatus = await ipc.getActivitySettings().catch(() => null);
+    set({ timer, unreconciled, activityStatus, ready: true });
 
     // §3.11: reconcile-due is a tray badge and a top-bar dot, never a
     // notification, and it never blocks the app.
@@ -207,6 +246,7 @@ export const useApp = create<AppState>((set, get) => ({
     void get().flushNote();
     set({ view, overlay: null });
     if (view === "reports" && !get().reports) void get().loadReports();
+    if (view === "activity") void get().loadActivity();
   },
 
   setOverlay(overlay) {
@@ -251,6 +291,12 @@ export const useApp = create<AppState>((set, get) => ({
     const { span, anchor } = get();
     const from = span === 7 ? fmt.weekStart(anchor) : anchor;
     const to = fmt.addDays(from, span - 1);
+    /* Recurring instances are real rows, materialised to a 90-day horizon
+       (§2.3, P2). Scrolling past that horizon is the one way to reach the edge,
+       so the top-up runs *before* the read and is idempotent — a week already
+       materialised costs one indexed query. Failures are swallowed: a series
+       that can't extend must not stop the planner from drawing. */
+    await ipc.extendSeriesTo(to).catch(() => 0);
     const week = await get().run(() => ipc.getWeek(from, to, fmt.tz()));
     if (week) set({ week });
   },
@@ -272,6 +318,42 @@ export const useApp = create<AppState>((set, get) => ({
     const from = fmt.addDays(to, -27);
     const reports = await get().run(() => ipc.getReports(from, to, fmt.tz()));
     if (reports) set({ reports });
+  },
+
+  /**
+   * Activity is fetched only when the view is open (§3.5). It is the one screen
+   * that reads a table the rest of the app never touches, and loading it on
+   * boot would cost every user a query for a feature that is off by default.
+   */
+  async loadActivity() {
+    const status = await get().run(() => ipc.getActivitySettings());
+    if (status) set({ activityStatus: status });
+    if (!status?.settings.enabled) {
+      set({ activityDay: null });
+      return;
+    }
+    const day = await get().run(() => ipc.getActivityDay(get().activityDate, fmt.tz()));
+    if (day) set({ activityDay: day });
+  },
+
+  setActivityDate(activityDate) {
+    set({ activityDate });
+    void get().loadActivity();
+  },
+
+  async putActivitySetting(key, value) {
+    const status = await get().run(
+      () => ipc.setActivitySetting(key, value),
+      "Couldn't change that Activity setting.",
+    );
+    if (status) {
+      set({ activityStatus: status });
+      await get().loadActivity();
+    }
+  },
+
+  noteSample() {
+    set({ sampledAt: Date.now() });
   },
 
   async openDetail(taskId) {
@@ -318,6 +400,10 @@ export const useApp = create<AppState>((set, get) => ({
 
   setTaskDrag(taskDrag) {
     set({ taskDrag });
+  },
+
+  setBlockDialog(blockDialog) {
+    set({ blockDialog });
   },
 
   selectTask(id, mode = "replace") {
@@ -428,6 +514,7 @@ export const useApp = create<AppState>((set, get) => ({
       if (fresh) set({ detail: fresh });
     }
     if (view === "reports") await get().loadReports();
+    if (view === "activity") await get().loadActivity();
   },
 }));
 

@@ -1,9 +1,9 @@
 /**
- * Settings (§3.8) and Activity (§3.5).
+ * Settings (§3.8).
  *
- * Every control here does something. Where a feature is deferred — Activity is
- * the only one — the section says so plainly instead of showing a switch that
- * does nothing or pointing at a screen that has no switch on it.
+ * Every control here does something, and nothing points at a screen that has no
+ * switch on it. Where a platform can't do a thing, the reason is printed next
+ * to the control rather than left as "unavailable".
  */
 
 import { useEffect, useState } from "react";
@@ -11,7 +11,6 @@ import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
 import type { IntegrityReport } from "../lib/types";
-import { Empty } from "../components/chrome";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -19,6 +18,36 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2>{title}</h2>
       <div className="stack">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A switch that reads as on or off without colour alone (§5.9, U11): the state
+ * is in `aria-checked`, in the knob's position, and in the word next to it.
+ */
+function Switch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      className="switch"
+      onClick={() => onChange(!checked)}
+    >
+      <i />
+      <span className="micro">{checked ? "On" : "Off"}</span>
+    </button>
   );
 }
 
@@ -176,20 +205,7 @@ export function Settings() {
         </Field>
       </Section>
 
-      <Section title="Activity">
-        <Field
-          label="Window tracking"
-          hint="When it lands: app-level tracking and window-title tracking as separate switches, titles off even when apps are on, a per-app exclusion list, and a retention setting with a visible next-purge date."
-        >
-          {/* No switch here, so the copy must not imply one. Activity is the
-              feature furthest from the loop and the only one Wayland cannot do
-              at all (§3.5, §9.6) — it is deferred, and saying so is cheaper
-              than a toggle that does nothing. */}
-          <p className="caption">
-            Not in this build. Nothing is sampled, and no window titles are read.
-          </p>
-        </Field>
-      </Section>
+      <ActivitySettings />
 
       <Section title="Data">
         <Field label="Export" hint="Written to your Downloads folder. JSON round-trips exactly, ids included. CSV ships tasks and sessions. ICS is export-only.">
@@ -211,6 +227,29 @@ export function Settings() {
                 Export {f.toUpperCase()}
               </button>
             ))}
+          </div>
+        </Field>
+        <Field
+          label="Import a calendar"
+          hint="Reads a local .ics file. Meetings arrive as fixed blocks — the obligations the rest of the day has to fit around. Read-only and offline: no URL, no account, and Fruit never writes back to your calendar. Re-importing the same file updates in place instead of duplicating."
+        >
+          <div className="row">
+            <button
+              className="btn"
+              onClick={async () => {
+                const path = await run(() => ipc.pickIcsFile(), "Couldn't open the file picker.");
+                if (!path) return; // cancelled is not a failure
+                const summary = await run(
+                  () => ipc.importIcs(path, fmt.tz()),
+                  "Couldn't import that calendar.",
+                );
+                // The note names what was skipped and why — an import that
+                // quietly drops half a calendar is worse than one that refuses.
+                if (summary) toast(summary.note);
+              }}
+            >
+              Choose an .ics file…
+            </button>
           </div>
         </Field>
         <Field label="Integrity check" hint="Runs quick_check, verifies foreign keys, and rebuilds the tracked caches from the views.">
@@ -253,13 +292,171 @@ export function Settings() {
   );
 }
 
-export function Activity() {
+/**
+ * Activity's privacy contract, as controls (§3.5, §7.2).
+ *
+ * Every promise the feature makes is a switch here, in the order someone
+ * worried about it would look for them: is it on, does it read titles, can I
+ * pause it, what is excluded, how long is it kept, and how do I delete it all.
+ * The enforcement lives in Rust — these controls set settings that
+ * `record_activity` reads *before* writing, so an exclusion cannot be defeated
+ * by a bug in the sampler.
+ */
+function ActivitySettings() {
+  const status = useApp((s) => s.activityStatus);
+  const put = useApp((s) => s.putActivitySetting);
+  const load = useApp((s) => s.loadActivity);
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const [apps, setApps] = useState<string | null>(null);
+  const [patterns, setPatterns] = useState<string | null>(null);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!status) {
+    return (
+      <Section title="Activity">
+        <p className="caption">Checking what this platform can do…</p>
+      </Section>
+    );
+  }
+
+  const s = status.settings;
+  const supported = status.support === "full";
+  // A list is edited as text and committed on blur; splitting on every
+  // keystroke would delete the entry you are halfway through typing.
+  const commitList = (key: string, raw: string) =>
+    void put(
+      key,
+      raw
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean),
+    );
+
   return (
-    <Empty>
-      Activity tracking isn't in this build — there's nothing to switch on yet. It sits furthest
-      from the plan–track–reconcile loop and can't work at all under Wayland, so it was deferred.
-      Everything Fruit knows about your time comes from the timer and from sessions you add by
-      hand.
-    </Empty>
+    <Section title="Activity">
+      {/* The platform's own sentence, always on screen next to the switch it
+          explains — never a bare "unavailable" (§3.10). */}
+      <p className="caption">{status.supportNote}</p>
+
+      <Field
+        label="Track applications"
+        hint="Samples which application is in front every 20 seconds, into the same local database as everything else. Nothing leaves this machine, and it is off until you turn it on."
+      >
+        <Switch
+          label="Track applications"
+          checked={s.enabled}
+          disabled={!supported}
+          onChange={(v) => void put("activity.enabled", v)}
+        />
+      </Field>
+
+      <Field
+        label="Track window titles"
+        hint="A separate switch, and off even when applications are on — a title is the document name, the customer, the ticket. Turning applications off turns this off with it."
+      >
+        <Switch
+          label="Track window titles"
+          checked={s.titlesEnabled}
+          disabled={!supported || !s.enabled}
+          onChange={(v) => void put("activity.titlesEnabled", v)}
+        />
+      </Field>
+
+      <Field label="Pause" hint="Survives a restart, so a pause before a private call stays paused.">
+        <Switch
+          label="Pause activity tracking"
+          checked={s.paused}
+          disabled={!supported || !s.enabled}
+          onChange={(v) => void put("activity.paused", v)}
+        />
+      </Field>
+
+      <Field
+        label="Never record these apps"
+        hint="Comma-separated executable or bundle names, e.g. 1Password.exe, Signal. Excluded apps are dropped before they are written, so they cannot resurface in an export."
+      >
+        <input
+          value={apps ?? s.excludedApps.join(", ")}
+          placeholder="1Password.exe, Signal"
+          disabled={!supported}
+          onChange={(e) => setApps(e.target.value)}
+          onBlur={(e) => {
+            setApps(null);
+            commitList("activity.excludedApps", e.target.value);
+          }}
+          style={{ width: "100%", maxWidth: 420 }}
+        />
+      </Field>
+
+      <Field
+        label="Never record titles containing"
+        hint="Comma-separated fragments, matched case-insensitively. The app is still recorded; only the title is dropped."
+      >
+        <input
+          value={patterns ?? s.excludedTitlePatterns.join(", ")}
+          placeholder="salary, incognito"
+          disabled={!supported || !s.titlesEnabled}
+          onChange={(e) => setPatterns(e.target.value)}
+          onBlur={(e) => {
+            setPatterns(null);
+            commitList("activity.excludedTitlePatterns", e.target.value);
+          }}
+          style={{ width: "100%", maxWidth: 420 }}
+        />
+      </Field>
+
+      <Field
+        label="Keep for"
+        hint={
+          s.retentionDays > 0 && s.nextPurgeAt
+            ? `Anything older is deleted automatically. Next purge ${fmt.longDate(
+                fmt.toLocalDate(new Date(s.nextPurgeAt)),
+              )}.`
+            : "Kept until you delete it. Nothing is purged automatically."
+        }
+      >
+        <div className="row">
+          {(
+            [
+              [30, "30 days"],
+              [90, "90 days"],
+              [0, "Forever"],
+            ] as const
+          ).map(([days, label]) => (
+            <button
+              key={days}
+              className="btn"
+              aria-pressed={s.retentionDays === days}
+              disabled={!supported}
+              onClick={() => void put("activity.retentionDays", days)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field
+        label="Delete everything recorded"
+        hint="Immediate and not undoable — a privacy promise you can't act on is not a promise."
+      >
+        <button
+          className="btn btn-danger"
+          onClick={async () => {
+            const removed = await run(() => ipc.clearActivity(), "Couldn't clear Activity.");
+            if (removed !== null) {
+              toast(`Deleted ${removed} activity ${removed === 1 ? "span" : "spans"}.`);
+              await load();
+            }
+          }}
+        >
+          Delete activity data
+        </button>
+      </Field>
+    </Section>
   );
 }

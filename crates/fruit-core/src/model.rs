@@ -237,11 +237,16 @@ pub struct BlockRow {
     pub local_date: String,
     pub tz: String,
     pub is_fixed: bool,
+    /// Set on every instance of a repeating series (§2.3, P2).
+    pub series_id: Option<String>,
+    pub rrule: Option<String>,
+    /// The VEVENT UID when this block came from a `.ics` file.
+    pub external_uid: Option<String>,
     pub created_at: Millis,
     pub updated_at: Millis,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NewBlock {
     pub task_id: Option<String>,
@@ -251,6 +256,9 @@ pub struct NewBlock {
     pub tz: String,
     #[serde(default)]
     pub is_fixed: bool,
+    /// An RFC 5545 subset (§2.3, P2). Present means "make this a series".
+    #[serde(default)]
+    pub rrule: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -544,6 +552,12 @@ pub struct DayReview {
     pub calibration_ratio: Option<f64>,
     /// The single takeaway line shown on close (§3.7, F5).
     pub takeaway: String,
+    /// Consecutive reconciled days including this one (§2.3).
+    ///
+    /// Returned here rather than left to Reports because closing a day is the
+    /// exact moment the streak changes, and it is the only moment at which
+    /// anyone is going to care.
+    pub streak_days: i64,
 }
 
 // ─── reports ───────────────────────────────────────────────────────────
@@ -611,6 +625,69 @@ pub struct ReportBundle {
 pub struct ReportFilter {
     pub project_id: Option<String>,
     pub tz: Option<String>,
+}
+
+// ─── activity (§3.5, P2) ───────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySettings {
+    pub enabled: bool,
+    /// Separate from `enabled`, and off even when apps are on (§3.5).
+    pub titles_enabled: bool,
+    pub paused: bool,
+    pub excluded_apps: Vec<String>,
+    pub excluded_title_patterns: Vec<String>,
+    /// 30 / 90 / 0 for forever.
+    pub retention_days: i64,
+    /// Shown in Settings, because "we delete it eventually" is not a promise.
+    pub next_purge_at: Option<Millis>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySample {
+    pub app_id: String,
+    pub window_title: Option<String>,
+    pub at: Millis,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySpanRow {
+    pub id: i64,
+    pub started_at: Millis,
+    pub ended_at: Millis,
+    pub app_id: String,
+    pub window_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppTotal {
+    pub app_id: String,
+    pub seconds: i64,
+}
+
+/// One plotted block against what was actually on screen underneath it.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockCorrelation {
+    pub block_id: String,
+    pub title: String,
+    pub starts_at: Millis,
+    pub duration_sec: i64,
+    pub top_apps: Vec<AppTotal>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityDay {
+    pub local_date: String,
+    pub spans: Vec<ActivitySpanRow>,
+    pub by_app: Vec<AppTotal>,
+    pub correlations: Vec<BlockCorrelation>,
+    pub tracked_sec: i64,
 }
 
 // ─── search, undo, data ────────────────────────────────────────────────

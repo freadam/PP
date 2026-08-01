@@ -10,7 +10,7 @@ use chrono::TimeZone;
 use chrono_tz::Tz;
 use fruit_core::clock::TestClock;
 use fruit_core::model::*;
-use fruit_core::store::IdleReport;
+use fruit_core::store::{IdleReport, SeriesScope};
 use fruit_core::time::{local_date, to_local};
 use fruit_core::{db, AppError, Store};
 
@@ -51,6 +51,7 @@ fn block(store: &mut Store, task_id: &str, starts_at: i64, minutes: i64) -> Bloc
             duration_sec: minutes * 60,
             tz: TZ.into(),
             is_fixed: false,
+            rrule: None,
         })
         .unwrap()
 }
@@ -574,6 +575,7 @@ fn d1_d7_d11_fuzz_leaves_the_database_consistent() {
                     duration_sec: ((rng.next() % 4 + 1) * 900) as i64,
                     tz: TZ.into(),
                     is_fixed: false,
+                    rrule: None,
                 }) {
                     blocks.push(b.id);
                 }
@@ -828,6 +830,7 @@ fn d8_dst_and_timezone_correctness() {
         duration_sec: 3600,
         tz: TZ.into(),
         is_fixed: false,
+        rrule: None,
     });
     assert!(matches!(crosses, Err(AppError::CrossesMidnight)));
 
@@ -932,6 +935,7 @@ fn boot_repairs_a_disagreeing_local_date() {
                 duration_sec: 1800,
                 tz: TZ.into(),
                 is_fixed: false,
+                rrule: None,
             })
             .unwrap();
         block_id = b.id.clone();
@@ -1117,7 +1121,7 @@ fn completed_tasks_land_in_a_group_at_the_bottom() {
         })
         .unwrap();
 
-    let mut make = |title: &str, done: bool, store: &mut Store| {
+    let make = |title: &str, done: bool, store: &mut Store| {
         let t = store
             .create_task(NewTask {
                 title: title.into(),
@@ -1318,4 +1322,422 @@ fn zero_length_segments_are_not_recorded() {
     store.start_timer(&t.id, None).unwrap();
     store.stop_timer().unwrap();
     assert!(store.get_task_detail(&t.id).unwrap().sessions.is_empty());
+}
+
+// ─── P2: recurring blocks, .ics import, activity ───────────────────────
+
+/// §2.3 — a recurring block is a *series of real blocks*, not a virtual
+/// pattern, because a session links to a block by id and drift is per block.
+#[test]
+fn a_recurring_block_produces_trackable_instances() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 8, 0));
+    let t = task(&mut store, "Stand-up");
+
+    let created = store
+        .schedule_recurring(
+            NewBlock {
+                task_id: Some(t.id.clone()),
+                starts_at: at(2025, 7, 30, 9, 0),
+                duration_sec: 900,
+                tz: TZ.into(),
+                ..Default::default()
+            },
+            "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+        )
+        .unwrap();
+    assert!(created.len() > 40, "90 days of weekdays, got {}", created.len());
+
+    let series_id = created[0].series_id.clone().expect("the seed carries the series");
+    assert!(created.iter().all(|b| b.series_id.as_deref() == Some(&series_id)));
+    assert_eq!(
+        created[0].rrule.as_deref(),
+        Some("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
+        "the rule lives on the seed, so it can always be read back"
+    );
+
+    // Every instance is an ordinary block: trackable, and it carries drift.
+    let instance = &created[1];
+    store.start_timer(&t.id, Some(&instance.id)).unwrap();
+    clock.advance(20 * 60_000);
+    store.stop_timer().unwrap();
+
+    let day = &week(&store, &instance.local_date).days[0];
+    let view = day.blocks.iter().find(|b| b.block.id == instance.id).unwrap();
+    assert_eq!(view.drift_state, DriftState::Overrun);
+    assert_eq!(view.drift_sec, 5 * 60);
+
+    // Weekends are not in the series.
+    assert!(
+        !created
+            .iter()
+            .any(|b| ["2025-08-02", "2025-08-03"].contains(&b.local_date.as_str())),
+        "BYDAY=MO..FR means no Saturday or Sunday"
+    );
+}
+
+/// Editing a series is where calendars get it wrong, so the scope is explicit:
+/// this one, this and later, or all of them.
+#[test]
+fn series_edits_have_an_explicit_scope() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 8, 0));
+    let t = task(&mut store, "Daily review");
+    let created = store
+        .schedule_recurring(
+            NewBlock {
+                task_id: Some(t.id.clone()),
+                starts_at: at(2025, 7, 30, 17, 0),
+                duration_sec: 900,
+                tz: TZ.into(),
+                ..Default::default()
+            },
+            "FREQ=DAILY;COUNT=10",
+        )
+        .unwrap();
+    assert_eq!(created.len(), 10);
+
+    // One instance only.
+    store
+        .unschedule_series(&created[2].id, SeriesScope::Instance)
+        .unwrap();
+    assert_eq!(remaining(&store, &created), 9);
+
+    // This one and everything after it.
+    let token = store
+        .unschedule_series(&created[5].id, SeriesScope::Future)
+        .unwrap();
+    assert_eq!(
+        remaining(&store, &created),
+        4,
+        "instances 5-9 go with it, leaving 0, 1, 3 and 4"
+    );
+
+    // …and undo puts the series back, like every other delete (§4.6).
+    store.restore(&token).unwrap();
+    assert_eq!(remaining(&store, &created), 10);
+
+    store
+        .unschedule_series(&created[0].id, SeriesScope::All)
+        .unwrap();
+    assert_eq!(remaining(&store, &created), 0);
+}
+
+/// §4.3 — "make this repeat" acts on the block you selected, in place.
+///
+/// The alternative (delete it, create a repeating one) would orphan the tracked
+/// time already sitting against it, which is exactly the kind of quiet data loss
+/// the block/session split exists to prevent (§6.1 rule 7).
+#[test]
+fn repeating_an_existing_block_keeps_its_tracked_time() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 8, 0));
+    let t = task(&mut store, "Weekly review");
+    let block = store
+        .schedule_block(NewBlock {
+            task_id: Some(t.id.clone()),
+            starts_at: at(2025, 7, 30, 16, 0),
+            duration_sec: 3600,
+            tz: TZ.into(),
+            ..Default::default()
+        })
+        .unwrap();
+
+    store.start_timer(&t.id, Some(&block.id)).unwrap();
+    clock.advance(30 * 60_000);
+    store.stop_timer().unwrap();
+
+    let created = store.repeat_block(&block.id, "FREQ=WEEKLY;COUNT=4").unwrap();
+    assert_eq!(created.len(), 4);
+    assert_eq!(created[0].id, block.id, "the seed is the block you selected");
+    assert!(created.iter().all(|b| b.series_id == created[0].series_id));
+
+    // The half hour is still attributed to it.
+    let day = &week(&store, &block.local_date).days[0];
+    let view = day.blocks.iter().find(|b| b.block.id == block.id).unwrap();
+    assert_eq!(view.tracked_sec, 30 * 60);
+
+    // Changing a live rule would mean silently rewriting occurrences someone
+    // may already have tracked against, so it is refused rather than guessed.
+    let again = store.repeat_block(&block.id, "FREQ=DAILY");
+    assert!(again.is_err(), "a block that already repeats refuses a second rule");
+}
+
+/// The picker's list is generated from the same code that parses it, so it can
+/// never offer a rule the engine would refuse (§4.3).
+#[test]
+fn every_repeat_preset_parses_and_describes_itself() {
+    let presets = fruit_core::rrule::presets();
+    assert_eq!(presets.len(), fruit_core::rrule::PRESETS.len());
+    for p in &presets {
+        assert!(
+            fruit_core::rrule::Rrule::parse(&p.rrule).is_ok(),
+            "{} offers an unparseable rule",
+            p.label
+        );
+        assert!(!p.description.is_empty(), "{} has no description", p.label);
+    }
+}
+
+fn remaining(store: &Store, created: &[BlockRow]) -> usize {
+    created
+        .iter()
+        .filter(|b| store.block_row_public(&b.id).is_some())
+        .count()
+}
+
+/// §2.3 — `.ics` import, read-only and fully offline. Imported events become
+/// *fixed* blocks: an external meeting is the thing you plan around.
+#[test]
+fn ics_import_creates_fixed_blocks_and_is_idempotent() {
+    let (mut store, _) = store_at(at(2025, 7, 28, 8, 0));
+    let ics = "\
+BEGIN:VCALENDAR\r
+BEGIN:VEVENT\r
+UID:standup@corp\r
+DTSTART;TZID=Europe/London:20250730T093000\r
+DTEND;TZID=Europe/London:20250730T094500\r
+SUMMARY:Stand-up\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:1to1@corp\r
+DTSTART;TZID=Europe/London:20250731T140000\r
+DURATION:PT30M\r
+SUMMARY:1:1\r
+END:VEVENT\r
+BEGIN:VEVENT\r
+UID:offsite@corp\r
+DTSTART;VALUE=DATE:20250801\r
+DTEND;VALUE=DATE:20250802\r
+SUMMARY:Offsite\r
+END:VEVENT\r
+END:VCALENDAR\r
+";
+    let summary = store.import_ics_text(ics, TZ).unwrap();
+    assert_eq!(summary.imported, 2);
+    assert_eq!(summary.skipped, 1, "the all-day offsite has no block form");
+    assert!(summary.note.contains("all-day"), "{}", summary.note);
+
+    let blocks = store.blocks_on("2025-07-30").unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].label.as_deref(), Some("Stand-up"));
+    assert!(blocks[0].is_fixed, "an external meeting is not yours to move");
+    assert_eq!(blocks[0].task_id, None);
+
+    // Importing the same file again updates rather than duplicating.
+    let again = store.import_ics_text(ics, TZ).unwrap();
+    assert_eq!(again.imported, 0);
+    assert_eq!(again.updated, 2);
+    assert_eq!(store.blocks_on("2025-07-30").unwrap().len(), 1);
+}
+
+/// A repeating meeting repeats in Fruit, through the same engine as a
+/// hand-made series.
+#[test]
+fn ics_recurring_events_expand() {
+    let (mut store, _) = store_at(at(2025, 7, 28, 8, 0));
+    let ics = "BEGIN:VEVENT\nUID:weekly@corp\nDTSTART;TZID=Europe/London:20250730T100000\n\
+               DURATION:PT1H\nSUMMARY:Weekly sync\nRRULE:FREQ=WEEKLY;BYDAY=WE;COUNT=4\n\
+               END:VEVENT";
+    let summary = store.import_ics_text(ics, TZ).unwrap();
+    assert_eq!(summary.imported, 1);
+    assert_eq!(summary.recurring_instances, 3, "the seed plus three more");
+
+    for date in ["2025-07-30", "2025-08-06", "2025-08-13", "2025-08-20"] {
+        assert_eq!(
+            store.blocks_on(date).unwrap().len(),
+            1,
+            "no instance on {date}"
+        );
+    }
+}
+
+/// §3.5 — the privacy contract is enforced where the write happens, not only
+/// described in the UI.
+#[test]
+fn activity_respects_the_privacy_contract() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+    let sample = |app: &str, title: &str, at: i64| ActivitySample {
+        app_id: app.into(),
+        window_title: Some(title.into()),
+        at,
+    };
+
+    // Off by default: nothing is recorded until it is switched on.
+    assert!(!store.activity_settings().unwrap().enabled);
+    assert!(!store
+        .record_activity(sample("code.exe", "main.rs", at(2025, 7, 30, 9, 0)))
+        .unwrap());
+
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    // Titles are a separate switch, and stay off even when apps are on.
+    assert!(store
+        .record_activity(sample("code.exe", "secret-project.rs", at(2025, 7, 30, 9, 0)))
+        .unwrap());
+    let day = store.get_activity_day("2025-07-30", TZ).unwrap();
+    assert_eq!(day.spans.len(), 1);
+    assert_eq!(day.spans[0].window_title, None, "titles are opt-in separately");
+
+    store
+        .set_activity_setting("activity.titlesEnabled", true.into())
+        .unwrap();
+    store
+        .record_activity(sample("mail.exe", "Inbox", at(2025, 7, 30, 9, 5)))
+        .unwrap();
+    let day = store.get_activity_day("2025-07-30", TZ).unwrap();
+    assert_eq!(day.spans[1].window_title.as_deref(), Some("Inbox"));
+
+    // An excluded app is never written at all — not hidden at read time.
+    store
+        .set_activity_setting("activity.excludedApps", serde_json::json!(["bank.exe"]))
+        .unwrap();
+    assert!(!store
+        .record_activity(sample("bank.exe", "Statements", at(2025, 7, 30, 9, 10)))
+        .unwrap());
+    assert!(!store
+        .get_activity_day("2025-07-30", TZ)
+        .unwrap()
+        .spans
+        .iter()
+        .any(|s| s.app_id == "bank.exe"));
+
+    // A title pattern suppresses the title, keeping the app.
+    store
+        .set_activity_setting("activity.excludedTitlePatterns", serde_json::json!(["password"]))
+        .unwrap();
+    store
+        .record_activity(sample("browser.exe", "My password vault", at(2025, 7, 30, 9, 15)))
+        .unwrap();
+    let day = store.get_activity_day("2025-07-30", TZ).unwrap();
+    let browser = day.spans.iter().find(|s| s.app_id == "browser.exe").unwrap();
+    assert_eq!(browser.window_title, None);
+
+    // Pause is remembered, and stops recording.
+    store.set_activity_setting("activity.paused", true.into()).unwrap();
+    assert!(!store
+        .record_activity(sample("code.exe", "main.rs", at(2025, 7, 30, 9, 20)))
+        .unwrap());
+
+    // Turning apps off turns titles off with it.
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, false.into())
+        .unwrap();
+    assert!(!store.activity_settings().unwrap().titles_enabled);
+}
+
+/// Consecutive samples of the same app coalesce, or a day would be tens of
+/// thousands of one-second rows.
+#[test]
+fn activity_samples_coalesce_into_spans() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    for minute in 0..10 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                at: at(2025, 7, 30, 9, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+    store
+        .record_activity(ActivitySample {
+            app_id: "mail.exe".into(),
+            window_title: None,
+            at: at(2025, 7, 30, 9, 10),
+        })
+        .unwrap();
+
+    let day = store.get_activity_day("2025-07-30", TZ).unwrap();
+    assert_eq!(day.spans.len(), 2, "ten samples of one app are one span");
+    assert_eq!(day.by_app[0].app_id, "code.exe");
+    assert_eq!(
+        day.by_app[0].seconds,
+        9 * 60 + fruit_core::store::SAMPLE_INTERVAL_MS / 1000,
+        "the span runs from the first sample to one interval past the last"
+    );
+}
+
+/// §2.3 CALIBRATE — activity correlation: what was actually on screen during
+/// the block you plotted. The one report that compares an intention against an
+/// observation rather than against Fruit's own record.
+#[test]
+fn activity_correlates_with_the_block_underneath_it() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 8, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    let t = task(&mut store, "Refactor auth");
+    let b = block(&mut store, &t.id, at(2025, 7, 30, 9, 0), 60);
+
+    // Half the hour in the editor, half in Slack.
+    for minute in 0..30 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                at: at(2025, 7, 30, 9, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+    for minute in 30..60 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "slack.exe".into(),
+                window_title: None,
+                at: at(2025, 7, 30, 9, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+
+    let day = store.get_activity_day("2025-07-30", TZ).unwrap();
+    let correlation = day
+        .correlations
+        .iter()
+        .find(|c| c.block_id == b.id)
+        .expect("the block has activity under it");
+    assert_eq!(correlation.title, "Refactor auth");
+    assert_eq!(correlation.top_apps.len(), 2);
+    // Both halves are the same length, so the ranking is a tie — and a tie has
+    // to resolve the same way every run, not by `HashMap` seeding.
+    assert_eq!(correlation.top_apps[0].app_id, "code.exe");
+    assert_eq!(correlation.top_apps[1].app_id, "slack.exe");
+    assert_eq!(
+        correlation.top_apps[0].seconds, correlation.top_apps[1].seconds,
+        "half an hour each, to the second"
+    );
+    assert!(correlation.top_apps[0].seconds > 25 * 60);
+}
+
+/// Retention is a promise with a mechanism behind it.
+#[test]
+fn activity_purges_at_the_retention_limit() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    store
+        .set_activity_setting("activity.retentionDays", 30.into())
+        .unwrap();
+    store
+        .record_activity(ActivitySample {
+            app_id: "code.exe".into(),
+            window_title: None,
+            at: at(2025, 7, 30, 9, 0),
+        })
+        .unwrap();
+
+    assert_eq!(store.purge_activity().unwrap(), 0, "nothing is stale yet");
+    clock.advance(40 * 24 * 3600 * 1000);
+    assert_eq!(store.purge_activity().unwrap(), 1);
+    assert!(store.activity_settings().unwrap().next_purge_at.is_some());
+
+    // "Forever" means no purge at all.
+    store
+        .set_activity_setting("activity.retentionDays", 0.into())
+        .unwrap();
+    assert_eq!(store.activity_settings().unwrap().next_purge_at, None);
 }

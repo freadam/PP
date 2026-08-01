@@ -69,48 +69,87 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
   await page.waitForTimeout(500);
   check("I7 no external requests (fonts included)", external.length === 0, external.join(", "));
 
-  // I4: every numeral that changes in place is tabular.
-  const nonTabular = await page.evaluate(() => {
-    const bad = [];
-    for (const el of document.querySelectorAll(".data, .micro, .focus-clock")) {
-      const v = getComputedStyle(el).fontVariantNumeric;
-      if (!v.includes("tabular-nums")) bad.push(el.className);
+  // These three are per-view: a control that only exists in Settings — the
+  // Activity switches, say — is never seen by a check that stays on the Planner.
+  const nonTabular = [];
+  const focusRing = [];
+  let unlabelled = 0;
+  /* Navigate with `G then <key>`, never a click: `:focus-visible` stops
+     matching programmatic focus once the page has seen a mouse interaction, so
+     clicking through the views would make U10 fail on every element for a
+     reason that has nothing to do with the CSS. */
+  for (const [view, key] of [
+    ["Planner", "p"],
+    ["Tasks", "t"],
+    ["Activity", "a"],
+    ["Reports", "r"],
+    ["Settings", "s"],
+  ]) {
+    await page.keyboard.press("g");
+    await page.keyboard.press(key);
+    await page.waitForTimeout(250);
+    if (!(await page.locator(`button[aria-label^="${view}"][aria-current="page"]`).count())) {
+      check(`U10 could reach ${view} by keyboard`, false);
+      continue;
     }
-    return bad;
-  });
+
+    // I4: every numeral that changes in place is tabular.
+    nonTabular.push(
+      ...(await page.evaluate(() => {
+        const bad = [];
+        for (const el of document.querySelectorAll(".data, .micro, .focus-clock")) {
+          const v = getComputedStyle(el).fontVariantNumeric;
+          if (!v.includes("tabular-nums")) bad.push(el.className);
+        }
+        return bad;
+      })),
+    );
+
+    // U10: a visible focus ring on every interactive element, never hover only.
+    focusRing.push(
+      ...(await page.evaluate(() => {
+        const targets = [
+          ...document.querySelectorAll("button, input, select, textarea, [tabindex]"),
+        ].filter((el) => el.offsetParent !== null);
+        const missing = [];
+        for (const el of targets) {
+          el.focus();
+          const s = getComputedStyle(el);
+          const ring =
+            (s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2) ||
+            s.boxShadow !== "none";
+          if (!ring) missing.push(el.getAttribute("aria-label") || el.className || el.tagName);
+        }
+        return missing;
+      })),
+    );
+
+    // I3: no state distinguishable by colour alone — every drift rail and every
+    // Activity bar carries an accessible name saying what the colour says.
+    unlabelled += await page.evaluate(
+      () =>
+        [...document.querySelectorAll(".rail-compact, .rail-bar, .app-bar")].filter(
+          (el) =>
+            !el.getAttribute("aria-label") &&
+            !el.getAttribute("title") &&
+            el.getAttribute("aria-hidden") !== "true",
+        ).length,
+    );
+  }
   check("I4 changing numerals use tabular figures", nonTabular.length === 0, nonTabular.join(", "));
-
-  // U10: a visible focus ring on every interactive element, never hover only.
-  const focusRing = await page.evaluate(async () => {
-    const targets = [...document.querySelectorAll("button, input, select, textarea, [tabindex]")]
-      .filter((el) => el.offsetParent !== null)
-      .slice(0, 40);
-    const missing = [];
-    for (const el of targets) {
-      el.focus();
-      const s = getComputedStyle(el);
-      const ring =
-        (s.outlineStyle !== "none" && parseFloat(s.outlineWidth) >= 2) ||
-        s.boxShadow !== "none";
-      if (!ring) missing.push(el.getAttribute("aria-label") || el.className || el.tagName);
-    }
-    return missing;
-  });
   check("U10 focus is visible on every interactive element", focusRing.length === 0, focusRing.join(", "));
-
-  // I3: no drift state distinguishable by colour alone — every rail carries a
-  // texture and an accessible name.
-  const unlabelled = await page.evaluate(() =>
-    [...document.querySelectorAll(".rail-compact, .rail-bar")].filter(
-      (el) => !el.getAttribute("aria-label"),
-    ).length,
-  );
   check("I3 drift encodings carry a text alternative", unlabelled === 0, `${unlabelled} unlabelled`);
 
   await ctx.close();
 }
 
 // I5: the layout holds at each breakpoint, and at 125% text scaling.
+//
+// Every view, not just the one that happens to open first: Activity's timeline
+// and Settings' widest hint lines are the two most likely places for a stray
+// pixel of horizontal scroll, and neither is the default screen.
+const VIEWS = ["Planner", "Tasks", "Activity", "Reports", "Settings"];
+
 for (const [width, height, scale] of [
   [960, 640, 1],
   [1130, 720, 1],
@@ -125,14 +164,22 @@ for (const [width, height, scale] of [
     await page.addStyleTag({ content: `html { font-size: ${16 * scale}px }` });
   }
   await page.waitForTimeout(400);
-  const overflow = await page.evaluate(() => ({
-    doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    body: document.body.scrollWidth - document.body.clientWidth,
-  }));
+  const worst = { doc: 0, body: 0, view: "Planner" };
+  for (const view of VIEWS) {
+    await page.click(`button[aria-label^="${view}"]`);
+    await page.waitForTimeout(250);
+    const overflow = await page.evaluate(() => ({
+      doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      body: document.body.scrollWidth - document.body.clientWidth,
+    }));
+    if (overflow.doc > worst.doc || overflow.body > worst.body) {
+      Object.assign(worst, overflow, { view });
+    }
+  }
   check(
     `I5 no horizontal overflow at ${width}×${height}${scale === 1 ? "" : " @125% text"}`,
-    overflow.doc <= 0 && overflow.body <= 0,
-    JSON.stringify(overflow),
+    worst.doc <= 0 && worst.body <= 0,
+    JSON.stringify(worst),
   );
   await ctx.close();
 }

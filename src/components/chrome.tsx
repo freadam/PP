@@ -134,6 +134,47 @@ export function TimerChip({ timer }: { timer: TimerState }) {
   );
 }
 
+/**
+ * §3.5 — while Activity is sampling, the app says so, always, in the chrome.
+ *
+ * It lights from `activity:sampled`, which the sampler emits only when a row
+ * was actually written. An indicator driven by a settings flag would claim to
+ * be recording while paused or excluded; this one cannot.
+ */
+export function RecordingIndicator() {
+  const status = useApp((s) => s.activityStatus);
+  const sampledAt = useApp((s) => s.sampledAt);
+  const go = useApp((s) => s.go);
+  const [fresh, setFresh] = useState(false);
+
+  useEffect(() => {
+    if (!sampledAt) return;
+    setFresh(true);
+    const t = setTimeout(() => setFresh(false), 900);
+    return () => clearTimeout(t);
+  }, [sampledAt]);
+
+  const settings = status?.settings;
+  if (!settings?.enabled || status?.support !== "full") return null;
+
+  return (
+    <button
+      className="recording"
+      data-paused={settings.paused}
+      data-fresh={fresh}
+      onClick={() => go("activity")}
+      title={
+        settings.paused
+          ? "Activity is paused — nothing is being recorded"
+          : "Activity is recording which application is in front. Nothing leaves this machine."
+      }
+    >
+      <span className="dot" />
+      <span className="micro">{settings.paused ? "Paused" : "Recording"}</span>
+    </button>
+  );
+}
+
 export function TopBar() {
   const timer = useApp((s) => s.timer);
   const setOverlay = useApp((s) => s.setOverlay);
@@ -157,6 +198,7 @@ export function TopBar() {
         <PomodoroStrip pomodoro={timer.pomodoro} />
       </span>
 
+      <RecordingIndicator />
       {unreconciled.length > 0 && (
         <button className="btn" onClick={() => setOverlay("reconcile")}>
           <span className="dot" style={{ background: "var(--track)" }} />

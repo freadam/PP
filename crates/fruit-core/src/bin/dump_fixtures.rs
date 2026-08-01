@@ -67,6 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             duration_sec: *estimate,
             tz: tz.clone(),
             is_fixed: i == 4,
+            rrule: None,
         })?;
 
         // Every drift state from §5.6 gets a representative on screen.
@@ -124,6 +125,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         duration_sec: 900,
         tz: tz.clone(),
         is_fixed: true,
+        rrule: None,
     })?;
     let firefight = store.create_task(NewTask {
         title: "Production firefight".into(),
@@ -137,6 +139,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ended_at: day_start_ms(0, 15) + 40 * 60_000,
         note: None,
     })?;
+
+    // A repeating block, so the preview shows the ↻ marker and the series that
+    // makes ⌫ ask which occurrences it means (§4.3, P2).
+    store.schedule_recurring(
+        NewBlock {
+            task_id: None,
+            label: Some("Daily stand-up".into()),
+            starts_at: day_start_ms(0, 9),
+            duration_sec: 900,
+            tz: tz.clone(),
+            is_fixed: true,
+            rrule: None,
+        },
+        "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+    )?;
+
+    // Activity (§3.5, P2). Enabled here only so the preview has something to
+    // draw; it is off in a real first run, and the fixture's own settings
+    // object below says `enabled: true` because that is genuinely what this
+    // recorded database had.
+    store.set_activity_setting(
+        fruit_core::store::ACTIVITY_ENABLED,
+        Value::Bool(true),
+    )?;
+    store.set_activity_setting("activity.titlesEnabled", Value::Bool(true))?;
+    // On *today*, because that is the day Activity opens on, and because the
+    // first-run seed puts a plotted block there for the correlation panel to
+    // compare against.
+    let activity_base = fruit_core::time::day_start(today_date, &zone_) + 9 * 3_600_000;
+    // Minutes after 09:00, how long, and what was in front. The 09:00 block on
+    // today is the first-run seed's "Refactor auth module" — so the preview's
+    // correlation panel has a real intention to hold the observation against,
+    // and it is not a flattering comparison, which is the point.
+    for (from_min, minutes, app_id, title) in [
+        (0i64, 22i64, "code.exe", "auth.rs — fruit"),
+        (22, 18, "slack.exe", "#eng-planning"),
+        (40, 25, "code.exe", "auth.rs — fruit"),
+        (65, 10, "chrome.exe", "OAuth 2.1 draft"),
+        (120, 55, "code.exe", "activity.rs — fruit"),
+        (185, 30, "slack.exe", "#design-review"),
+        (240, 70, "code.exe", "Activity.tsx — fruit"),
+        (330, 25, "chrome.exe", "RFC 5545 — RRULE"),
+    ] {
+        // One sample every 20 seconds, exactly as the shell's loop does: each
+        // covers a nominal interval, and `record_activity` coalesces a run of
+        // them into one span. Recording it any other way would be a fixture of
+        // something the app never produces.
+        let start = activity_base + from_min * 60_000;
+        for step in 0..(minutes * 3) {
+            store.record_activity(ActivitySample {
+                app_id: app_id.into(),
+                window_title: Some(title.into()),
+                at: start + step * 20_000,
+            })?;
+        }
+    }
 
     let range = DateRange {
         from: format_date(monday),
@@ -184,6 +242,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!(store.unreconciled_days(&today, 10)?),
     );
     out.insert("get_timer_state".into(), json!(store.timer_state()?));
+    out.insert(
+        "get_activity_day".into(),
+        json!(store.get_activity_day(&today, &tz)?),
+    );
+    // `support` and `supportNote` are the shell's answer, not the core's — the
+    // browser preview has no platform hook at all, so they are stated here
+    // rather than recorded. Everything under `settings` is the real thing.
+    out.insert(
+        "get_activity_settings".into(),
+        json!({
+            "support": "full",
+            "supportNote": "Browser preview. In the desktop app this sentence comes from the platform itself.",
+            "settings": store.activity_settings()?,
+        }),
+    );
+    out.insert("get_rrule_presets".into(), json!(fruit_core::rrule::presets()));
+    out.insert("extend_series_to".into(), json!(0));
     out.insert("get_settings".into(), Value::Object(store.all_settings()?));
     out.insert("get_deleted".into(), json!(store.deleted_rows()?));
     out.insert("search".into(), json!(store.search("draft", 20)?));

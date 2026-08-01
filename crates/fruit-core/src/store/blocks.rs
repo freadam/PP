@@ -23,15 +23,26 @@ impl Store {
             local_date: row.get(5)?,
             tz: row.get(6)?,
             is_fixed: row.get::<_, i64>(7)? == 1,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
+            series_id: row.get(8)?,
+            rrule: row.get(9)?,
+            external_uid: row.get(10)?,
+            created_at: row.get(11)?,
+            updated_at: row.get(12)?,
         })
     }
 
     pub(crate) const BLOCK_COLS: &'static str =
-        "id, task_id, label, starts_at, duration_sec, local_date, tz, is_fixed, created_at, updated_at";
+        "id, task_id, label, starts_at, duration_sec, local_date, tz, is_fixed,
+         series_id, rrule, external_uid, created_at, updated_at";
 
     pub fn schedule_block(&mut self, input: NewBlock) -> Result<BlockRow> {
+        // A rule on the input means a series; `schedule_recurring` validates the
+        // seed through this same function, so there is no second validation path.
+        if let Some(rule) = input.rrule.clone() {
+            let mut seed = input;
+            seed.rrule = None;
+            return Ok(self.schedule_recurring(seed, &rule)?.remove(0));
+        }
         let now = self.now();
         let zone = zone(&input.tz)?;
         check_plausible(input.starts_at, now)?;
@@ -83,6 +94,20 @@ impl Store {
             params![id, now],
         )?;
         self.block_row(&id)
+    }
+
+    /// `None` when the block is gone or soft-deleted — the shape tests want.
+    pub fn block_row_public(&self, id: &str) -> Option<BlockRow> {
+        self.conn
+            .query_row(
+                &format!(
+                    "SELECT {} FROM scheduled_block WHERE id = ?1 AND deleted_at IS NULL",
+                    Self::BLOCK_COLS
+                ),
+                [id],
+                Self::map_block,
+            )
+            .ok()
     }
 
     pub(crate) fn block_row(&self, id: &str) -> Result<BlockRow> {
@@ -264,6 +289,7 @@ impl Store {
             duration_sec: b.duration_sec,
             tz: b.tz,
             is_fixed: false,
+            rrule: None,
         })
     }
 

@@ -475,6 +475,7 @@ function DayColumnView({
             data-tiny={height < 28}
             data-warn={b.lanes > 1}
             data-done={b.taskStatus === "done"}
+            data-series={b.block.seriesId != null}
             style={{
               top,
               height,
@@ -493,7 +494,7 @@ function DayColumnView({
                 driftSec: b.driftSec,
                 state: b.driftState,
               },
-            )}`}
+            )}${b.block.seriesId ? ", repeats" : ""}`}
             onPointerDown={(e) => onDragStart(e, b, "move")}
             onClick={() => selectBlock(b.block.id)}
             onDoubleClick={() => b.block.taskId && void openDetail(b.block.taskId)}
@@ -515,6 +516,16 @@ function DayColumnView({
             />
             {height >= 28 && (
               <span className="plate-title" style={{ fontSize: "var(--t-body)" }}>
+                {/* A repeating block looks like every other block, because it
+                    is one. The marker earns its pixels by changing what ⌫
+                    does — and the dotted right edge in CSS carries the same
+                    fact down to a 15-minute stand-up, where there is no room
+                    for a glyph but ⌫ still asks a different question. */}
+                {b.block.seriesId && (
+                  <span className="repeat-mark" aria-hidden="true" title="Repeats">
+                    ↻
+                  </span>
+                )}
                 {b.title}
               </span>
             )}

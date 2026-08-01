@@ -1184,6 +1184,156 @@ textarea::placeholder {
   color: var(--faint);
 }
 
+/* ─── Activity (§3.5, P2) ────────────────────────────────────────────── */
+
+/* One stacked bar, no legend: proportion is the message, and the app name is
+   in the tooltip and the accessible label where a legend would have put it. */
+.app-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: var(--rule);
+  min-width: 0;
+}
+.app-bar > i {
+  display: block;
+  height: 100%;
+  min-width: 1px;
+}
+
+/* The Planner's axis, reused exactly — same hour height, same 48px gutter — so
+   the two screens can be compared by eye rather than by reading both. */
+.activity-timeline {
+  overflow: auto;
+  max-height: 52vh;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+}
+.activity-canvas {
+  position: relative;
+  /* The 00 label sits on the hour line, which means half of it is above the
+     first row — without this it is clipped by the scroll box. */
+  padding-top: 0.6em;
+}
+.activity-timeline .hour-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--rule);
+}
+.activity-lane {
+  position: absolute;
+  inset: 0 0 0 48px;
+}
+.activity-span {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 1px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s-6);
+  color: var(--app-ink);
+  white-space: nowrap;
+}
+
+/* The recording indicator (§3.5): visible whenever sampling is live, and it
+   pulses on an actual write rather than on a timer. */
+.recording {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-6);
+  padding: 2px var(--s-8);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+}
+.recording .dot {
+  background: var(--over);
+  transition: opacity 160ms linear;
+}
+.recording[data-fresh="true"] .dot {
+  opacity: 0.35;
+}
+.recording[data-paused="true"] .dot {
+  background: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .recording .dot {
+    transition: none;
+  }
+  .recording[data-fresh="true"] .dot {
+    opacity: 1;
+  }
+}
+
+/* A switch reads as on or off from its knob position and its word, not from
+   colour alone (§5.9, U11). */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  color: var(--muted);
+}
+.switch > i {
+  display: block;
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--rule);
+  transition: background 120ms linear;
+}
+.switch > i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 120ms ease, background 120ms linear;
+}
+.switch[aria-checked="true"] > i {
+  background: color-mix(in srgb, var(--plot) 30%, var(--rule));
+  border-color: var(--plot);
+}
+.switch[aria-checked="true"] > i::after {
+  transform: translateX(16px);
+  background: var(--plot);
+}
+.switch[aria-checked="true"] {
+  color: var(--ink);
+}
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .switch > i,
+  .switch > i::after {
+    transition: none;
+  }
+}
+
+/* A repeating block is an ordinary block with one extra glyph (§4.3, P2). */
+.repeat-mark {
+  color: var(--muted);
+  margin-right: 4px;
+  font-size: var(--t-micro);
+}
+/* …and a dotted right edge, which survives where the glyph cannot: a 15-minute
+   stand-up is a `data-tiny` plate with room for no text at all, and it is
+   exactly the kind of block that repeats. Without this, ⌫ would ask "which
+   occurrences?" on a plate carrying no sign that it was part of a series. */
+.plate[data-series="true"] {
+  border-right: 2px dotted var(--muted);
+}
+
 .scroll-y {
   overflow-y: auto;
   min-height: 0;

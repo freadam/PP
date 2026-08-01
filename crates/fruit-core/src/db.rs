@@ -13,6 +13,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_init.sql"),
     include_str!("../migrations/0002_tracked_cache.sql"),
     include_str!("../migrations/0003_rollover.sql"),
+    include_str!("../migrations/0004_recurrence_and_activity.sql"),
 ];
 
 pub fn schema_version() -> i64 {
