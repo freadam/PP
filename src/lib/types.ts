@@ -46,6 +46,9 @@ export interface TaskRow {
   dueAt: Millis | null;
   priority: number;
   energy: string | null;
+  /** "Doesn't fit one sitting" — the top of the estimate scale, and a distinct
+   *  state from "not estimated yet". */
+  isRollover: boolean;
   sortRank: number;
   completedAt: Millis | null;
   tags: TagRow[];
@@ -361,6 +364,7 @@ export interface NewTask {
   dueAt?: Millis | null;
   priority?: number | null;
   energy?: string | null;
+  isRollover?: boolean;
   tags?: string[];
 }
 
@@ -373,6 +377,7 @@ export interface TaskPatch {
   priority?: number;
   energy?: string | null;
   sortRank?: number;
+  isRollover?: boolean;
   tags?: string[];
 }
 

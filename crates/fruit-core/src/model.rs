@@ -99,6 +99,9 @@ pub struct TaskRow {
     pub due_at: Option<Millis>,
     pub priority: i64,
     pub energy: Option<String>,
+    /// "Doesn't fit one sitting" — the top of the estimate scale, and a
+    /// different state from "not estimated yet" (migration 0003).
+    pub is_rollover: bool,
     pub sort_rank: f64,
     pub completed_at: Option<Millis>,
     pub tags: Vec<TagRow>,
@@ -124,6 +127,8 @@ pub struct NewTask {
     pub priority: Option<i64>,
     pub energy: Option<String>,
     #[serde(default)]
+    pub is_rollover: bool,
+    #[serde(default)]
     pub tags: Vec<String>,
 }
 
@@ -145,6 +150,9 @@ pub struct TaskPatch {
     #[serde(default, with = "double_option")]
     pub energy: Option<Option<String>>,
     pub sort_rank: Option<f64>,
+    /// Setting this to true clears `estimate_sec`; setting an estimate clears
+    /// this. The two are mutually exclusive by construction.
+    pub is_rollover: Option<bool>,
     /// Replaces the whole tag set when present.
     pub tags: Option<Vec<String>>,
 }

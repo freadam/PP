@@ -38,12 +38,14 @@ export function Tasks() {
           {backlog.groups
             .filter((g) => g.count > 0)
             .map((group) => (
-              <section key={group.key}>
+              <section key={group.key} data-group={group.key}>
                 <h2 className="group-head label">
                   {group.label}
                   <span className="data">{group.count}</span>
                   {group.estimateSec > 0 && (
-                    <span className="total data">{fmt.duration(group.estimateSec)} estimated</span>
+                    <span className="total data">
+                      {fmt.duration(group.estimateSec)} estimated
+                    </span>
                   )}
                 </h2>
                 {group.taskIds.map((id) => {
@@ -259,8 +261,14 @@ function TaskRowView({ task }: { task: TaskRow }) {
         </span>
       ))}
 
-      {task.estimateSec != null && (
-        <span className="task-meta data">{fmt.duration(task.estimateSec)}</span>
+      {task.isRollover ? (
+        <span className="task-meta micro" title="Doesn't fit one sitting; carries across days">
+          Rollover
+        </span>
+      ) : (
+        task.estimateSec != null && (
+          <span className="task-meta data">{fmt.duration(task.estimateSec)}</span>
+        )
       )}
 
       {planned > 0 && task.trackedSec > 0 && (

@@ -89,6 +89,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // One rollover task and a couple of finished ones, so the preview shows
+    // the top of the estimate ladder and the greyed Completed tail.
+    store.create_task(NewTask {
+        title: "Rewrite the sync layer".into(),
+        project_id: Some(deep.id.clone()),
+        is_rollover: true,
+        priority: Some(2),
+        tags: vec!["dev".into()],
+        ..Default::default()
+    })?;
+    for title in ["Fix the flaky test", "Reply to the RFC thread"] {
+        let t = store.create_task(NewTask {
+            title: title.into(),
+            project_id: Some(deep.id.clone()),
+            estimate_sec: Some(1800),
+            ..Default::default()
+        })?;
+        store.add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: day_start_ms(0, 13),
+            ended_at: day_start_ms(0, 13) + 25 * 60_000,
+            note: None,
+        })?;
+        store.set_task_status(&t.id, Status::Done)?;
+    }
+
     // A meeting nobody plans for, and one unplanned session.
     store.schedule_block(NewBlock {
         task_id: None,

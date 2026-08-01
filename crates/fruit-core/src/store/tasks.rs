@@ -12,6 +12,9 @@ use crate::time::{check_plausible, local_date, parse_date, zone};
 /// §6.5: subtask depth ≤ 3. Deeper nesting is a UI problem, not a feature.
 const MAX_DEPTH: usize = 3;
 const MAX_TITLE: usize = 500;
+/// How much of the completed tail the project page carries. Enough to see what
+/// the week cost, short of loading a year of history into a list view.
+const DONE_TAIL_LIMIT: u32 = 100;
 
 /// The projection every task read shares. `now_param` is the 1-based index of
 /// the "now" binding, so callers with a variable number of filter parameters
@@ -19,7 +22,8 @@ const MAX_TITLE: usize = 500;
 fn task_cols(now_param: usize) -> String {
     format!(
         "t.id, t.project_id, t.parent_id, t.title, t.status, t.estimate_sec, t.due_date, t.due_at,
-         t.priority, t.energy, t.sort_rank, t.completed_at, t.created_at, t.updated_at,
+         t.priority, t.energy, t.is_rollover, t.sort_rank, t.completed_at,
+         t.created_at, t.updated_at,
          COALESCE((SELECT tracked_sec FROM task_tracked_cache c WHERE c.task_id = t.id), 0),
          (SELECT COUNT(*) FROM task s WHERE s.parent_id = t.id AND s.deleted_at IS NULL),
          (SELECT COUNT(*) FROM task s WHERE s.parent_id = t.id AND s.deleted_at IS NULL
@@ -43,14 +47,15 @@ impl Store {
             due_at: row.get(7)?,
             priority: row.get(8)?,
             energy: row.get(9)?,
-            sort_rank: row.get(10)?,
-            completed_at: row.get(11)?,
-            created_at: row.get(12)?,
-            updated_at: row.get(13)?,
-            tracked_sec: row.get(14)?,
-            subtask_total: row.get(15)?,
-            subtask_done: row.get(16)?,
-            is_scheduled: row.get::<_, i64>(17)? == 1,
+            is_rollover: row.get::<_, i64>(10)? == 1,
+            sort_rank: row.get(11)?,
+            completed_at: row.get(12)?,
+            created_at: row.get(13)?,
+            updated_at: row.get(14)?,
+            tracked_sec: row.get(15)?,
+            subtask_total: row.get(16)?,
+            subtask_done: row.get(17)?,
+            is_scheduled: row.get::<_, i64>(18)? == 1,
             tags: Vec::new(),
         })
     }
@@ -136,6 +141,11 @@ impl Store {
                 return Err(AppError::invalid("An estimate has to be between 1 second and 30 days."));
             }
         }
+        if input.is_rollover && input.estimate_sec.is_some() {
+            return Err(AppError::invalid(
+                "A task is either estimated or a rollover, not both.",
+            ));
+        }
         if input.due_date.is_some() && input.due_at.is_some() {
             return Err(AppError::invalid(
                 "A task has either a due date or a due time, not both.",
@@ -167,8 +177,8 @@ impl Store {
         tx.execute(
             "INSERT INTO task
                (id, project_id, parent_id, title, status, estimate_sec, due_date, due_at,
-                priority, energy, sort_rank, device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,'open',?5,?6,?7,?8,?9,?10,?11,?12,?12)",
+                priority, energy, is_rollover, sort_rank, device_id, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,'open',?5,?6,?7,?8,?9,?10,?11,?12,?13,?13)",
             params![
                 id,
                 input.project_id,
@@ -179,6 +189,7 @@ impl Store {
                 input.due_at,
                 priority,
                 input.energy,
+                input.is_rollover as i64,
                 rank,
                 self.device_id,
                 now
@@ -276,8 +287,12 @@ impl Store {
                     return Err(AppError::invalid("An estimate has to be positive."));
                 }
             }
+            // An estimate and a rollover are mutually exclusive, so setting one
+            // clears the other in the same statement — there is no window in
+            // which both are true.
             tx.execute(
-                "UPDATE task SET estimate_sec = ?2, updated_at = ?3 WHERE id = ?1",
+                "UPDATE task SET estimate_sec = ?2, is_rollover = 0, updated_at = ?3
+                  WHERE id = ?1",
                 params![id, estimate, now],
             )?;
         }
@@ -319,6 +334,15 @@ impl Store {
             tx.execute(
                 "UPDATE task SET energy = ?2, updated_at = ?3 WHERE id = ?1",
                 params![id, energy, now],
+            )?;
+        }
+        if let Some(rollover) = patch.is_rollover {
+            tx.execute(
+                "UPDATE task SET is_rollover = ?2,
+                        estimate_sec = CASE WHEN ?2 = 1 THEN NULL ELSE estimate_sec END,
+                        updated_at = ?3
+                  WHERE id = ?1",
+                params![id, rollover as i64, now],
             )?;
         }
         if let Some(rank) = patch.sort_rank {
@@ -445,7 +469,7 @@ impl Store {
         let sql = format!(
             "SELECT {} FROM task t
               WHERE {where_sql}
-              ORDER BY t.status ASC, t.priority DESC, t.sort_rank ASC
+              ORDER BY t.status ASC, t.completed_at DESC, t.priority DESC, t.sort_rank ASC
               LIMIT {limit} OFFSET {offset}",
             task_cols(args.len())
         );
@@ -472,21 +496,40 @@ impl Store {
         let today_date = parse_date(&today)?;
         let week_end = today_date + chrono::Duration::days(6);
 
-        let mut query = TaskQuery {
+        let base = TaskQuery {
             project_id: filter.project_id.clone(),
             tag: filter.tag.clone(),
-            scope: Some("open".into()),
+            include_subtasks: false,
             limit: Some(1000),
             ..Default::default()
         };
-        query.include_subtasks = false;
-        let mut tasks = self.get_tasks(query)?.rows;
+        let mut tasks = self
+            .get_tasks(TaskQuery {
+                scope: Some("open".into()),
+                ..base.clone()
+            })?
+            .rows;
 
         if filter.unscheduled_only {
             tasks.retain(|t| !t.is_scheduled);
         }
 
+        // Completed work goes to the bottom, not away: it is the record of what
+        // the project actually cost, and hiding it makes a finished project look
+        // empty. Capped, because the tail grows forever.
+        let done = self
+            .get_tasks(TaskQuery {
+                scope: Some("done".into()),
+                limit: Some(DONE_TAIL_LIMIT),
+                ..base
+            })?
+            .rows;
+        tasks.extend(done);
+
         let bucket_of = |t: &TaskRow| -> &'static str {
+            if t.status != Status::Open {
+                return "done";
+            }
             let date = t
                 .due_date
                 .clone()
@@ -509,6 +552,7 @@ impl Store {
             ("week", "This week"),
             ("no-date", "No date"),
             ("someday", "Someday"),
+            ("done", "Completed"),
         ];
         let groups = order
             .iter()

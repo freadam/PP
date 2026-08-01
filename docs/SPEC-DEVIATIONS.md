@@ -1,9 +1,9 @@
 # Where this build departs from the spec
 
-Five deviations. Each one names the spec text it changes and the reason. Nothing
-here is a preference; they are all cases where following the spec literally
-would produce a broken app, or where the spec left a decision open (§9) and the
-build had to make one.
+Seven deviations. Each one names the spec text it changes and the reason. Most
+are cases where following the spec literally would produce a broken app, or
+where the spec left a decision open (§9). Two — §5 and §6 — are changes the
+product owner asked for after seeing the build.
 
 ---
 
@@ -82,7 +82,50 @@ The spec left nine decisions open. This build had to pick; each is reversible.
 
 ---
 
-## 5. Idle detection is OS-wide where the OS allows it
+## 5. The estimate field is a dropdown again
+
+**Spec §1.5** lists this as a deliberate v1→v2 change: *"Estimate = dropdown of
+5 fixed values → Free-text field with parser + presets"*, because a dropdown
+*"contradicted the `~45m` capture token"*.
+
+The product owner asked for the dropdown back, with a specific ladder — 30 min,
+1, 1.5, 2, 2.5, 3, 3.5, 4 Hrs, Rollover. The spec's objection is still correct,
+so the contradiction is handled rather than ignored: `estimateOptions` keeps any
+off-ladder value the parser produced as an extra rung, labelled
+*(from capture)*. Capturing `Fix login bug ~45m` and then opening the dropdown
+shows 45 min in the list; it is never silently rounded to 30.
+
+**Rollover** is the top of the ladder — work that does not fit one sitting and
+carries across days. It is *not* the same as an unestimated task: "I haven't
+thought about it" and "I have thought about it and it doesn't fit in a number"
+are different states, and collapsing both into `estimate_sec IS NULL` would make
+the backlog unreadable. So it is its own column (migration 0003), with the
+pairing rule — rollover implies no estimate, an estimate clears rollover —
+enforced in the command layer and covered by
+`rollover_and_an_estimate_are_mutually_exclusive`.
+
+Calibration ignores rollover tasks automatically: it already requires a
+non-null estimate, and there is no ratio to compute without one.
+
+---
+
+## 6. Completed tasks stay on the project page
+
+**Spec §3.2** lists the task groups as Overdue · Today · This week · No date ·
+Someday — all open work. Completed tasks had nowhere to go.
+
+They now form a sixth group, *Completed*, pinned last and rendered recessive:
+greyed, struck through, with the drift rails dimmed. Full contrast returns on
+hover and focus, so a completed row is never unreadable when you actually go to
+it, and it stays keyboard-reachable.
+
+The reason to show it at all: a finished project that renders empty is lying
+about what it cost. The tail is capped at 100 rows, because it otherwise grows
+without limit and this is a list view, not an archive.
+
+---
+
+## 7. Idle detection is OS-wide where the OS allows it
 
 **Spec §4.5** requires idle detection but does not say how. "Idle" has to mean
 *away from the machine* — a developer reading a stack trace in their editor is

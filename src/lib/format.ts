@@ -104,3 +104,51 @@ export function minutesIntoDay(at: Millis): number {
 export function priorityLabel(p: number): string {
   return ["", "low", "medium", "high"][p] ?? "";
 }
+
+/**
+ * The estimate scale. A fixed ladder rather than free text, at the product
+ * owner's call — note this reverses spec §1.5, which replaced a dropdown with
+ * a parser because a dropdown contradicts the `~45m` capture token. The
+ * contradiction is real, so `estimateOptions` keeps any off-ladder value the
+ * parser produced as an extra rung: choosing from the list is easy, and no
+ * existing estimate is silently rounded away.
+ *
+ * `Rollover` is the top of the ladder — work that doesn't fit one sitting —
+ * and is a different state from "not estimated yet", which is why it is a
+ * column of its own rather than a null.
+ */
+export const ESTIMATE_LADDER_SEC = [
+  1800, 3600, 5400, 7200, 9000, 10800, 12600, 14400,
+] as const;
+
+export interface EstimateOption {
+  /** `""` none · `"rollover"` · otherwise the duration in seconds, as a string. */
+  value: string;
+  label: string;
+  /** True for a value that came from the task rather than the ladder. */
+  offLadder?: boolean;
+}
+
+export function estimateLabel(sec: number): string {
+  const hours = sec / 3600;
+  if (sec < 3600) return `${Math.round(sec / 60)} min`;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} ${hours === 1 ? "Hr" : "Hrs"}`;
+}
+
+export function estimateOptions(current: number | null): EstimateOption[] {
+  const ladder: EstimateOption[] = ESTIMATE_LADDER_SEC.map((sec) => ({
+    value: String(sec),
+    label: estimateLabel(sec),
+  }));
+  // A task captured as `~45m` keeps its 45m rather than being rounded to the
+  // nearest rung the moment someone opens the dropdown.
+  if (current != null && !ESTIMATE_LADDER_SEC.includes(current as never)) {
+    ladder.push({ value: String(current), label: estimateLabel(current), offLadder: true });
+    ladder.sort((a, b) => Number(a.value) - Number(b.value));
+  }
+  return [
+    { value: "", label: "No estimate" },
+    ...ladder,
+    { value: "rollover", label: "Rollover" },
+  ];
+}

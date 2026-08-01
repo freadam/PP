@@ -68,7 +68,9 @@ why. Use `npm run app` for anything real.
 **Plan.** Projects, tasks, subtasks that are real tasks, a 24-hour planner at
 1/3/7-day spans, drag-to-schedule with three collision policies, and a capture
 grammar (`Fix login bug #work ~45m !! ^tomorrow 9am`) that shows you what it
-parsed *before* you commit.
+parsed *before* you commit. Estimates run on a fixed ladder — 30 min to 4 Hrs,
+then Rollover for work that doesn't fit one sitting — and completed tasks sit
+greyed at the bottom of the project rather than vanishing.
 
 **Track.** One timer, enforced by the schema. Bound to a block when started
 from one, which is what makes drift per-block computable. Manual session entry,
@@ -95,7 +97,7 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 
 | Part | Status |
 |---|---|
-| `fruit-core` | Complete and tested — 68 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
+| `fruit-core` | Complete and tested — 71 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
 | Renderer | Complete for P0 + P1; verified in a headless browser (I1, I3–I7, U10) |
 | `src-tauri` | **Written but not compiled here** — linking needs a system webview, and this container has none. See below. |
 | Activity (§3.5) | P2, deliberately not built. The view says so and explains Wayland. |

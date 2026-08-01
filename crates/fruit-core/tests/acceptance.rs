@@ -1022,3 +1022,153 @@ impl Lcg {
         (self.0 >> 33) as u32
     }
 }
+
+// ─── the estimate scale, and the completed tail ────────────────────────
+
+/// Rollover is the top of the estimate scale — "doesn't fit one sitting" — and
+/// is a different state from "not estimated yet". The two never coexist.
+#[test]
+fn rollover_and_an_estimate_are_mutually_exclusive() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+
+    let both = store.create_task(NewTask {
+        title: "confused".into(),
+        estimate_sec: Some(3600),
+        is_rollover: true,
+        ..Default::default()
+    });
+    assert!(both.is_err(), "a task cannot be estimated *and* a rollover");
+
+    let t = store
+        .create_task(NewTask {
+            title: "Rewrite the parser".into(),
+            is_rollover: true,
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(t.is_rollover);
+    assert_eq!(t.estimate_sec, None);
+
+    // Choosing an estimate clears the rollover…
+    let t = store
+        .update_task(
+            &t.id,
+            TaskPatch {
+                estimate_sec: Some(Some(2 * 3600)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(!t.is_rollover);
+    assert_eq!(t.estimate_sec, Some(7200));
+
+    // …and choosing rollover clears the estimate.
+    let t = store
+        .update_task(
+            &t.id,
+            TaskPatch {
+                is_rollover: Some(true),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(t.is_rollover);
+    assert_eq!(t.estimate_sec, None, "no number is left behind to confuse drift");
+
+    // An unestimated task is distinguishable from a rollover — the whole
+    // reason this is a column and not a NULL.
+    let plain = task(&mut store, "Not thought about yet");
+    assert!(!plain.is_rollover);
+    assert_eq!(plain.estimate_sec, None);
+}
+
+/// A rollover task carries no estimate, so calibration has nothing to compare
+/// and must leave it out rather than counting it as a zero.
+#[test]
+fn rollover_tasks_stay_out_of_calibration() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let t = store
+        .create_task(NewTask {
+            title: "Open-ended".into(),
+            is_rollover: true,
+            ..Default::default()
+        })
+        .unwrap();
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(3 * 3600 * 1000);
+    store.stop_timer().unwrap();
+    store.set_task_status(&t.id, Status::Done).unwrap();
+
+    let report = store.calibration(TZ, None).unwrap();
+    assert_eq!(report.sample_count, 0, "no estimate means no ratio");
+}
+
+/// §3.2 — completed tasks belong at the bottom of the project, not gone.
+/// A finished project that renders empty is lying about what it cost.
+#[test]
+fn completed_tasks_land_in_a_group_at_the_bottom() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let project = store
+        .create_project(NewProject {
+            name: "Ship it".into(),
+            colour: None,
+            kind: None,
+            weekly_target_sec: None,
+        })
+        .unwrap();
+
+    let mut make = |title: &str, done: bool, store: &mut Store| {
+        let t = store
+            .create_task(NewTask {
+                title: title.into(),
+                project_id: Some(project.id.clone()),
+                estimate_sec: Some(1800),
+                ..Default::default()
+            })
+            .unwrap();
+        if done {
+            clock.advance(60_000);
+            store.set_task_status(&t.id, Status::Done).unwrap();
+        }
+        t
+    };
+    make("Still open", false, &mut store);
+    let first = make("Finished first", true, &mut store);
+    let last = make("Finished last", true, &mut store);
+
+    let view = store
+        .get_backlog(
+            BacklogFilter {
+                project_id: Some(project.id.clone()),
+                ..Default::default()
+            },
+            TZ,
+        )
+        .unwrap();
+
+    let keys: Vec<&str> = view.groups.iter().map(|g| g.key.as_str()).collect();
+    assert_eq!(
+        keys.last(),
+        Some(&"done"),
+        "Completed is the last group, so it reads as a tail"
+    );
+
+    let completed = view.groups.iter().find(|g| g.key == "done").unwrap();
+    assert_eq!(completed.label, "Completed");
+    assert_eq!(completed.count, 2);
+    assert_eq!(completed.estimate_sec, 3600, "totals still add up");
+    assert_eq!(
+        completed.task_ids,
+        vec![last.id.clone(), first.id.clone()],
+        "most recently finished first"
+    );
+
+    // The open task is untouched by any of this.
+    let open: i64 = view
+        .groups
+        .iter()
+        .filter(|g| g.key != "done")
+        .map(|g| g.count)
+        .sum();
+    assert_eq!(open, 1);
+}

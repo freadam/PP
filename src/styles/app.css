@@ -682,6 +682,42 @@ textarea::placeholder {
   color: var(--faint);
   text-decoration: line-through;
 }
+
+/* §3.2 — completed work sits at the bottom of the project, greyed. It stays
+   visible because it is the record of what the project actually cost; a
+   finished project that renders empty is lying. Recessive, not hidden:
+   still readable, still clickable, still keyboard-reachable. */
+[data-group="done"] .task-row,
+[data-group="done"] .group-head {
+  color: var(--faint);
+}
+[data-group="done"] .task-row .task-meta,
+[data-group="done"] .task-row .due-chip,
+[data-group="done"] .group-head .total {
+  color: var(--faint);
+}
+[data-group="done"] .task-row .dot,
+[data-group="done"] .task-row .tag,
+[data-group="done"] .task-row .priority-mark,
+[data-group="done"] .task-row .rail-compact,
+[data-group="done"] .task-row .badge-drift {
+  opacity: 0.55;
+}
+/* Hover and focus restore full contrast, so a completed row is never
+   unreadable when you actually go to it. */
+[data-group="done"] .task-row:hover,
+[data-group="done"] .task-row:focus-within {
+  color: var(--muted);
+}
+[data-group="done"] .task-row:hover .dot,
+[data-group="done"] .task-row:hover .tag,
+[data-group="done"] .task-row:hover .priority-mark,
+[data-group="done"] .task-row:hover .rail-compact,
+[data-group="done"] .task-row:hover .badge-drift,
+[data-group="done"] .task-row:focus-within .rail-compact,
+[data-group="done"] .task-row:focus-within .badge-drift {
+  opacity: 1;
+}
 .task-title {
   /* A <button> centres its text by default, which is wrong for a title. */
   text-align: left;

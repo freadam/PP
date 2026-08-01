@@ -119,9 +119,6 @@ function TitleField() {
 function Fields() {
   const detail = useApp((s) => s.detail)!;
   const projects = useApp((s) => s.projects);
-  const [estimate, setEstimate] = useState(
-    detail.task.estimateSec ? fmt.duration(detail.task.estimateSec) : "",
-  );
 
   const patch = async (p: Parameters<typeof ipc.updateTask>[1]) => {
     const { run, refresh } = useApp.getState();
@@ -154,23 +151,32 @@ function Fields() {
         <label className="label" style={{ width: 76, color: "var(--muted)" }} htmlFor="d-estimate">
           Estimate
         </label>
-        {/* §1.5 — free text with a parser, not a dropdown of five fixed values;
-            a dropdown contradicted the `~45m` capture token. */}
-        <input
+        {/* A fixed ladder, 30 min → 4 Hrs → Rollover. Any off-ladder value the
+            capture parser produced (`~45m`) appears as an extra rung rather
+            than being rounded away — see `estimateOptions`. */}
+        <select
           id="d-estimate"
           className="grow data"
-          value={estimate}
-          placeholder="45m · 1h30m · 2h"
-          onChange={(e) => setEstimate(e.target.value)}
-          onBlur={() => {
-            const m = /^(?:(\d+(?:\.\d+)?)h)?\s*(?:(\d+)m)?$|^(\d+)$/.exec(estimate.trim());
-            if (!m) return;
-            const hours = m[1] ? parseFloat(m[1]) : 0;
-            const mins = m[2] ? parseInt(m[2], 10) : m[3] ? parseInt(m[3], 10) : 0;
-            const sec = Math.round(hours * 3600 + mins * 60);
-            void patch({ estimateSec: sec > 0 ? sec : null });
+          value={
+            detail.task.isRollover
+              ? "rollover"
+              : detail.task.estimateSec != null
+                ? String(detail.task.estimateSec)
+                : ""
+          }
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "rollover") void patch({ isRollover: true });
+            else void patch({ estimateSec: v === "" ? null : Number(v) });
           }}
-        />
+        >
+          {fmt.estimateOptions(detail.task.estimateSec).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+              {o.offLadder ? " (from capture)" : ""}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="row">
@@ -207,10 +213,14 @@ function Fields() {
         <span>
           Tracked <span className="data">{fmt.duration(detail.task.trackedSec)}</span>
         </span>
-        {detail.task.estimateSec != null && (
-          <span>
-            of <span className="data">{fmt.duration(detail.task.estimateSec)}</span> estimated
-          </span>
+        {detail.task.isRollover ? (
+          <span>· rollover, no single-sitting estimate</span>
+        ) : (
+          detail.task.estimateSec != null && (
+            <span>
+              of <span className="data">{fmt.duration(detail.task.estimateSec)}</span> estimated
+            </span>
+          )
         )}
       </div>
     </div>

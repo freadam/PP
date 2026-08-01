@@ -12,6 +12,7 @@ use crate::time::now_ms;
 pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_init.sql"),
     include_str!("../migrations/0002_tracked_cache.sql"),
+    include_str!("../migrations/0003_rollover.sql"),
 ];
 
 pub fn schema_version() -> i64 {
