@@ -56,6 +56,9 @@ export interface TaskRow {
   subtaskTotal: number;
   subtaskDone: number;
   isScheduled: boolean;
+  /** When work was first and last recorded against this task, from its sessions. */
+  firstSessionAt: Millis | null;
+  lastSessionAt: Millis | null;
   createdAt: Millis;
   updatedAt: Millis;
 }
@@ -170,8 +173,15 @@ export interface PomodoroState {
 
 export interface TimerState {
   phase: TimerPhase;
+  /** The task being timed. Outlives any one segment, so it survives an idle gap. */
+  runTaskId: string | null;
+  taskTitle: string | null;
+  /** The open segment, or null during an idle challenge or break. */
   session: SessionRow | null;
+  /** Counted seconds for the whole run, across segments. */
   elapsedSec: number;
+  /** Counted seconds for the open segment only. */
+  segmentElapsedSec: number;
   idleFrom: Millis | null;
   idleTo: Millis | null;
   recoverySessionId: string | null;

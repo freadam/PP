@@ -13,6 +13,7 @@ import * as fmt from "../lib/format";
 import type { DeletedRow, TaskRow } from "../lib/types";
 import { undoableDelete } from "../store/app";
 import { BREAK_SIDEBAR_COLLAPSE, useViewportWidth } from "../lib/useViewport";
+import { useStartTaskDrag } from "../lib/useTaskDrag";
 
 export function Sidebar() {
   const view = useApp((s) => s.view);
@@ -53,6 +54,7 @@ function CollapsedStrip() {
 function BacklogPane() {
   const backlog = useApp((s) => s.backlog);
   const openDetail = useApp((s) => s.openDetail);
+  const startTaskDrag = useStartTaskDrag();
 
   const unscheduled = (backlog?.tasks ?? []).filter((t) => !t.isScheduled).slice(0, 60);
 
@@ -72,9 +74,10 @@ function BacklogPane() {
           {unscheduled.map((t) => (
             <button
               key={t.id}
-              className="sidebar-row"
+              className="sidebar-row draggable"
+              onPointerDown={(e) => startTaskDrag(e, t)}
               onClick={() => void openDetail(t.id)}
-              title="Select it and press S to schedule with the keyboard"
+              title="Drag onto the planner, or select it and press S"
             >
               <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                 {t.title}

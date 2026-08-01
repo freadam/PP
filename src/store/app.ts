@@ -27,6 +27,20 @@ import type {
 } from "../lib/types";
 
 export type ViewName = "planner" | "tasks" | "activity" | "reports" | "settings";
+
+/**
+ * A task being dragged toward the planner (§4.3 — "sidebar backlog item" and
+ * "task row" are listed sources, not just existing blocks).
+ *
+ * It lives in the store because the drag starts in one component and lands in
+ * another; keeping it local to either would mean the Planner could never see a
+ * drag that began in the Sidebar.
+ */
+export interface TaskDrag {
+  taskId: string;
+  title: string;
+  durationSec: number;
+}
 export type Overlay = null | "focus" | "reconcile" | "palette" | "detail" | "shortcuts";
 
 export interface Toast {
@@ -63,6 +77,7 @@ interface AppState {
   hourHeight: number;
   week: WeekView | null;
   selectedBlockId: string | null;
+  taskDrag: TaskDrag | null;
 
   // ─── tasks ───────────────────────────────────────────────────────────
   backlog: BacklogView | null;
@@ -106,6 +121,7 @@ interface AppState {
   flushNote: () => Promise<void>;
 
   selectBlock: (id: string | null) => void;
+  setTaskDrag: (d: TaskDrag | null) => void;
   selectTask: (id: string, mode?: "replace" | "toggle" | "range") => void;
 
   toggleTimer: (taskId: string, blockId?: string | null) => Promise<void>;
@@ -138,6 +154,7 @@ export const useApp = create<AppState>((set, get) => ({
   hourHeight: 56,
   week: null,
   selectedBlockId: null,
+  taskDrag: null,
 
   backlog: null,
   projects: [],
@@ -150,8 +167,11 @@ export const useApp = create<AppState>((set, get) => ({
 
   timer: {
     phase: "idle",
+    runTaskId: null,
+    taskTitle: null,
     session: null,
     elapsedSec: 0,
+    segmentElapsedSec: 0,
     idleFrom: null,
     idleTo: null,
     recoverySessionId: null,
@@ -296,6 +316,10 @@ export const useApp = create<AppState>((set, get) => ({
     set({ selectedBlockId });
   },
 
+  setTaskDrag(taskDrag) {
+    set({ taskDrag });
+  },
+
   selectTask(id, mode = "replace") {
     const current = get().selectedTaskIds;
     if (mode === "toggle") {
@@ -321,7 +345,8 @@ export const useApp = create<AppState>((set, get) => ({
 
   async toggleTimer(taskId, blockId) {
     const { timer } = get();
-    const running = timer.phase === "running" && timer.session?.taskId === taskId;
+    const running =
+      timer.phase !== "idle" && (timer.session?.taskId ?? timer.runTaskId) === taskId;
     const next = await get().run(() =>
       running ? ipc.stopTimer() : ipc.startTimer(taskId, blockId ?? null),
     );

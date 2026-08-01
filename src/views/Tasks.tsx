@@ -14,6 +14,7 @@ import type { CapturePreview, TaskRow } from "../lib/types";
 import { DriftBadge, DriftRailCompact } from "../components/DriftRail";
 import { Empty } from "../components/chrome";
 import { taskDue } from "../components/Sidebar";
+import { useStartTaskDrag } from "../lib/useTaskDrag";
 
 export function Tasks() {
   const backlog = useApp((s) => s.backlog);
@@ -172,11 +173,12 @@ function TaskRowView({ task }: { task: TaskRow }) {
   const toggleTimer = useApp((s) => s.toggleTimer);
   const timer = useApp((s) => s.timer);
   const projects = useApp((s) => s.projects);
+  const startTaskDrag = useStartTaskDrag();
   const [menu, setMenu] = useState(false);
 
   const project = projects.find((p) => p.id === task.projectId);
   const due = taskDue(task);
-  const running = timer.phase === "running" && timer.session?.taskId === task.id;
+  const running = timer.phase === "running" && timer.runTaskId === task.id;
   const planned = task.estimateSec ?? 0;
   const driftSec = planned > 0 ? task.trackedSec - planned : 0;
   const state =
@@ -218,6 +220,13 @@ function TaskRowView({ task }: { task: TaskRow }) {
       className="task-row"
       data-selected={selected}
       data-done={task.status === "done"}
+      onPointerDown={(e) => {
+        // Only the row itself starts a drag; the checkbox, timer toggle and
+        // overflow menu keep their own gestures.
+        if (e.target === e.currentTarget || (e.target as HTMLElement).closest(".task-title")) {
+          startTaskDrag(e, task);
+        }
+      }}
       onClick={(e) => selectTask(task.id, e.shiftKey ? "range" : e.metaKey ? "toggle" : "replace")}
       onDoubleClick={() => void openDetail(task.id)}
     >
@@ -261,7 +270,17 @@ function TaskRowView({ task }: { task: TaskRow }) {
         </span>
       ))}
 
-      {task.isRollover ? (
+      {task.status === "done" && task.firstSessionAt != null ? (
+        /* For finished work, *when* it happened beats what it was estimated
+           at — the estimate is already folded into the drift rail beside it. */
+        <span
+          className="task-meta data"
+          title={`Worked ${fmt.longDate(fmt.toLocalDate(new Date(task.firstSessionAt)))}`}
+        >
+          {fmt.clock(task.firstSessionAt)}–
+          {task.lastSessionAt != null ? fmt.clock(task.lastSessionAt) : "?"}
+        </span>
+      ) : task.isRollover ? (
         <span className="task-meta micro" title="Doesn't fit one sitting; carries across days">
           Rollover
         </span>

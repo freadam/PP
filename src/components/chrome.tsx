@@ -90,9 +90,11 @@ export function TimerChip({ timer }: { timer: TimerState }) {
   const openDetail = useApp((s) => s.openDetail);
   const toggleTimer = useApp((s) => s.toggleTimer);
   const running = timer.phase === "running";
-  const session = timer.session;
 
-  if (!session) {
+  // The chip follows the *run*, not the segment: a segment closes whenever the
+  // machine sleeps or you walk away, and a chip that blanks out at that moment
+  // would be reporting a bookkeeping detail as if it were news.
+  if (!timer.runTaskId) {
     return (
       <span className="timer-chip" data-idle="true">
         <span className="caption">No timer running</span>
@@ -102,15 +104,28 @@ export function TimerChip({ timer }: { timer: TimerState }) {
   }
 
   return (
-    <span className="timer-chip" aria-live="polite">
-      <span className="dot" style={{ background: "var(--track)" }} />
-      <button className="chip-title" onClick={() => void openDetail(session.taskId)}>
-        {session.taskTitle}
+    <span className="timer-chip" data-idle={!running} aria-live="polite">
+      <span
+        className="dot"
+        style={{ background: running ? "var(--track)" : "var(--muted)" }}
+      />
+      <button
+        className="chip-title"
+        onClick={() => timer.runTaskId && void openDetail(timer.runTaskId)}
+      >
+        {timer.taskTitle ?? "Timing"}
       </button>
       <span className="data">{fmt.stopwatch(timer.elapsedSec)}</span>
+      {!running && (
+        <span className="micro" style={{ color: "var(--muted)" }}>
+          {timer.phase === "idleChallenge" ? "paused" : timer.phase}
+        </span>
+      )}
       <button
         aria-label={running ? "Stop timer" : "Start timer"}
-        onClick={() => void toggleTimer(session.taskId, session.blockId)}
+        onClick={() =>
+          timer.runTaskId && void toggleTimer(timer.runTaskId, timer.session?.blockId)
+        }
         style={{ color: "var(--muted)" }}
       >
         {running ? "■" : "▶"}

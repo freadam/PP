@@ -54,7 +54,8 @@ export const COMMANDS: Command[] = [
     keys: "Space",
     run: () => {
       const { timer, selectedTaskIds, backlog } = app();
-      if (timer.session) return void app().toggleTimer(timer.session.taskId, timer.session.blockId);
+      if (timer.runTaskId)
+        return void app().toggleTimer(timer.runTaskId, timer.session?.blockId);
       const id = selectedTaskIds[0] ?? backlog?.tasks[0]?.id;
       if (id) void app().toggleTimer(id);
       else app().toast("Select a task first, then press Space.");

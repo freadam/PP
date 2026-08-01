@@ -202,6 +202,7 @@ textarea::placeholder {
 
 .sidebar-row {
   display: flex;
+  user-select: none;
   align-items: center;
   gap: var(--s-8);
   width: 100%;
@@ -212,6 +213,12 @@ textarea::placeholder {
 }
 .sidebar-row:hover {
   background: var(--raised);
+}
+.sidebar-row.draggable {
+  cursor: grab;
+}
+.sidebar-row.draggable:active {
+  cursor: grabbing;
 }
 .sidebar-row[aria-selected="true"] {
   background: var(--raised);
@@ -562,6 +569,8 @@ textarea::placeholder {
    says "here is the record". */
 .plate {
   position: absolute;
+  /* A pointer drag must not start a text selection instead. */
+  user-select: none;
   background: var(--raised);
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
@@ -594,6 +603,30 @@ textarea::placeholder {
 }
 .plate[data-running="true"] {
   border-color: var(--track);
+}
+/* A completed block is history, not plan. It recedes to `faint` so the eye
+   goes to what is still open, but it keeps its drift rail — what a finished
+   block cost is the whole point of having drawn it. */
+.plate[data-done="true"] {
+  background: color-mix(in srgb, var(--raised) 55%, var(--ink));
+  border-color: var(--rule);
+  color: var(--faint);
+}
+.plate[data-done="true"] .plate-title {
+  text-decoration: line-through;
+}
+.plate[data-done="true"]::after {
+  opacity: 0.35;
+}
+.plate[data-done="true"] .rail {
+  opacity: 0.7;
+}
+.plate[data-done="true"]:hover,
+.plate[data-done="true"]:focus-visible {
+  color: var(--muted);
+}
+.plate[data-done="true"]:hover .rail {
+  opacity: 1;
 }
 .plate[data-warn="true"] {
   background: color-mix(in srgb, var(--over) 12%, var(--raised));
@@ -663,6 +696,7 @@ textarea::placeholder {
    controls: hover-only destructive controls are unreachable by keyboard. */
 .task-row {
   display: flex;
+  user-select: none;
   align-items: center;
   gap: var(--s-8);
   height: 36px;

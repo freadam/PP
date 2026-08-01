@@ -111,6 +111,10 @@ pub struct TaskRow {
     pub subtask_done: i64,
     /// True when the task has at least one block starting after now.
     pub is_scheduled: bool,
+    /// The first and last instants any work was recorded against this task.
+    /// Derived from `time_session`, like everything else about tracked time.
+    pub first_session_at: Option<Millis>,
+    pub last_session_at: Option<Millis>,
     pub created_at: Millis,
     pub updated_at: Millis,
 }
@@ -388,8 +392,16 @@ pub enum TimerPhase {
 #[serde(rename_all = "camelCase")]
 pub struct TimerState {
     pub phase: TimerPhase,
+    /// The task being timed, which outlives any one segment — during an idle
+    /// challenge or a break the run continues with nothing recording.
+    pub run_task_id: Option<String>,
+    pub task_title: Option<String>,
+    /// The open segment, or `None` during an idle challenge or break.
     pub session: Option<SessionRow>,
+    /// Counted seconds for the whole run, across segments.
     pub elapsed_sec: i64,
+    /// Counted seconds for the open segment only.
+    pub segment_elapsed_sec: i64,
     /// Set in `IdleChallenge`: the exact span the user has to rule on (§4.5, U6).
     pub idle_from: Option<Millis>,
     pub idle_to: Option<Millis>,
@@ -402,8 +414,11 @@ impl TimerState {
     pub fn idle() -> Self {
         TimerState {
             phase: TimerPhase::Idle,
+            run_task_id: None,
+            task_title: None,
             session: None,
             elapsed_sec: 0,
+            segment_elapsed_sec: 0,
             idle_from: None,
             idle_to: None,
             recovery_session_id: None,

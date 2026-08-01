@@ -45,6 +45,10 @@ export function Planner() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [adHoc, setAdHoc] = useState<{ date: string; startMin: number } | null>(null);
   const [nowMin, setNowMin] = useState(() => fmt.minutesIntoDay(Date.now()));
+  const taskDrag = useApp((s) => s.taskDrag);
+  const [taskDrop, setTaskDrop] = useState<
+    { date: string; startMin: number; durationMin: number } | null
+  >(null);
 
   /* §6.9 — the now cursor is minute-aligned and paused when the Planner is
      unmounted. A 1-second interval keeps the CPU awake permanently for a line
@@ -208,6 +212,74 @@ export function Planner() {
     };
   }, [drag, days, pointToSlot]);
 
+  /* §4.3 — a task dragged from the sidebar or a task row lands here. The drag
+     began in another component, so it arrives through the store; everything
+     from the insertion plate to the drop is the same as for an existing block. */
+  useEffect(() => {
+    if (!taskDrag) {
+      setTaskDrop(null);
+      return;
+    }
+    const durationMin = taskDrag.durationSec / 60;
+
+    const onMove = (e: PointerEvent) => {
+      const el = scrollRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const above = e.clientY - r.top;
+        const below = r.bottom - e.clientY;
+        let dy = 0;
+        if (above < AUTOSCROLL_EDGE_PX) dy = -(1 - above / AUTOSCROLL_EDGE_PX);
+        else if (below < AUTOSCROLL_EDGE_PX) dy = 1 - below / AUTOSCROLL_EDGE_PX;
+        if (dy !== 0) el.scrollTop += (dy * AUTOSCROLL_MAX_PX_S) / 60;
+      }
+      const slot = pointToSlot(e.clientX, e.clientY, e.altKey);
+      setTaskDrop(slot ? { date: slot.date, startMin: slot.startMin, durationMin } : null);
+    };
+
+    const onUp = async (e: PointerEvent) => {
+      const slot = pointToSlot(e.clientX, e.clientY, e.altKey);
+      const { setTaskDrag, run, refresh, toast, selectBlock } = useApp.getState();
+      setTaskDrag(null);
+      setTaskDrop(null);
+      if (!slot) return;
+      const startsAt = new Date(`${slot.date}T00:00:00`).getTime() + slot.startMin * 60_000;
+      const block = await run(
+        () =>
+          ipc.scheduleBlock({
+            taskId: taskDrag.taskId,
+            startsAt,
+            durationSec: taskDrag.durationSec,
+            tz: fmt.tz(),
+          }),
+        "Couldn't plot that task.",
+      );
+      if (block) {
+        selectBlock(block.id);
+        toast(`Plotted "${taskDrag.title}" at ${fmt.clock(startsAt)}.`);
+        await refresh();
+      }
+    };
+
+    // Esc cancels and nothing is written — the same contract as a block drag (U3).
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        useApp.getState().setTaskDrag(null);
+        setTaskDrop(null);
+      }
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [taskDrag, pointToSlot]);
+
   const onGridPointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     const slot = pointToSlot(e.clientX, e.clientY, e.altKey);
@@ -311,6 +383,8 @@ export function Planner() {
             <DropPlate live={drag.live} days={days} minuteToY={minuteToY} />
           )}
 
+          {taskDrop && <DropPlate live={taskDrop} days={days} minuteToY={minuteToY} />}
+
           {adHoc && (
             <AdHocForm
               slot={adHoc}
@@ -400,6 +474,7 @@ function DayColumnView({
             data-running={b.isRunning}
             data-tiny={height < 28}
             data-warn={b.lanes > 1}
+            data-done={b.taskStatus === "done"}
             style={{
               top,
               height,

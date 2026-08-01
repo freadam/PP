@@ -70,6 +70,48 @@ const delay = 60_000 - (Date.now() % 60_000) + 50;
 A one-second wake loop for a line that moves 0.6px a second is how an app lands
 in "using significant energy", and this audience notices that publicly.
 
+## Why a session is a segment, not a sitting
+
+Counting correctly is not enough. A session row also carries a `started_at` and
+an `ended_at`, and those are what a person reads back a week later — so they
+have to be times that actually happened.
+
+The failure case is a meeting. You start a timer, close the lid, and reopen it
+three hours later. Counting on the monotonic clock keeps `elapsed_sec` honest at
+twenty minutes, but a single row spanning `09:00 → 12:10` is still a lie about
+*when* the work happened, and no amount of correct arithmetic fixes it.
+
+So a `time_session` row is one **contiguous awake interval**, not one sitting.
+A run — everything between pressing start and pressing stop — is made of one or
+more segments, and the boundaries are the moments the record can no longer
+vouch for:
+
+| Boundary | Segment closes at | Then |
+|---|---|---|
+| Machine slept (wall ≫ monotonic) | the last heartbeat | idle challenge; discard opens a fresh segment |
+| No input past the idle threshold | the last input | same, and the counter is rolled back first |
+| Switched task, or stopped | now | the run ends |
+
+Both endpoints of every segment are wall-clock instants, so the Sessions tab
+reads `09:00–09:20` and `11:30–12:10` with a visible gap between them, rather
+than one row that quietly absorbs the meeting. `sleep_splits_the_session_instead_of_spanning_it`
+asserts exactly that: no segment's wall span may exceed what it counted by more
+than a minute.
+
+Two consequences worth stating:
+
+- **The runtime tracks two figures.** `run_ms` is the whole run and is what the
+  timer chip shows; `segment_ms` is the open segment and is what gets written to
+  its row. A chip that reset to `00:00` every time you came back from a meeting
+  would be reporting a bookkeeping detail as if it were news.
+- **Choosing "keep" un-splits.** If the span *was* work, the closed segment is
+  reopened and the span folded back in, so the record shows one interval rather
+  than a suspicious pair. Splitting is reversible because the user's judgement
+  outranks the heuristic.
+
+An empty segment is deleted rather than kept. A zero-length interval in the
+Sessions tab is noise, not a record.
+
 ## Why derived data is computed in Rust, not the renderer
 
 Drift, drift state, task groupings, the calibration headline, the reconcile
@@ -82,12 +124,37 @@ The most visible case is `DriftState`. It is computed once, in
 row and the report bar all render from it. They cannot disagree about whether
 something overran, because none of them decides.
 
+`TaskRow.first_session_at` / `last_session_at` follow the same rule. The
+Completed group shows *when* a finished task was worked rather than what it was
+estimated at, and those bounds are `MIN`/`MAX` over its sessions computed in the
+projection — not something the renderer reconstructs by scanning a session list
+it would have to fetch first.
+
 Tracked time follows the same rule one level down: the views `block_tracked`
 and `task_tracked` are the truth, the `*_cache` tables are written in the same
 transaction as every session mutation, and `rebuild_tracked_caches` regenerates
 them from the views on demand. A cache that cannot be rebuilt is not a cache,
 it is a second truth — so the fuzz test asserts they still match after 10,000
 operations.
+
+## Why the drag state lives in the store
+
+Most component state belongs to its component. Dragging is the exception, and
+for a structural reason: §4.3 lists four drag sources — sidebar backlog item,
+task row, existing block, block edge — and two of them start in a *different
+component* from the one that handles the drop.
+
+A drag that begins on a sidebar row and ends on the planner grid cannot live in
+either component's `useState`; the Planner would never see it. So `taskDrag`
+sits in the store, `useStartTaskDrag` writes it, and the Planner reads it and
+owns everything geometric — the slot maths, the insertion plate, auto-scroll,
+`Esc`-to-cancel, and the `schedule_block` call.
+
+Dragging an *existing block* stays local to the Planner, because it starts and
+ends there. Two mechanisms, but only where the boundary genuinely differs.
+
+Both paths remain optional. `S` then arrows schedules and nudges without a
+pointer, and the drag is never the only route to anything (§4.3, U1).
 
 ## Why the browser preview reads recorded output
 
@@ -114,3 +181,5 @@ why, because a simulated write would be exactly the lie this avoids.
    do; `time_session` is what happened. A session may exist with no block
    (unplanned work) and a block with no session (never started), and both are
    meaningful states the UI renders rather than edge cases it hides.
+8. A session covers one contiguous *awake* interval, so its endpoints are always
+   real system-clock instants. See "Why a session is a segment" above.

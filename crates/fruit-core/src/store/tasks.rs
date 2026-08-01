@@ -30,7 +30,10 @@ fn task_cols(now_param: usize) -> String {
                                        AND s.status = 'done'),
          EXISTS(SELECT 1 FROM scheduled_block b
                  WHERE b.task_id = t.id AND b.deleted_at IS NULL
-                   AND b.starts_at + b.duration_sec*1000 >= ?{now_param})"
+                   AND b.starts_at + b.duration_sec*1000 >= ?{now_param}),
+         (SELECT MIN(s.started_at) FROM time_session s WHERE s.task_id = t.id),
+         (SELECT MAX(COALESCE(s.ended_at, s.started_at)) FROM time_session s
+           WHERE s.task_id = t.id)"
     )
 }
 
@@ -56,6 +59,11 @@ impl Store {
             subtask_total: row.get(16)?,
             subtask_done: row.get(17)?,
             is_scheduled: row.get::<_, i64>(18)? == 1,
+            // When the work actually happened, from the sessions themselves.
+            // Completed rows show this instead of an estimate — what a finished
+            // task cost, and when, is the interesting fact about it.
+            first_session_at: row.get(19)?,
+            last_session_at: row.get(20)?,
             tags: Vec::new(),
         })
     }

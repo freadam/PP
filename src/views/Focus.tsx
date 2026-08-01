@@ -57,7 +57,7 @@ export function Focus() {
         setOverlay(null);
       } else if (e.key === " ") {
         e.preventDefault();
-        if (timer.session) void toggleTimer(timer.session.taskId, timer.session.blockId);
+        if (timer.runTaskId) void toggleTimer(timer.runTaskId, timer.session?.blockId);
       } else if (e.key === "h" || e.key === "H") {
         setHideDigits((v) => !v);
       } else if (/^[1-4]$/.test(e.key)) {
@@ -66,7 +66,7 @@ export function Focus() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setOverlay, timer.session, toggleTimer]);
+  }, [setOverlay, timer.runTaskId, timer.session, toggleTimer]);
 
   // The planner context: the next block that has not started yet.
   const nextBlock = week?.days
@@ -93,7 +93,7 @@ export function Focus() {
           {hideDigits ? "——:——" : fmt.stopwatch(timer.elapsedSec)}
         </div>
 
-        <div className="title">{timer.session?.taskTitle ?? "No timer running"}</div>
+        <div className="title">{timer.taskTitle ?? "No timer running"}</div>
 
         {nextSubtask && (
           <div className="caption">
@@ -112,7 +112,7 @@ export function Focus() {
         <button
           className="btn"
           onClick={() =>
-            timer.session && void toggleTimer(timer.session.taskId, timer.session.blockId)
+            timer.runTaskId && void toggleTimer(timer.runTaskId, timer.session?.blockId)
           }
         >
           {timer.phase === "running" ? "Pause" : "Resume"} <span className="kbd">Space</span>

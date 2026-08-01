@@ -34,15 +34,24 @@ pub struct IdleReport {
 #[derive(Debug)]
 pub struct TimerRuntime {
     pub phase: TimerPhase,
+    /// The open segment, if one is open. `None` during an idle challenge or a
+    /// break — the run continues, but nothing is being recorded.
     pub session_id: Option<String>,
-    /// Counted milliseconds that are already banked.
-    accumulated_ms: i64,
+    /// What this run is timing. Held across segment boundaries so a resume
+    /// knows what to reopen.
+    task_id: Option<String>,
+    block_id: Option<String>,
+    /// Counted milliseconds banked for the whole run (all segments).
+    run_ms: i64,
+    /// Counted milliseconds banked for the *current* segment only. This is
+    /// what gets written to the session row.
+    segment_ms: i64,
     /// Monotonic reading at which the current counting stretch began.
     resumed_mono: Option<i64>,
     last_wall: i64,
     last_mono: i64,
     last_heartbeat: i64,
-    /// The span awaiting a keep/discard decision, and whether it was counted.
+    /// The span awaiting a keep/discard decision.
     pending_span: Option<(Millis, Millis)>,
     pending_ms: i64,
     recovery_session_id: Option<String>,
@@ -57,7 +66,10 @@ impl Default for TimerRuntime {
         TimerRuntime {
             phase: TimerPhase::Idle,
             session_id: None,
-            accumulated_ms: 0,
+            task_id: None,
+            block_id: None,
+            run_ms: 0,
+            segment_ms: 0,
             resumed_mono: None,
             last_wall: 0,
             last_mono: 0,
@@ -72,17 +84,29 @@ impl Default for TimerRuntime {
 }
 
 impl TimerRuntime {
-    fn elapsed_ms(&self, mono_now: i64) -> i64 {
-        self.accumulated_ms
-            + match self.resumed_mono {
-                Some(r) => (mono_now - r).max(0),
-                None => 0,
-            }
+    /// Counted time for the whole run — what the timer chip shows, so it does
+    /// not reset to zero when a segment closes.
+    fn run_elapsed_ms(&self, mono_now: i64) -> i64 {
+        self.run_ms + self.live_ms(mono_now)
+    }
+
+    /// Counted time for the open segment — what gets written to its row.
+    fn segment_elapsed_ms(&self, mono_now: i64) -> i64 {
+        self.segment_ms + self.live_ms(mono_now)
+    }
+
+    fn live_ms(&self, mono_now: i64) -> i64 {
+        match self.resumed_mono {
+            Some(r) => (mono_now - r).max(0),
+            None => 0,
+        }
     }
 
     fn pause(&mut self, mono_now: i64) {
         if let Some(r) = self.resumed_mono.take() {
-            self.accumulated_ms += (mono_now - r).max(0);
+            let live = (mono_now - r).max(0);
+            self.run_ms += live;
+            self.segment_ms += live;
         }
     }
 
@@ -98,16 +122,27 @@ impl Store {
 
     pub fn timer_state(&self) -> Result<TimerState> {
         let mono = self.clock.mono_ms();
-        let elapsed_sec = (self.timer.elapsed_ms(mono) / 1000).max(self.timer.floor_sec);
+        let running = self.timer.task_id.is_some();
+        let run_sec = (self.timer.run_elapsed_ms(mono) / 1000).max(self.timer.floor_sec);
         let session = match &self.timer.session_id {
             Some(id) => self.session_row(id).ok(),
             None => None,
         };
         Ok(TimerState {
             phase: self.timer.phase,
+            run_task_id: self.timer.task_id.clone(),
+            task_title: self.timer.task_id.as_ref().and_then(|id| {
+                self.conn
+                    .query_row("SELECT title FROM task WHERE id = ?1", [id], |r| r.get(0))
+                    .ok()
+            }),
             session,
-            elapsed_sec: if self.timer.session_id.is_some() {
-                elapsed_sec
+            // The run total, not the segment: a segment boundary is a
+            // bookkeeping detail, and a chip that resets to 00:00 when you come
+            // back from a meeting is a chip nobody trusts.
+            elapsed_sec: if running { run_sec } else { 0 },
+            segment_elapsed_sec: if running {
+                self.timer.segment_elapsed_ms(mono) / 1000
             } else {
                 0
             },
@@ -116,6 +151,70 @@ impl Store {
             recovery_session_id: self.timer.recovery_session_id.clone(),
             pomodoro: self.timer.pomodoro,
         })
+    }
+
+    /// Opens a new segment for the current run and marks it running.
+    ///
+    /// Every segment is one contiguous *awake* interval, so its `started_at`
+    /// and `ended_at` are real system-clock instants with no sleep inside them.
+    fn open_segment(&mut self, now: Millis) -> Result<()> {
+        let (Some(task_id), block_id) = (self.timer.task_id.clone(), self.timer.block_id.clone())
+        else {
+            return Ok(());
+        };
+        let id = new_id();
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "INSERT INTO time_session
+               (id, task_id, block_id, started_at, ended_at, elapsed_sec, heartbeat_at,
+                source, is_confirmed, device_id, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,NULL,0,?4,'timer',1,?5,?4,?4)",
+            params![id, task_id, block_id, now, self.device_id],
+        )?;
+        tx.execute(
+            "UPDATE app_state SET running_session_id = ?1 WHERE id = 1",
+            [&id],
+        )?;
+        tx.commit()?;
+        self.timer.session_id = Some(id);
+        self.timer.segment_ms = 0;
+        self.timer.last_heartbeat = now;
+        self.timer.resume(self.clock.mono_ms());
+        self.timer.phase = TimerPhase::Running;
+        Ok(())
+    }
+
+    /// Closes the open segment at `end`, a wall-clock instant the machine is
+    /// known to have been awake for.
+    ///
+    /// A segment with nothing counted in it is deleted rather than kept: an
+    /// empty interval in the Sessions tab is noise, not a record.
+    fn close_segment(&mut self, end: Millis) -> Result<()> {
+        let Some(id) = self.timer.session_id.take() else {
+            return Ok(());
+        };
+        self.timer.pause(self.clock.mono_ms());
+        let elapsed_sec = self.timer.segment_ms / 1000;
+
+        let tx = self.conn.transaction()?;
+        if elapsed_sec <= 0 {
+            tx.execute("DELETE FROM time_session WHERE id = ?1", [&id])?;
+        } else {
+            tx.execute(
+                "UPDATE time_session
+                    SET ended_at = ?2, elapsed_sec = ?3, heartbeat_at = ?2, updated_at = ?2
+                  WHERE id = ?1",
+                params![id, end.max(0), elapsed_sec],
+            )?;
+        }
+        tx.execute(
+            "UPDATE app_state SET running_session_id = NULL WHERE id = 1",
+            [],
+        )?;
+        db::rebuild_tracked_caches(&tx)?;
+        tx.commit()?;
+        self.timer.segment_ms = 0;
+        Ok(())
     }
 
     /// Boot: an open session means the last run did not end cleanly. No new
@@ -210,71 +309,42 @@ impl Store {
         if self.timer.phase == TimerPhase::Recovering {
             return Err(AppError::RecoveryPending);
         }
-        let title: String = self
-            .conn
-            .query_row(
-                "SELECT title FROM task WHERE id = ?1 AND deleted_at IS NULL",
-                [task_id],
-                |r| r.get(0),
-            )
-            .map_err(|_| AppError::NotFound("task"))?;
-        let _ = title;
+        let exists: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM task WHERE id = ?1 AND deleted_at IS NULL",
+            [task_id],
+            |r| r.get(0),
+        )?;
+        if exists == 0 {
+            return Err(AppError::NotFound("task"));
+        }
 
         let now = self.now();
-        let mono = self.clock.mono_ms();
-        let elapsed_ms = self.timer.elapsed_ms(mono);
-        let previous = self.timer.session_id.clone();
+        // Close whatever was running at the real instant it stopped, then begin
+        // a new run. The singleton is cleared and re-set inside each half, so
+        // there is never a moment with two open sessions (§6.5).
+        self.close_segment(now)?;
 
-        let id = new_id();
-        let tx = self.conn.transaction()?;
-        if let Some(prev) = &previous {
-            close_session(&tx, prev, now, elapsed_ms / 1000)?;
-        }
-        tx.execute(
-            "INSERT INTO time_session
-               (id, task_id, block_id, started_at, ended_at, elapsed_sec, heartbeat_at,
-                source, is_confirmed, device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,NULL,0,?4,'timer',1,?5,?4,?4)",
-            params![id, task_id, block_id, now, self.device_id],
-        )?;
-        tx.execute(
-            "UPDATE app_state SET running_session_id = ?1 WHERE id = 1",
-            [&id],
-        )?;
-        db::rebuild_tracked_caches(&tx)?;
-        tx.commit()?;
-
+        let pomodoro = self.timer.pomodoro;
         self.timer = TimerRuntime {
             phase: TimerPhase::Running,
-            session_id: Some(id),
-            resumed_mono: Some(mono),
+            task_id: Some(task_id.to_string()),
+            block_id: block_id.map(str::to_string),
             last_wall: now,
-            last_mono: mono,
-            last_heartbeat: now,
-            pomodoro: self.timer.pomodoro,
+            last_mono: self.clock.mono_ms(),
+            pomodoro,
             ..TimerRuntime::default()
         };
+        self.open_segment(now)?;
         self.timer_state()
     }
 
     pub fn stop_timer(&mut self) -> Result<TimerState> {
-        let Some(id) = self.timer.session_id.clone() else {
+        if self.timer.task_id.is_none() {
             return self.timer_state();
-        };
-        let now = self.now();
-        let mono = self.clock.mono_ms();
-        self.timer.pause(mono);
-        let elapsed_sec = (self.timer.accumulated_ms / 1000).max(self.timer.floor_sec);
-
-        let tx = self.conn.transaction()?;
-        close_session(&tx, &id, now, elapsed_sec)?;
-        tx.execute(
-            "UPDATE app_state SET running_session_id = NULL WHERE id = 1",
-            [],
-        )?;
-        db::rebuild_tracked_caches(&tx)?;
-        tx.commit()?;
-
+        }
+        // The end of a session is a system-clock instant, always — never a
+        // number derived from the counter.
+        self.close_segment(self.now())?;
         let pomodoro = self.timer.pomodoro;
         self.timer = TimerRuntime {
             pomodoro,
@@ -302,8 +372,14 @@ impl Store {
         self.timer.last_mono = mono;
 
         if divergence > SLEEP_THRESHOLD_MS {
+            // The machine slept. Close the segment at the last moment we know
+            // it was awake, so no session ever spans the gap — a session
+            // reading 09:00–12:10 for twenty minutes of work is exactly the
+            // "wrong data" a meeting-shaped sleep used to produce.
+            let slept_from = now - divergence;
             self.timer.pause(mono);
-            self.timer.pending_span = Some((now - divergence, now));
+            self.close_segment(self.timer.last_heartbeat.max(slept_from))?;
+            self.timer.pending_span = Some((slept_from, now));
             self.timer.pending_ms = divergence;
             self.timer.phase = TimerPhase::IdleChallenge;
             return self.timer_state();
@@ -315,25 +391,31 @@ impl Store {
             let idle_ms = now - report.last_input_at;
             let threshold = self.idle_threshold_ms();
             if idle_ms >= threshold {
+                // The counter *has* been running through the idle span, so it
+                // is rolled back first; then the segment closes at the last
+                // input, which is the last instant the record can vouch for.
                 self.timer.pause(mono);
-                self.timer.accumulated_ms = (self.timer.accumulated_ms - idle_ms).max(0);
+                self.timer.run_ms = (self.timer.run_ms - idle_ms).max(0);
+                self.timer.segment_ms = (self.timer.segment_ms - idle_ms).max(0);
+                self.timer.floor_sec = 0; // an authorised trim resets the floor
+                self.close_segment(report.last_input_at)?;
                 self.timer.pending_span = Some((report.last_input_at, now));
                 self.timer.pending_ms = idle_ms;
                 self.timer.phase = TimerPhase::IdleChallenge;
-                self.timer.floor_sec = 0; // an authorised trim resets the floor
                 return self.timer_state();
             }
         }
 
-        let elapsed_sec = (self.timer.elapsed_ms(mono) / 1000).max(self.timer.floor_sec);
-        self.timer.floor_sec = elapsed_sec;
+        let run_sec = (self.timer.run_elapsed_ms(mono) / 1000).max(self.timer.floor_sec);
+        self.timer.floor_sec = run_sec;
+        let segment_sec = self.timer.segment_elapsed_ms(mono) / 1000;
 
         if now - self.timer.last_heartbeat >= HEARTBEAT_EVERY_MS {
             if let Some(id) = &self.timer.session_id {
                 self.conn.execute(
                     "UPDATE time_session SET heartbeat_at = ?2, elapsed_sec = ?3, updated_at = ?2
                       WHERE id = ?1",
-                    params![id, now, elapsed_sec],
+                    params![id, now, segment_sec],
                 )?;
                 let tx = self.conn.transaction()?;
                 db::rebuild_tracked_caches(&tx)?;
@@ -356,16 +438,28 @@ impl Store {
         if self.timer.phase != TimerPhase::IdleChallenge {
             return self.timer_state();
         }
+        let now = self.now();
         let mono = self.clock.mono_ms();
+        let pending = self.timer.pending_ms;
+
         match action {
+            // The span counts after all: reopen the segment that was closed at
+            // the boundary and fold the span back into it, so the record shows
+            // one continuous interval rather than a suspicious pair.
             IdleAction::Keep => {
-                self.timer.accumulated_ms += self.timer.pending_ms;
+                // Reopen first: closing the segment banked its counted time
+                // into the row and zeroed the runtime figure, so the reopen has
+                // to restore it before the kept span is added on top.
+                self.reopen_last_segment()?;
+                self.timer.run_ms += pending;
+                self.timer.segment_ms += pending;
                 self.timer.phase = TimerPhase::Running;
                 self.timer.resume(mono);
             }
+            // The honest default. A fresh segment starts now, so the gap is
+            // visible in the record as a gap.
             IdleAction::Discard => {
-                self.timer.phase = TimerPhase::Running;
-                self.timer.resume(mono);
+                self.open_segment(now)?;
             }
             IdleAction::AssignToBreak => {
                 self.timer.phase = TimerPhase::Break;
@@ -373,16 +467,58 @@ impl Store {
         }
         self.timer.pending_span = None;
         self.timer.pending_ms = 0;
-        self.timer.last_wall = self.now();
+        self.timer.last_wall = now;
         self.timer.last_mono = mono;
-        self.timer.floor_sec = (self.timer.elapsed_ms(mono) / 1000).max(0);
+        self.timer.last_heartbeat = now;
+        self.timer.floor_sec = (self.timer.run_elapsed_ms(mono) / 1000).max(0);
         self.timer_state()
     }
 
+    /// Undoes the most recent split for this run, for `IdleAction::Keep`.
+    fn reopen_last_segment(&mut self) -> Result<()> {
+        let Some(task_id) = self.timer.task_id.clone() else {
+            return Ok(());
+        };
+        let last: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT id FROM time_session
+                  WHERE task_id = ?1 AND source = 'timer'
+                  ORDER BY started_at DESC LIMIT 1",
+                [&task_id],
+                |r| r.get(0),
+            )
+            .ok();
+        match last {
+            Some(id) => {
+                let banked: i64 = self
+                    .conn
+                    .query_row(
+                        "SELECT elapsed_sec FROM time_session WHERE id = ?1",
+                        [&id],
+                        |r| r.get(0),
+                    )
+                    .unwrap_or(0);
+                self.timer.segment_ms = banked * 1000;
+                self.conn.execute(
+                    "UPDATE time_session SET ended_at = NULL, updated_at = ?2 WHERE id = ?1",
+                    params![id, self.now()],
+                )?;
+                self.conn.execute(
+                    "UPDATE app_state SET running_session_id = ?1 WHERE id = 1",
+                    [&id],
+                )?;
+                self.timer.session_id = Some(id);
+                Ok(())
+            }
+            // The segment was empty and got deleted; just start a new one.
+            None => self.open_segment(self.now() - self.timer.pending_ms),
+        }
+    }
+
     pub fn resume_from_break(&mut self) -> Result<TimerState> {
-        if self.timer.phase == TimerPhase::Break && self.timer.session_id.is_some() {
-            self.timer.phase = TimerPhase::Running;
-            self.timer.resume(self.clock.mono_ms());
+        if self.timer.phase == TimerPhase::Break && self.timer.task_id.is_some() {
+            self.open_segment(self.now())?;
         }
         self.timer_state()
     }
@@ -589,21 +725,6 @@ impl Store {
             at: now,
         })
     }
-}
-
-fn close_session(
-    tx: &rusqlite::Transaction,
-    id: &str,
-    now: i64,
-    elapsed_sec: i64,
-) -> Result<()> {
-    tx.execute(
-        "UPDATE time_session
-            SET ended_at = ?2, elapsed_sec = MAX(?3, 0), heartbeat_at = ?2, updated_at = ?2
-          WHERE id = ?1 AND ended_at IS NULL",
-        params![id, now, elapsed_sec],
-    )?;
-    Ok(())
 }
 
 fn map_session(r: &rusqlite::Row) -> rusqlite::Result<SessionRow> {

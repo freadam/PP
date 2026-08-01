@@ -1172,3 +1172,150 @@ fn completed_tasks_land_in_a_group_at_the_bottom() {
         .sum();
     assert_eq!(open, 1);
 }
+
+// ─── sessions are contiguous awake intervals ───────────────────────────
+
+/// The meeting case: the laptop sleeps mid-session. No session row may span
+/// the sleep — a row reading 09:00–12:10 for twenty minutes of work is worse
+/// than no row, because the start and end times are what you read back later.
+#[test]
+fn sleep_splits_the_session_instead_of_spanning_it() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let t = task(&mut store, "Write the proposal");
+    store.start_timer(&t.id, None).unwrap();
+
+    // Twenty minutes of real work, with heartbeats.
+    for _ in 0..40 {
+        clock.advance(30_000);
+        store.tick(None).unwrap();
+    }
+    // Lid closes for a three-hour meeting.
+    clock.sleep(3 * 3600 * 1000);
+    let state = store.tick(None).unwrap();
+    assert_eq!(state.phase, TimerPhase::IdleChallenge);
+    assert!(state.session.is_none(), "nothing is recording during the gap");
+
+    // Back at the desk: discard the sleep (the default) and carry on.
+    store.resolve_idle(IdleAction::Discard).unwrap();
+    for _ in 0..20 {
+        clock.advance(30_000);
+        store.tick(None).unwrap();
+    }
+    store.stop_timer().unwrap();
+
+    let sessions = store.get_task_detail(&t.id).unwrap().sessions;
+    assert_eq!(sessions.len(), 2, "one segment either side of the sleep");
+    for s in &sessions {
+        let wall = (s.ended_at.unwrap() - s.started_at) / 1000;
+        assert!(
+            (wall - s.elapsed_sec).abs() <= 60,
+            "a segment's wall span must match what it counted: {}s wall vs {}s counted",
+            wall,
+            s.elapsed_sec,
+        );
+        assert!(
+            wall < 3600,
+            "no segment swallowed the three-hour sleep ({wall}s)"
+        );
+    }
+
+    // Both ends of every segment are real system-clock instants.
+    let first = &sessions[1];
+    let second = &sessions[0];
+    assert!(second.started_at >= first.ended_at.unwrap());
+    assert!(
+        second.started_at - first.ended_at.unwrap() >= 3 * 3600 * 1000 - 60_000,
+        "the gap in the record is the sleep, and it is visible as a gap"
+    );
+
+    // And the total is still only the time actually worked.
+    assert!((store.get_task(&t.id).unwrap().tracked_sec - 30 * 60).abs() <= 60);
+}
+
+/// Keeping the span is the other half: the split is undone, so the record
+/// shows one interval rather than a suspicious pair.
+#[test]
+fn keeping_an_idle_span_rejoins_the_segment() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let t = task(&mut store, "Reading a spec");
+    store.start_timer(&t.id, None).unwrap();
+
+    clock.advance(10 * 60_000);
+    let last_input = clock.now();
+    clock.advance(20 * 60_000);
+    store
+        .tick(Some(IdleReport {
+            last_input_at: last_input,
+        }))
+        .unwrap();
+
+    let kept = store.resolve_idle(IdleAction::Keep).unwrap();
+    assert_eq!(kept.phase, TimerPhase::Running);
+    assert_eq!(kept.elapsed_sec, 30 * 60, "the span counts");
+    store.stop_timer().unwrap();
+
+    let sessions = store.get_task_detail(&t.id).unwrap().sessions;
+    assert_eq!(sessions.len(), 1, "kept means one interval, not two");
+    assert_eq!(sessions[0].elapsed_sec, 30 * 60);
+}
+
+/// Start and stop both take the wall clock, so a session's endpoints are the
+/// times a person would recognise — never a figure derived from the counter.
+#[test]
+fn session_endpoints_come_from_the_system_clock() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 14, 0));
+    let t = task(&mut store, "Pairing");
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(45 * 60_000);
+    store.stop_timer().unwrap();
+
+    let s = &store.get_task_detail(&t.id).unwrap().sessions[0];
+    assert_eq!(s.started_at, at(2025, 7, 30, 14, 0));
+    assert_eq!(s.ended_at, Some(at(2025, 7, 30, 14, 45)));
+
+    // …and the task carries those bounds for the completed list to show.
+    let row = store.get_task(&t.id).unwrap();
+    assert_eq!(row.first_session_at, Some(at(2025, 7, 30, 14, 0)));
+    assert_eq!(row.last_session_at, Some(at(2025, 7, 30, 14, 45)));
+}
+
+/// Switching tasks closes the old run at the real instant it stopped, and
+/// never leaves two sessions open (§6.5).
+#[test]
+fn switching_tasks_closes_the_previous_segment_cleanly() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let a = task(&mut store, "Write intro");
+    let b = task(&mut store, "Refactor auth");
+
+    store.start_timer(&a.id, None).unwrap();
+    clock.advance(24 * 60_000);
+    store.start_timer(&b.id, None).unwrap();
+
+    let open: i64 = store
+        .connection()
+        .query_row(
+            "SELECT COUNT(*) FROM time_session WHERE ended_at IS NULL",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(open, 1);
+
+    let first = &store.get_task_detail(&a.id).unwrap().sessions[0];
+    assert_eq!(first.ended_at, Some(at(2025, 7, 30, 9, 24)));
+    assert_eq!(first.elapsed_sec, 24 * 60);
+
+    clock.advance(60_000);
+    store.stop_timer().unwrap();
+}
+
+/// A segment with nothing in it is deleted rather than kept — an empty
+/// interval in the Sessions tab is noise, not a record.
+#[test]
+fn zero_length_segments_are_not_recorded() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+    let t = task(&mut store, "Started by mistake");
+    store.start_timer(&t.id, None).unwrap();
+    store.stop_timer().unwrap();
+    assert!(store.get_task_detail(&t.id).unwrap().sessions.is_empty());
+}

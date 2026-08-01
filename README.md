@@ -46,7 +46,7 @@ npm run app          # the real thing: Tauri window + SQLite on disk
 
 ```bash
 npm run dev          # browser preview, reading recorded DTOs (see below)
-cargo test           # 68 tests, incl. the §8 acceptance criteria
+cargo test           # 76 tests, incl. the §8 acceptance criteria
 node scripts/check-ui.mjs      # I1, I3–I7, U10 against `npm run preview`
 ```
 
@@ -73,10 +73,12 @@ then Rollover for work that doesn't fit one sitting — and completed tasks sit
 greyed at the bottom of the project rather than vanishing.
 
 **Track.** One timer, enforced by the schema. Bound to a block when started
-from one, which is what makes drift per-block computable. Manual session entry,
-because people forget to press start and a record you can't correct is a record
-you can't trust. Crash recovery that trims to the last heartbeat, idle detection
-that discards by default, and sleep that is never counted silently.
+from one, which is what makes drift per-block computable. Every session covers
+one contiguous *awake* interval, so a laptop that sleeps through a meeting
+splits the record rather than producing a row that claims three hours of work.
+Manual session entry, because people forget to press start and a record you
+can't correct is a record you can't trust. Crash recovery that trims to the
+last heartbeat, and idle that discards by default.
 
 **Reconcile.** The day review: overran blocks, never-started blocks, untracked
 gaps, unplanned sessions — each with a default action and a one-key alternative.
@@ -97,7 +99,7 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 
 | Part | Status |
 |---|---|
-| `fruit-core` | Complete and tested — 71 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
+| `fruit-core` | Complete and tested — 76 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
 | Renderer | Complete for P0 + P1; verified in a headless browser (I1, I3–I7, U10) |
 | `src-tauri` | **Written but not compiled here** — linking needs a system webview, and this container has none. See below. |
 | Activity (§3.5) | P2, deliberately not built. The view says so and explains Wayland. |
