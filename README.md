@@ -101,15 +101,30 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 |---|---|
 | `fruit-core` | Complete and tested — 76 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
 | Renderer | Complete for P0 + P1; verified in a headless browser (I1, I3–I7, U10) |
-| `src-tauri` | **Written but not compiled here** — linking needs a system webview, and this container has none. See below. |
+| `src-tauri` | Compiles and runs on **Windows** (x64, MSVC). Not built on macOS or Linux yet. See below. |
 | Activity (§3.5) | P2, deliberately not built. The view says so and explains Wayland. |
 | Recurring blocks, `.ics` import | P2, not built. `rrule`/`series_id` exist in the schema. |
 
-`src-tauri` is the one part of this repo that has never been through a
-compiler. It is thin by design — windows, tray, a one-second loop, and a
-one-line wrapper per command — but "thin" is not "verified". On a machine with
-a webview, `npm run app` is the first thing to try, and `cargo build` inside
-`src-tauri/` will surface anything that needs fixing.
+`src-tauri` cannot be compiled in the container this repo was developed in —
+linking needs a system webview and there is none — so it is the one part not
+covered by the automated checks above. It has since been built and run on
+Windows 10/11 with the MSVC toolchain. macOS and Linux are still unbuilt; the
+platform-specific code is confined to `src-tauri/src/idle.rs`, which is the
+first place to look if either fails.
+
+### Windows: "Access is denied (os error 5)" when building
+
+Cargo cannot overwrite `fruit.exe` while a copy of it is running — Windows
+locks the file, unlike Linux and macOS. Close the app (check the tray as well
+as the taskbar; `tauri-plugin-single-instance` means a stray instance quietly
+takes focus rather than starting a second one) or:
+
+```powershell
+taskkill /IM fruit.exe /F
+```
+
+then build again. Nothing is wrong with the code when this happens — the
+message appears at the *link* step, which means everything before it compiled.
 
 ## Documents
 
