@@ -1,5 +1,9 @@
 # Architecture
 
+Why the code is shaped this way. For *what the app is* — the
+screens, the entities, the constraints — see
+[`PRODUCT-SPEC.md`](PRODUCT-SPEC.md).
+
 Three layers, and the boundaries between them are the whole design.
 
 ```

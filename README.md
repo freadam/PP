@@ -139,8 +139,9 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 linking needs a system webview and there is none — so it is the one part not
 covered by the automated checks above. It has since been built and run on
 Windows 10/11 with the MSVC toolchain. macOS and Linux are still unbuilt; the
-platform-specific code is confined to `src-tauri/src/idle.rs`, which is the
-first place to look if either fails.
+platform-specific code is confined to `src-tauri/src/idle.rs` and
+`src-tauri/src/frontmost.rs`, which are the first places to look if either
+fails.
 
 ### Windows: "Access is denied (os error 5)" when building
 
@@ -158,6 +159,7 @@ message appears at the *link* step, which means everything before it compiled.
 
 ## Documents
 
+- [`docs/PRODUCT-SPEC.md`](docs/PRODUCT-SPEC.md) — the whole app in one document: what it does, who for, every screen, every entity, every constraint
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — why the layers are where they are
 - [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) — every §8 criterion, and what covers it
 - [`docs/SPEC-DEVIATIONS.md`](docs/SPEC-DEVIATIONS.md) — where this build departs from the spec, and why
