@@ -1741,3 +1741,422 @@ fn activity_purges_at_the_retention_limit() {
         .unwrap();
     assert_eq!(store.activity_settings().unwrap().next_purge_at, None);
 }
+
+// ─── MVP acceptance (Plan Rev 3 §14) — the unified day ─────────────────
+
+fn area(store: &Store, name: &str) -> LifeAreaRow {
+    store
+        .get_life_areas(TZ, false)
+        .unwrap()
+        .into_iter()
+        .find(|a| a.name == name)
+        .unwrap_or_else(|| panic!("no built-in area called {name}"))
+}
+
+fn life(store: &mut Store, area_name: &str, from: i64, to: i64) -> LifeEntryRow {
+    let id = area(store, area_name).id;
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: id,
+            label: None,
+            started_at: from,
+            ended_at: to,
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap()
+}
+
+/// M1 + M4 — every second of the selected date is accounted for exactly once,
+/// including the seconds nothing happened in.
+///
+/// This is the product's central promise in one assertion. The workbook could
+/// not make it (its totals were maintained by hand); a single `time_entry`
+/// table could not make it either, because an observation and a session
+/// describing the same hour would be two rows and two durations.
+#[test]
+fn a_day_accounts_for_every_second_exactly_once() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 22, 0));
+    let t = task(&mut store, "Refactor auth");
+
+    // 00:00–07:00 asleep, 09:00–10:00 worked, and the rest of the day is empty.
+    life(&mut store, "Sleep/Rest", at(2025, 7, 30, 0, 0), at(2025, 7, 30, 7, 0));
+    store.start_timer(&t.id, None).unwrap();
+    clock.shift_wall(-(13 * 3600 * 1000)); // pretend the run happened at 09:00
+    let _ = clock;
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    let d = &day.totals;
+
+    assert_eq!(d.day_sec, 24 * 3600);
+    assert_eq!(
+        d.confirmed_work_sec
+            + d.confirmed_life_sec
+            + d.private_sec
+            + d.observed_only_sec
+            + d.idle_sec
+            + d.empty_sec,
+        d.day_sec,
+        "the layers must tile the day: {d:?}"
+    );
+    assert_eq!(d.confirmed_life_sec, 7 * 3600, "seven hours of sleep");
+
+    // M1: every slot is present, empty ones included.
+    assert_eq!(day.slots.len(), 48, "24 hours at 30-minute slots");
+    assert!(
+        day.slots.iter().any(|s| s.state == SlotState::Empty),
+        "empty time is a real state, not an absent row"
+    );
+}
+
+/// M2 + M8 — an observation overlapping a confirmed session **enriches** it.
+/// It contributes evidence and no duration, so the day still sums to a day.
+#[test]
+fn observation_enriches_a_confirmed_session_without_adding_time() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    let t = task(&mut store, "Refactor auth");
+
+    store.start_timer(&t.id, None).unwrap();
+    // Twenty minutes of the hour were actually spent in Slack.
+    for minute in 20..40 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "slack.exe".into(),
+                window_title: None,
+                at: at(2025, 7, 30, 9, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+    clock.advance(60 * 60_000);
+    store.stop_timer().unwrap();
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    let d = &day.totals;
+
+    assert_eq!(d.confirmed_work_sec, 3600, "the hour is work, all of it");
+    assert_eq!(
+        d.observed_only_sec, 0,
+        "the observation is inside a confirmed session, so it owns nothing"
+    );
+    assert_eq!(
+        d.confirmed_work_sec + d.confirmed_life_sec + d.private_sec
+            + d.observed_only_sec + d.idle_sec + d.empty_sec,
+        d.day_sec,
+        "and the day still sums to a day"
+    );
+
+    // …but the evidence is there to be read.
+    let worked = day
+        .segments
+        .iter()
+        .find(|s| matches!(s.owner, SlotOwner::Work { .. }))
+        .expect("the work segment");
+    assert!(
+        worked.evidence.iter().any(|a| a.app_id == "slack.exe"),
+        "the segment carries what the machine saw"
+    );
+    assert!(d.pc_sec > 0, "and PC time is reported separately");
+}
+
+/// M5 — contribution modes are work-only, and converting a record to life time
+/// clears one by construction: `life_entry` has nowhere to put it.
+#[test]
+fn contribution_is_work_only_and_clears_on_conversion() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let t = task(&mut store, "Sprint review");
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(30 * 60_000);
+    store.stop_timer().unwrap();
+    // Stopping clears the runtime's session; the record is read back from the task.
+    let session = store.get_task_detail(&t.id).unwrap().sessions.remove(0);
+
+    let with_mode = store
+        .set_session_contribution(&session.id, Some(Contribution::Attend))
+        .unwrap();
+    assert_eq!(with_mode.contribution, Some(Contribution::Attend));
+
+    // Convert it to family time. There is no contribution field to carry over.
+    let family = area(&store, "Family").id;
+    let entry = store
+        .convert_session_to_life(&session.id, &family, TZ)
+        .unwrap();
+    assert_eq!(entry.area_name, "Family");
+    assert_eq!(entry.started_at, session.started_at);
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    assert_eq!(
+        day.totals.confirmed_work_sec, 0,
+        "the work session is gone, not duplicated"
+    );
+    assert_eq!(day.totals.confirmed_life_sec, 30 * 60);
+}
+
+/// M9 — a life entry can take an interval back from a confirmed record, but
+/// only when the caller has said so: replacing is destructive.
+#[test]
+fn life_entries_fill_gaps_and_replace_with_confirmation() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 12, 0));
+    let t = task(&mut store, "Deep work");
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(60 * 60_000);
+    store.stop_timer().unwrap();
+
+    // Without `replace_existing`, both records exist and precedence decides.
+    let lunch = area(&store, "Wellbeing").id;
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: lunch.clone(),
+            label: Some("Lunch".into()),
+            started_at: at(2025, 7, 30, 12, 0),
+            ended_at: at(2025, 7, 30, 13, 0),
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    assert_eq!(
+        day.totals.confirmed_life_sec, 3600,
+        "life wins the hour by precedence"
+    );
+    assert_eq!(
+        day.totals.confirmed_work_sec, 0,
+        "and the session is shadowed rather than counted twice"
+    );
+    // The session is still there — precedence hid it, it did not delete it.
+    assert_eq!(store.get_task_detail(&t.id).unwrap().sessions.len(), 1);
+
+    // With `replace_existing`, the session actually goes.
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: lunch,
+            label: Some("Lunch, properly".into()),
+            started_at: at(2025, 7, 30, 12, 0),
+            ended_at: at(2025, 7, 30, 13, 0),
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: true,
+        })
+        .unwrap();
+    assert_eq!(
+        store.get_task_detail(&t.id).unwrap().sessions.len(),
+        0,
+        "replace clears the interval it takes"
+    );
+}
+
+/// Private time is accounted for without being recorded — it is not a gap the
+/// reconciler should nag about, and it is not in any life-area total either.
+#[test]
+fn private_time_is_accounted_for_but_not_categorised() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 20, 0));
+    let id = area(&store, "Personal/Spiritual").id;
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: id,
+            label: None,
+            started_at: at(2025, 7, 30, 18, 0),
+            ended_at: at(2025, 7, 30, 19, 0),
+            tz: TZ.into(),
+            is_private: true,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    assert_eq!(day.totals.private_sec, 3600);
+    assert_eq!(day.totals.confirmed_life_sec, 0, "private is its own bucket");
+    assert_eq!(day.totals.empty_sec, 23 * 3600, "and it is not a gap");
+    assert!(day.slots.iter().any(|s| s.state == SlotState::Private));
+}
+
+/// A day the clocks change on is 23 or 25 hours, and the invariant is "the
+/// day", never "86,400 seconds".
+#[test]
+fn the_counting_invariant_holds_across_a_dst_transition() {
+    for (date, hours) in [("2025-03-30", 23), ("2025-10-26", 25)] {
+        let (mut store, _) = store_at(at(2025, 6, 1, 12, 0));
+        let day = store.get_day(date, TZ, None).unwrap();
+        let d = &day.totals;
+        assert_eq!(d.day_sec, hours * 3600, "{date} is {hours} hours long");
+        assert_eq!(
+            d.confirmed_work_sec + d.confirmed_life_sec + d.private_sec
+                + d.observed_only_sec + d.idle_sec + d.empty_sec,
+            d.day_sec,
+            "{date} must still tile exactly"
+        );
+        assert_eq!(day.slots.len() as i64, hours * 2, "{date} slot count");
+    }
+}
+
+/// The slot grid is a lens, never a quantisation: changing it must not change
+/// a single second of the arithmetic (§8.1).
+#[test]
+fn slot_size_changes_the_view_not_the_totals() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 20, 0));
+    // Ten minutes, deliberately not aligned to any slot boundary.
+    life(
+        &mut store,
+        "Fun",
+        at(2025, 7, 30, 9, 7),
+        at(2025, 7, 30, 9, 17),
+    );
+
+    let mut totals = Vec::new();
+    for minutes in [5, 15, 30, 60] {
+        let day = store.get_day("2025-07-30", TZ, Some(minutes)).unwrap();
+        assert_eq!(day.slots.len() as i64, 24 * 60 / minutes);
+        totals.push((day.totals.confirmed_life_sec, day.totals.empty_sec));
+    }
+    assert!(
+        totals.windows(2).all(|w| w[0] == w[1]),
+        "totals must be identical at every zoom: {totals:?}"
+    );
+    assert_eq!(totals[0].0, 600, "ten minutes, at every zoom");
+    assert_eq!(
+        totals[0].1,
+        24 * 3600 - 600,
+        "and the entertainment hour is not rounded up to a slot"
+    );
+}
+
+/// A life area holding records refuses to be deleted, and a built-in never
+/// deletes at all — an imported workbook maps onto the built-in set.
+#[test]
+fn life_areas_refuse_to_orphan_their_records() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+    let sleep = area(&store, "Sleep/Rest");
+    assert!(
+        store.delete_life_area(&sleep.id).is_err(),
+        "built-in areas archive, they do not delete"
+    );
+
+    let custom = store
+        .create_life_area(NewLifeArea {
+            name: "Sailing".into(),
+            kind: Some("core".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(store.delete_life_area(&custom.id).is_ok(), "empty and custom: fine");
+
+    let custom = store
+        .create_life_area(NewLifeArea {
+            name: "Sailing".into(),
+            ..Default::default()
+        })
+        .unwrap();
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: custom.id.clone(),
+            label: None,
+            started_at: at(2025, 7, 30, 9, 0),
+            ended_at: at(2025, 7, 30, 10, 0),
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    assert!(
+        store.delete_life_area(&custom.id).is_err(),
+        "an area with records refuses rather than orphaning them"
+    );
+}
+
+/// Every field crossing the IPC boundary is camelCase, including the ones
+/// inside struct enum variants.
+///
+/// This exists because of a real break: `#[serde(rename_all = "camelCase")]`
+/// renames an enum's *variants* and not its struct-variant **fields**, so
+/// `SlotOwner` shipped `app_id` while every other DTO shipped `appId`. The
+/// renderer read `undefined` and the primary screen rendered nothing — and
+/// nothing in `cargo test` or `tsc` could see it, because both sides were
+/// individually correct.
+///
+/// Walking the serialised JSON is the only place that mismatch is visible.
+#[test]
+fn wire_shape_is_camel_case() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    // One of every owner variant, so every struct variant is actually reached.
+    life(&mut store, "Sleep/Rest", at(2025, 7, 30, 0, 0), at(2025, 7, 30, 6, 0));
+    let t = task(&mut store, "Refactor auth");
+    block(&mut store, &t.id, at(2025, 7, 30, 9, 0), 60);
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(30 * 60_000);
+    store.stop_timer().unwrap();
+    store
+        .record_activity(ActivitySample {
+            app_id: "code.exe".into(),
+            window_title: None,
+            at: at(2025, 7, 30, 14, 0),
+        })
+        .unwrap();
+
+    let day = store.get_day("2025-07-30", TZ, None).unwrap();
+    let json = serde_json::to_value(&day).unwrap();
+
+    let mut offenders = Vec::new();
+    walk_keys(&json, &mut |key| {
+        if key.contains('_') {
+            offenders.push(key.to_string());
+        }
+    });
+    offenders.sort();
+    offenders.dedup();
+    assert!(
+        offenders.is_empty(),
+        "these fields cross the boundary as snake_case: {offenders:?}"
+    );
+
+    // …and the variants themselves are reached, so the walk above is not
+    // passing merely because nothing interesting was in the payload.
+    let kinds: Vec<&str> = day
+        .segments
+        .iter()
+        .filter_map(|s| json_kind(&serde_json::to_value(&s.owner).unwrap()))
+        .collect();
+    for expected in ["life", "work", "observed", "empty"] {
+        assert!(
+            kinds.contains(&expected),
+            "the fixture never produced a {expected} segment, so it proves nothing"
+        );
+    }
+}
+
+fn json_kind(v: &serde_json::Value) -> Option<&'static str> {
+    match v.get("kind")?.as_str()? {
+        "life" => Some("life"),
+        "work" => Some("work"),
+        "observed" => Some("observed"),
+        "idle" => Some("idle"),
+        "empty" => Some("empty"),
+        _ => None,
+    }
+}
+
+fn walk_keys(v: &serde_json::Value, f: &mut impl FnMut(&str)) {
+    match v {
+        serde_json::Value::Object(map) => {
+            for (k, child) in map {
+                f(k);
+                walk_keys(child, f);
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|i| walk_keys(i, f)),
+        _ => {}
+    }
+}

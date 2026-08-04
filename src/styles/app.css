@@ -1373,3 +1373,180 @@ textarea::placeholder {
     display: none;
   }
 }
+
+/* ─── Day view (Plan Rev 3 §8.1) — the primary operational screen ─────── */
+
+.day-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  padding: 0 var(--s-16) var(--s-16);
+}
+.day-table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  min-height: 0;
+}
+.day-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.day-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: var(--s-6) var(--s-8);
+  text-align: left;
+  font-size: var(--t-label);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.day-table thead th:first-child { width: 72px; }
+.day-table thead th:nth-child(2) { width: 22%; }
+.day-table thead th:nth-child(4) { width: 16%; }
+.day-table thead th:last-child   { width: 150px; }
+
+.day-row > * {
+  padding: var(--s-2) var(--s-8);
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+  height: 26px;
+}
+/* A heavier rule at the hour, hairline between — the planner's rhythm, in a
+   table. Without it 48 identical rows read as a wall of text. */
+.day-row[data-hour="true"] > * {
+  border-top: 1px solid var(--line);
+}
+.day-row[data-now="true"] > * {
+  box-shadow: inset 0 1px 0 var(--paper);
+}
+.day-row .day-time {
+  color: var(--muted);
+  font-weight: 400;
+  text-align: left;
+}
+
+/* Unaccounted time is hatched and labelled, never blank: blank is
+   indistinguishable from "not loaded yet", and this is the state the user is
+   here to act on (Plan Rev 3 §17.4). */
+.day-row[data-state="empty"] > * {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    color-mix(in srgb, var(--rule) 55%, transparent) 6px,
+    color-mix(in srgb, var(--rule) 55%, transparent) 7px
+  );
+}
+.day-row[data-state="plannedNotStarted"] > * {
+  background: color-mix(in srgb, var(--plot) 7%, transparent);
+}
+.day-row[data-state="observedOnly"] > * {
+  background: color-mix(in srgb, var(--track) 6%, transparent);
+}
+.day-row[data-state="private"] .day-actual {
+  color: var(--muted);
+}
+
+.day-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-6);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.day-chip + .day-chip { margin-left: var(--s-8); }
+.day-chip > i {
+  flex: none;
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+}
+/* The plan is an outline, the record is solid — the same distinction the drift
+   rail makes, so the two screens teach the same vocabulary. */
+.day-chip[data-plan="true"] {
+  color: var(--muted);
+}
+.day-chip[data-plan="true"] > i {
+  height: 10px;
+  opacity: 0.7;
+}
+.day-chip[data-owner="observed"],
+.day-chip[data-owner="idle"] {
+  color: var(--muted);
+}
+
+.day-fill {
+  color: var(--faint);
+  font-size: var(--t-micro);
+}
+.day-fill:hover,
+.day-fill:focus-visible {
+  color: var(--plot);
+}
+
+.day-glyph {
+  display: inline-block;
+  width: 1.1em;
+  color: var(--muted);
+}
+.day-observed {
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The day's arithmetic as one bar. It sums to the day exactly, because the
+   totals behind it do — the counting invariant, drawn. */
+.day-ledger {
+  padding: var(--s-8) 0 var(--s-12);
+}
+.day-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 1px;
+  overflow: hidden;
+  background: var(--rule);
+}
+.day-bar > i {
+  display: block;
+  height: 100%;
+}
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  margin-right: 4px;
+  vertical-align: baseline;
+}
+.day-ledger-figures {
+  margin-top: var(--s-6);
+  flex-wrap: wrap;
+  gap: var(--s-12);
+  color: var(--muted);
+}
+.l-work     { background: var(--track); }
+.l-life     { background: var(--plot); }
+.l-private  { background: var(--faint); }
+.l-observed { background: color-mix(in srgb, var(--track) 45%, var(--rule)); }
+.l-idle     { background: var(--rule); }
+.l-empty    { background: repeating-linear-gradient(
+                45deg, var(--rule), var(--rule) 3px,
+                color-mix(in srgb, var(--muted) 30%, var(--rule)) 3px,
+                color-mix(in srgb, var(--muted) 30%, var(--rule)) 4px); }
+
+.area-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--s-4);
+}

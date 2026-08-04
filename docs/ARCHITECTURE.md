@@ -116,6 +116,62 @@ Two consequences worth stating:
 An empty segment is deleted rather than kept. A zero-length interval in the
 Sessions tab is noise, not a record.
 
+## Why four record types resolve into one timeline at read time
+
+The product shows a single 24-hour column, but it stores four different kinds of
+claim about the same hour, and they are not interchangeable:
+
+| Table | The claim | Who made it |
+|---|---|---|
+| `scheduled_block` | "I mean to do this" | the user, in advance |
+| `time_session` | "I did this work" | the timer, or the user correcting it |
+| `life_entry` | "I did this non-work thing" | the user |
+| `activity_span` | "this app was in front" | the machine |
+
+The tempting design is one `time_entry` table with a `kind` column. It is
+wrong for a reason that shows up immediately: **an observation and a session
+describe the same second without being the same fact.** If the timer says you
+were on the auth refactor from 09:00 to 10:00 and the observer says Slack was
+frontmost from 09:20 to 09:40, one table forces a choice — overwrite, or store
+both and count 80 minutes for a 60-minute hour. Neither is acceptable, and the
+second is the failure mode the product exists to avoid.
+
+So the tables stay separate and **overlap is resolved on read**, never by
+mutating anything:
+
+1. a confirmed `life_entry` wins,
+2. then a confirmed `time_session`,
+3. then an `activity_span`,
+4. then the hour is empty.
+
+`store::day::resolve_day` builds the boundary set from every source, cuts the
+day into segments at those boundaries, and gives each segment **exactly one**
+owner. Totals sum segments, not rows — which is why a ten-minute session inside
+a thirty-minute slot contributes ten minutes and not thirty. The slot grid is a
+lens for the eye; the segments are the arithmetic.
+
+Three things follow, and each is a requirement that would otherwise need its
+own mechanism:
+
+- **Observation enriches rather than adds.** The Slack span above is attached to
+  the session's segment as evidence and contributes no duration of its own. The
+  Day view can say "you were in Slack for twenty of those minutes" without the
+  day summing to more than a day.
+- **Empty is a real state, not an absent row.** Segments cover the day with no
+  gaps, so an unaccounted hour is a segment whose owner is `Empty`. It is
+  something the UI is handed, not something it has to notice is missing —
+  which is what makes an empty hour reconcilable.
+- **The invariant is one assertion.** For any local date, the segment durations
+  sum to the length of that day: 24 hours, or 23 or 25 across a DST transition.
+  `a_day_accounts_for_every_second_exactly_once` asserts it on a hand-built day;
+  `overlapping_records_never_double_count` asserts it over 200 randomly
+  overlapping records. Plan acceptance M2, M4 and M8 all reduce to that line.
+
+The plan is deliberately *not* in this precedence list. A block is an intention,
+and an intention that silently becomes actual time is how a planner starts
+lying to you. It renders as a separate overlay, and the difference between the
+two layers is the drift the whole product is about.
+
 ## Why derived data is computed in Rust, not the renderer
 
 Drift, drift state, task groupings, the calibration headline, the reconcile

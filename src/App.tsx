@@ -18,6 +18,7 @@ import { TaskDetail } from "./views/TaskDetail";
 import { Reports } from "./views/Reports";
 import { Settings } from "./views/Settings";
 import { Activity } from "./views/Activity";
+import { Day } from "./views/Day";
 import { Focus } from "./views/Focus";
 import { ReconcileSheet } from "./views/Reconcile";
 import { BlockDialogs } from "./components/BlockDialogs";
@@ -100,6 +101,7 @@ export default function App() {
         <NavRail />
         <Sidebar />
         <main className="main">
+          {view === "day" && <Day />}
           {view === "planner" && <Planner />}
           {view === "tasks" && <Tasks />}
           {view === "reports" && <Reports />}

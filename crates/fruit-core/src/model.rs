@@ -360,6 +360,8 @@ pub struct SessionRow {
     pub source: String,
     pub is_confirmed: bool,
     pub note: Option<String>,
+    /// Work contribution mode. Work records only — see `Contribution`.
+    pub contribution: Option<Contribution>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -812,4 +814,353 @@ pub mod double_option {
     {
         Option::<T>::deserialize(d).map(Some)
     }
+}
+
+// ─── life time (Plan Rev 3 §7) ─────────────────────────────────────────
+
+/// What a life area is *for*, which is what the summaries group by. The
+/// workbook's core-versus-entertainment split, plus rest, which is neither.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AreaKind {
+    Core,
+    Entertainment,
+    Rest,
+    Other,
+}
+
+impl AreaKind {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "core" => Self::Core,
+            "entertainment" => Self::Entertainment,
+            "rest" => Self::Rest,
+            "other" => Self::Other,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Core => "core",
+            Self::Entertainment => "entertainment",
+            Self::Rest => "rest",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifeAreaRow {
+    pub id: String,
+    pub name: String,
+    pub colour: String,
+    pub kind: AreaKind,
+    pub monthly_target_sec: Option<i64>,
+    pub sort_rank: f64,
+    /// Built-in areas can be renamed and retargeted but never deleted — an
+    /// imported workbook maps onto them, and a missing one is silent data loss.
+    pub is_builtin: bool,
+    pub is_archived: bool,
+    /// Confirmed seconds in the current local month, for target-versus-actual.
+    pub month_tracked_sec: i64,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewLifeArea {
+    pub name: String,
+    pub colour: Option<String>,
+    pub kind: Option<String>,
+    pub monthly_target_sec: Option<i64>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifeAreaPatch {
+    pub name: Option<String>,
+    pub colour: Option<String>,
+    pub kind: Option<String>,
+    #[serde(default, with = "double_option")]
+    pub monthly_target_sec: Option<Option<i64>>,
+    pub is_archived: Option<bool>,
+}
+
+/// Confirmed non-work time. Unlike a session this has no accumulator and no
+/// open state — it is always a closed interval asserted after the fact, because
+/// there is no timer for sleeping.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifeEntryRow {
+    pub id: String,
+    pub life_area_id: String,
+    pub area_name: String,
+    pub area_colour: String,
+    pub area_kind: AreaKind,
+    pub label: Option<String>,
+    pub started_at: Millis,
+    pub ended_at: Millis,
+    pub local_date: String,
+    pub tz: String,
+    /// Accounted for, but nothing recorded about it.
+    pub is_private: bool,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewLifeEntry {
+    pub life_area_id: String,
+    pub label: Option<String>,
+    pub started_at: Millis,
+    pub ended_at: Millis,
+    pub tz: String,
+    #[serde(default)]
+    pub is_private: bool,
+    pub note: Option<String>,
+    /// Clear any confirmed record already covering this interval.
+    ///
+    /// Replacing is destructive, so it is never the default: the caller has to
+    /// have shown the user what is about to go (M9).
+    #[serde(default)]
+    pub replace_existing: bool,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifeEntryPatch {
+    pub life_area_id: Option<String>,
+    pub label: Option<String>,
+    pub started_at: Option<Millis>,
+    pub ended_at: Option<Millis>,
+    pub is_private: Option<bool>,
+    pub note: Option<String>,
+}
+
+/// Work contribution mode (Plan Rev 3 §7). Work records only — there is
+/// deliberately no counterpart on `life_entry`, so "contribution never applies
+/// to personal time" is a fact about the schema rather than a rule the UI is
+/// trusted to remember.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Contribution {
+    None,
+    Attend,
+    Support,
+    Own,
+    Assist,
+}
+
+impl Contribution {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "none" => Self::None,
+            "attend" => Self::Attend,
+            "support" => Self::Support,
+            "own" => Self::Own,
+            "assist" => Self::Assist,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Attend => "attend",
+            Self::Support => "support",
+            Self::Own => "own",
+            Self::Assist => "assist",
+        }
+    }
+}
+
+// ─── the unified day (Plan Rev 3 §7, §8.1) ─────────────────────────────
+
+/// What owns one segment of the day, after precedence is applied.
+///
+/// Exactly one owner per segment, which is the whole point: two owners would
+/// be two durations for the same second.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+// `rename_all` renames *variants*; struct-variant **fields** need
+// `rename_all_fields`. Without the second attribute this enum goes over the
+// wire as `app_id`/`area_name` while every other DTO is camelCase — a silent,
+// per-variant contract break. `wire_shape_is_camel_case` guards it.
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
+pub enum SlotOwner {
+    /// Confirmed non-work time.
+    Life {
+        entry_id: String,
+        area_id: String,
+        area_name: String,
+        area_colour: String,
+        area_kind: AreaKind,
+        label: Option<String>,
+        is_private: bool,
+    },
+    /// Confirmed work.
+    Work {
+        session_id: String,
+        task_id: String,
+        task_title: String,
+        project_id: Option<String>,
+        project_colour: Option<String>,
+        contribution: Option<Contribution>,
+    },
+    /// The machine saw an application, and nobody has confirmed what it meant.
+    Observed {
+        app_id: String,
+        domain: Option<String>,
+        category: Option<String>,
+    },
+    /// Observed, and the observation was "nobody was here".
+    Idle,
+    /// Nothing at all. A real state with a real duration — not an absent row.
+    Empty,
+}
+
+impl SlotOwner {
+    /// Rank in the §7 precedence order. Lower wins.
+    pub fn rank(&self) -> u8 {
+        match self {
+            SlotOwner::Life { .. } => 0,
+            SlotOwner::Work { .. } => 1,
+            SlotOwner::Observed { .. } => 2,
+            SlotOwner::Idle => 3,
+            SlotOwner::Empty => 4,
+        }
+    }
+
+    pub fn is_confirmed(&self) -> bool {
+        matches!(self, SlotOwner::Life { .. } | SlotOwner::Work { .. })
+    }
+}
+
+/// One contiguous run of the day with a single owner. Segments tile the day
+/// exactly: no gaps, no overlaps, and their durations sum to the day's length.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DaySegment {
+    pub from: Millis,
+    pub to: Millis,
+    pub owner: SlotOwner,
+    /// Applications seen during this segment. **Evidence, not duration** — a
+    /// segment owned by a confirmed session carries what the observer saw
+    /// without the day summing to more than a day (M8).
+    pub evidence: Vec<AppTotal>,
+}
+
+/// The plan overlay. Deliberately outside the precedence order: an intention
+/// that silently becomes actual time is how a planner starts lying to you.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DayPlan {
+    pub block_id: String,
+    pub title: String,
+    pub project_colour: Option<String>,
+    pub starts_at: Millis,
+    pub duration_sec: i64,
+    pub tracked_sec: i64,
+    pub drift_sec: i64,
+    pub drift_state: DriftState,
+    pub is_fixed: bool,
+    pub series_id: Option<String>,
+}
+
+/// One row of the Day table. The slot grid is a lens for the eye; the segments
+/// above are the arithmetic, which is why a ten-minute session inside a
+/// thirty-minute slot contributes ten minutes and not thirty.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DaySlot {
+    pub index: i64,
+    pub starts_at: Millis,
+    pub ends_at: Millis,
+    /// Every segment overlapping this slot, longest first.
+    pub segments: Vec<DaySegment>,
+    /// Plan overlay for this slot, if any.
+    pub plans: Vec<DayPlan>,
+    /// The dominant owner, for the single-glance read down the column.
+    pub state: SlotState,
+}
+
+/// The one word that describes a slot (Plan Rev 3 §7 "required time states").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SlotState {
+    /// No record of any kind, and no plan either.
+    Empty,
+    /// A block covers it and nothing happened. The most actionable state on
+    /// the screen: it is the difference between intending and doing.
+    PlannedNotStarted,
+    ConfirmedWork,
+    ConfirmedLife,
+    /// Accounted for, deliberately unrecorded.
+    Private,
+    /// The machine saw something; nobody has said what it was.
+    ObservedOnly,
+    Idle,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaTotal {
+    pub area_id: String,
+    pub name: String,
+    pub colour: String,
+    pub kind: AreaKind,
+    pub seconds: i64,
+    pub monthly_target_sec: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectTotal {
+    pub project_id: Option<String>,
+    pub name: String,
+    pub colour: Option<String>,
+    pub seconds: i64,
+}
+
+/// The day's arithmetic, summed from segments.
+///
+/// The invariant that matters: `confirmed_work + confirmed_life + private +
+/// observed_only + idle + empty == day_sec`, where `day_sec` is 24 hours — or
+/// 23 or 25 across a DST transition.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DayTotals {
+    pub day_sec: i64,
+    pub planned_sec: i64,
+    pub confirmed_work_sec: i64,
+    pub confirmed_life_sec: i64,
+    pub private_sec: i64,
+    pub observed_only_sec: i64,
+    pub idle_sec: i64,
+    pub empty_sec: i64,
+    /// Confirmed life time in an `entertainment` area, plus observed-only time
+    /// the classifier called entertainment.
+    pub entertainment_sec: i64,
+    /// Every second the machine was observed in front of someone, whether or
+    /// not it also belongs to a confirmed record. **Overlaps the totals above
+    /// on purpose** — it answers "how much of this day was at the PC", which is
+    /// a different question from "how was this day spent".
+    pub pc_sec: i64,
+    pub by_area: Vec<AreaTotal>,
+    pub by_project: Vec<ProjectTotal>,
+    pub by_app: Vec<AppTotal>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DayView {
+    pub local_date: String,
+    pub tz: String,
+    pub slot_minutes: i64,
+    pub starts_at: Millis,
+    pub ends_at: Millis,
+    pub slots: Vec<DaySlot>,
+    pub segments: Vec<DaySegment>,
+    pub totals: DayTotals,
+    pub is_reconciled: bool,
+    pub is_today: bool,
+    pub now: Millis,
 }

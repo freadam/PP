@@ -79,6 +79,7 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
      clicking through the views would make U10 fail on every element for a
      reason that has nothing to do with the CSS. */
   for (const [view, key] of [
+    ["Day", "d"],
     ["Planner", "p"],
     ["Tasks", "t"],
     ["Activity", "a"],
@@ -148,7 +149,7 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
 // Every view, not just the one that happens to open first: Activity's timeline
 // and Settings' widest hint lines are the two most likely places for a stray
 // pixel of horizontal scroll, and neither is the default screen.
-const VIEWS = ["Planner", "Tasks", "Activity", "Reports", "Settings"];
+const VIEWS = ["Day", "Planner", "Tasks", "Activity", "Reports", "Settings"];
 
 for (const [width, height, scale] of [
   [960, 640, 1],

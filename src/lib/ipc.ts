@@ -45,6 +45,12 @@ import type {
 } from "./types";
 import type {
   ActivityDay,
+  AreaKind,
+  Contribution,
+  DayView,
+  LifeAreaRow,
+  LifeEntryRow,
+  NewLifeEntry,
   ActivityStatus,
   BlockRow,
   IcsImportSummary,
@@ -257,3 +263,52 @@ export const getActivityDay = (date: LocalDate, tz: string) =>
   call<ActivityDay>("get_activity_day", { date, tz });
 
 export const clearActivity = () => call<number>("clear_activity", {});
+
+/* ─── the unified day and life time (Plan Rev 3 §7, §8.1) ──────────────── */
+
+export const getDay = (date: LocalDate, tz: string, slotMinutes?: number) =>
+  call<DayView>("get_day", { date, tz, slotMinutes: slotMinutes ?? null });
+
+export const getLifeAreas = (tz: string, includeArchived = false) =>
+  call<LifeAreaRow[]>("get_life_areas", { tz, includeArchived });
+
+export const createLifeArea = (input: {
+  name: string;
+  colour?: string;
+  kind?: AreaKind;
+  monthlyTargetSec?: number | null;
+}) => call<LifeAreaRow>("create_life_area", { input });
+
+export const updateLifeArea = (
+  id: string,
+  patch: { name?: string; colour?: string; kind?: AreaKind; monthlyTargetSec?: number | null; isArchived?: boolean },
+) => call<LifeAreaRow>("update_life_area", { id, patch });
+
+export const deleteLifeArea = (id: string) => call<UndoToken>("delete_life_area", { id });
+
+export const getLifeEntries = (date: LocalDate, tz: string) =>
+  call<LifeEntryRow[]>("get_life_entries", { date, tz });
+
+export const addLifeEntry = (input: NewLifeEntry) =>
+  call<LifeEntryRow>("add_life_entry", { input });
+
+export const updateLifeEntry = (
+  id: string,
+  patch: {
+    lifeAreaId?: string;
+    label?: string | null;
+    startedAt?: Millis;
+    endedAt?: Millis;
+    isPrivate?: boolean;
+    note?: string | null;
+  },
+) => call<LifeEntryRow>("update_life_entry", { id, patch });
+
+export const deleteLifeEntry = (id: string) => call<UndoToken>("delete_life_entry", { id });
+
+/** Work records only — there is no life-entry equivalent, by design. */
+export const setSessionContribution = (id: string, contribution: Contribution | null) =>
+  call<SessionRow>("set_session_contribution", { id, contribution });
+
+export const convertSessionToLife = (id: string, lifeAreaId: string, tz: string) =>
+  call<LifeEntryRow>("convert_session_to_life", { id, lifeAreaId, tz });

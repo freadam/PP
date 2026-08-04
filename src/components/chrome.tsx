@@ -27,6 +27,8 @@ export function BrandMark({ size = 20, state = "idle" }: { size?: number; state?
 }
 
 const NAV: { view: ViewName; label: string; key: string; icon: string }[] = [
+  // Day first: it is the primary operational screen (Plan Rev 3 §8.1).
+  { view: "day", label: "Day", key: "D", icon: "▦" },
   { view: "planner", label: "Planner", key: "P", icon: "▤" },
   { view: "tasks", label: "Tasks", key: "T", icon: "☰" },
   { view: "activity", label: "Activity", key: "A", icon: "◷" },
@@ -55,7 +57,7 @@ export function NavRail() {
             {item.icon}
           </span>
           {/* §3.11: reconcile-due is a dot, not a notification. */}
-          {item.view === "planner" && unreconciled.length > 0 && <span className="rail-dot" />}
+          {item.view === "day" && unreconciled.length > 0 && <span className="rail-dot" />}
         </button>
       ))}
     </nav>

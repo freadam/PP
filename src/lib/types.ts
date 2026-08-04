@@ -168,6 +168,8 @@ export interface SessionRow {
   source: "timer" | "pomodoro" | "manual" | "recovered";
   isConfirmed: boolean;
   note: string | null;
+  /** Work contribution mode. Work records only — life entries have no such field. */
+  contribution: Contribution | null;
 }
 
 /** §5.6 redundancy table. No drift state is carried by colour alone. */
@@ -492,4 +494,171 @@ export interface TaskQuery {
   includeSubtasks?: boolean;
   limit?: number;
   offset?: number;
+}
+
+// ─── life time and the unified day (Plan Rev 3 §7, §8.1) ───────────────
+
+export type AreaKind = "core" | "entertainment" | "rest" | "other";
+
+export interface LifeAreaRow {
+  id: string;
+  name: string;
+  colour: string;
+  kind: AreaKind;
+  monthlyTargetSec: number | null;
+  sortRank: number;
+  /** Built-ins archive but never delete — an imported workbook maps onto them. */
+  isBuiltin: boolean;
+  isArchived: boolean;
+  monthTrackedSec: number;
+}
+
+export interface LifeEntryRow {
+  id: string;
+  lifeAreaId: string;
+  areaName: string;
+  areaColour: string;
+  areaKind: AreaKind;
+  label: string | null;
+  startedAt: Millis;
+  endedAt: Millis;
+  localDate: LocalDate;
+  tz: string;
+  /** Accounted for, but nothing recorded about it. */
+  isPrivate: boolean;
+  note: string | null;
+}
+
+export interface NewLifeEntry {
+  lifeAreaId: string;
+  label?: string | null;
+  startedAt: Millis;
+  endedAt: Millis;
+  tz: string;
+  isPrivate?: boolean;
+  note?: string | null;
+  /** Clears whatever confirmed record already covers the interval. Destructive. */
+  replaceExisting?: boolean;
+}
+
+/** Work records only. `life_entry` has no counterpart, by design. */
+export type Contribution = "none" | "attend" | "support" | "own" | "assist";
+
+export const CONTRIBUTIONS: { value: Contribution; label: string; hint: string }[] = [
+  { value: "none", label: "None", hint: "Work, with no contribution mode recorded" },
+  { value: "attend", label: "Attend", hint: "You were present" },
+  { value: "support", label: "Support", hint: "You helped someone else's work" },
+  { value: "own", label: "Own", hint: "The outcome was yours" },
+  { value: "assist", label: "Assist", hint: "You did part of it, someone else led" },
+];
+
+/** Exactly one owner per segment — two owners would be two durations. */
+export type SlotOwner =
+  | {
+      kind: "life";
+      entryId: string;
+      areaId: string;
+      areaName: string;
+      areaColour: string;
+      areaKind: AreaKind;
+      label: string | null;
+      isPrivate: boolean;
+    }
+  | {
+      kind: "work";
+      sessionId: string;
+      taskId: string;
+      taskTitle: string;
+      projectId: string | null;
+      projectColour: string | null;
+      contribution: Contribution | null;
+    }
+  | { kind: "observed"; appId: string; domain: string | null; category: string | null }
+  | { kind: "idle" }
+  | { kind: "empty" };
+
+export interface DaySegment {
+  from: Millis;
+  to: Millis;
+  owner: SlotOwner;
+  /** Evidence, not duration — see `attach_evidence` in day.rs. */
+  evidence: AppTotal[];
+}
+
+export interface DayPlan {
+  blockId: string;
+  title: string;
+  projectColour: string | null;
+  startsAt: Millis;
+  durationSec: number;
+  trackedSec: number;
+  driftSec: number;
+  driftState: DriftState;
+  isFixed: boolean;
+  seriesId: string | null;
+}
+
+export type SlotState =
+  | "empty"
+  | "plannedNotStarted"
+  | "confirmedWork"
+  | "confirmedLife"
+  | "private"
+  | "observedOnly"
+  | "idle";
+
+export interface DaySlot {
+  index: number;
+  startsAt: Millis;
+  endsAt: Millis;
+  segments: DaySegment[];
+  plans: DayPlan[];
+  state: SlotState;
+}
+
+export interface AreaTotal {
+  areaId: string;
+  name: string;
+  colour: string;
+  kind: AreaKind;
+  seconds: number;
+  monthlyTargetSec: number | null;
+}
+
+export interface DayProjectTotal {
+  projectId: string | null;
+  name: string;
+  colour: string | null;
+  seconds: number;
+}
+
+export interface DayTotals {
+  daySec: number;
+  plannedSec: number;
+  confirmedWorkSec: number;
+  confirmedLifeSec: number;
+  privateSec: number;
+  observedOnlySec: number;
+  idleSec: number;
+  emptySec: number;
+  entertainmentSec: number;
+  /** Overlaps the layers above on purpose — a different question. */
+  pcSec: number;
+  byArea: AreaTotal[];
+  byProject: DayProjectTotal[];
+  byApp: AppTotal[];
+}
+
+export interface DayView {
+  localDate: LocalDate;
+  tz: string;
+  slotMinutes: number;
+  startsAt: Millis;
+  endsAt: Millis;
+  slots: DaySlot[];
+  segments: DaySegment[];
+  totals: DayTotals;
+  isReconciled: boolean;
+  isToday: boolean;
+  now: Millis;
 }

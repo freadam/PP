@@ -1,390 +1,335 @@
-# Fruit — Product Specification
+# Product Specification
 
-**What this document is.** A description of the application as it actually
-exists in this repository, written to be read cold by someone who has never
-seen it. It is not the original brief. Where the two differ, the brief is
-wrong and [`SPEC-DEVIATIONS.md`](SPEC-DEVIATIONS.md) says why.
+**Working name:** Fruit (repository name; the plan calls it *Harmonized Offline
+Time Planner and Tracker*)
+**Baseline:** Project Plan Revision 3 — 4 August 2026
+**Release target:** Windows-first MVP, 12 weeks
+**Status of this document:** the specification of record. Where it disagrees
+with anything else in this repository, this document wins and the other file
+needs updating.
 
-**Status at time of writing.** P0, P1 and P2 are implemented. 103 Rust tests
-green; the renderer is verified in a headless browser at five viewport sizes on
-every view. `src-tauri` builds and runs on Windows; macOS and Linux are
-unbuilt.
+---
+
+## 0. How this document relates to what is already built
+
+The repository currently contains a working implementation of *Fruit —
+Technical Product Specification v2*: a planner, timer, reconciler and
+calibrator with opt-in application-level activity observation. That build is
+**one of four inputs** to this product, not the product itself.
+
+| Input | What it contributes |
+|---|---|
+| **Fruit v2** (built, in this repo) | The Plan→Track→Reconcile→Calibrate loop, plan/record separation, drift, the timer state machine, privacy architecture, the testable core |
+| **The workbook** (client's Excel) | The 24-hour day table, life areas, targets vs actual, monthly reporting, the Excel export format |
+| **Rize** | Automatic PC activity observation, including browser domains |
+| **Super Productivity** | Projects, tasks, estimates, timers |
+
+The plan reorders the product around the workbook's day table. That is the
+single biggest change: **the Planner stops being the primary screen.**
 
 ---
 
 ## 1. What does the app do?
 
-> **Fruit is a local-first desktop application that records the difference
-> between the time you planned to spend on your work and the time you actually
-> spent, and uses that difference to make your next plan more accurate.**
+> **A local-first Windows application that shows how the user planned to spend
+> the month, what they actually did across work and life, where PC
+> entertainment displaced intention, and how to make the next plan more
+> realistic.**
 
-That sentence is doing more work than it looks. Three claims inside it are the
-whole product:
+### The primary outcome
 
-**"the difference"** — Fruit stores two independent things and never merges
-them. A `scheduled_block` is an intention: *I mean to spend 90 minutes on the
-auth refactor, Tuesday at 09:00.* A `time_session` is a record: *between 09:04
-and 10:47 the timer was running against that task.* The gap between them is
-**drift**, and drift is the only number the interface is really about. Every
-other feature exists to make drift honest or to make it useful.
+**Reduce unplanned PC entertainment**, while producing a trustworthy monthly
+account of work, personal activities, sleep/rest, and unaccounted time.
 
-**"local-first"** — the database is a SQLite file on the user's disk. There is
-no account, no server, no sync, and no network call anywhere in the core loop.
-The OFFLINE badge in the title bar is a statement of fact, not a connectivity
-indicator.
+That is a behaviour-change goal, not a reporting goal, and it is what
+distinguishes this product from a time tracker. The reports exist to make the
+behaviour visible; the Day view exists to make the record cheap enough to keep.
 
-**"more accurate"** — the loop closes. After thirty days of tracked work, Fruit
-can say *"your 2-hour estimates run 1.6× over, from 11 samples"*, which is a
-fact about you that you cannot get by trying harder to estimate well.
+### Secondary outcomes
+
+- More accurate project estimates, via planned-versus-tracked drift.
+- Less daily effort to maintain the monthly record than the workbook costs today.
+- One offline replacement for tracking currently spread across several tools.
+- The user's existing Excel reporting workflow preserved.
 
 ### The loop
 
 ```
-PLAN ──▶ TRACK ──▶ RECONCILE ──▶ CALIBRATE ──▶ back to PLAN, better
- │         │           │              │
- │         │           │              └─ trailing 30-day tracked ÷ estimate,
- │         │           │                 bucketed, median, n ≥ 5
- │         │           └─ end of day: what overran, what was never started,
- │         │              what you did that wasn't on the plan
- │         └─ one timer, bound to the block it was started from
- └─ blocks on a 24-hour grid, at 1 / 3 / 7-day spans
+PLAN ──▶ TRACK ──▶ RECONCILE ──▶ CALIBRATE ──▶ PLAN BETTER
+  │        │           │             │
+  │        │           │             └─ estimate accuracy, recurring patterns
+  │        │           └─ confirm gaps, overruns, unplanned and observed-only time
+  │        └─ timers, manual life entries, and automatic PC observation
+  └─ projects, tasks, life targets, scheduled blocks
 ```
 
 ### What it deliberately does not do
 
-No sync. No accounts. No mobile app. No collaboration or shared workspaces. No
-AI scheduling or auto-planning. No plugin API. No web version. No telemetry, no
-crash reporting, no analytics of any kind. No writing back to your calendar.
-
-These are not "not yet" items. Every one of them is a thing that would require
-the data to leave the machine or would put a second author on the plan, and
-both break the premise.
+No sync, accounts, cloud, web, mobile, macOS or Linux. No collaboration, team
+workspaces, or manager reporting. No personal-notes system, wiki, Markdown
+editor, or Obsidian integration. No role/KPI/value scoring. No expense, loan or
+income tracking. No AI scheduling. No telemetry or crash uploads. No calendar
+write-back, plugin API, website blocking, or tamper prevention.
 
 ---
 
 ## 2. Who uses it?
 
-### The user
+A **privacy-conscious solo knowledge worker on Windows** who plans and reports
+their own time, and who wants both project tracking and a broader account of
+where their life's hours go.
 
-A **solo knowledge worker who bills, reports, or budgets their own time** and
-who has noticed that their sense of how long things take is unreliable.
-Concretely: freelance developers and designers, consultants, researchers,
-graduate students, indie founders, and salaried engineers who keep their own
-sprint estimates.
+They:
 
-Three things are assumed true of them and shape every decision below:
-
-1. **They already have a task manager and are not looking for another one.**
-   Fruit's task features exist to make blocks and sessions attachable to
-   something meaningful — not to compete with a dedicated GTD app. This is why
-   there are no filters-as-saved-views, no recurring *tasks*, no kanban.
-2. **They work with a keyboard and dislike surprises.** They will learn
-   shortcuts. They will notice a 1-second timer loop in Activity Monitor and
-   they will complain about it publicly. They will read the schema.
-3. **They are privacy-alert.** "Where does this data go" is a question they ask
-   before installing, and "nowhere" has to be verifiable, not asserted.
+- want automatic evidence of PC use, but the final say on every classification;
+- use the keyboard heavily and will learn shortcuts;
+- need tasks only to support planning and tracking — not GTD, not kanban;
+- need a **detailed day** for correction and a **month-first dashboard** for
+  seeing patterns;
+- expect every byte of activity data to stay on the machine.
 
 ### The primary task
 
-> **At the start of the day, lay out the hours. During the day, run a timer
-> against what you're doing. At the end of the day, spend ninety seconds
-> reconciling the two.**
+> **Plan the month. During each day, let the timer and the observer do most of
+> the recording. At the end of the day, spend ninety seconds confirming what
+> the app got right and filling in what it could not see.**
 
-Everything else in the app is in service of that ninety seconds actually
-happening. If the user stops reconciling, Fruit degrades into a mediocre timer,
-and calibration — the only thing it offers that a calendar doesn't — never
-arrives.
+The design target for daily reconciliation is **90 seconds**; the accepted
+ceiling after the learning period is **five minutes**. If reconciliation stops
+happening, the monthly account stops being trustworthy and the product's whole
+claim fails — so every feature is judged partly on whether it makes those
+ninety seconds shorter.
 
-### Secondary tasks, in rough order of frequency
+### Non-users
 
-| Task | Where it happens |
-|---|---|
-| Capture a thought without leaving the keyboard | `C` from anywhere → the capture bar |
-| Plot a captured task into a specific hour | Drag from the sidebar, or `S` then arrows |
-| Correct a session you forgot to start | Task detail → Sessions → add manually |
-| Answer "where did last week actually go" | Reports |
-| Answer "was I actually doing that, or was I in Slack" | Activity |
-| Set up a standing commitment | Select a block → `R` → pick a repeat rule |
-| Bring in meetings you don't control | Settings → Data → Import a calendar |
-
-### Explicit non-users
-
-Teams (there is no shared anything), managers reporting on other people's time
-(nothing is exportable *about* another person because nothing is shared),
-anyone who wants automated time tracking with no timer (Activity observes but
-never fills in your sessions for you — see §4).
+Teams, managers reporting on someone else's time, anyone wanting automated
+tracking with no confirmation step. Observation never becomes a confirmed
+record on its own.
 
 ---
 
 ## 3. What are the key screens?
 
-Five primary views on a persistent shell, plus five overlays. The shell — nav
-rail, title bar with the timer chip, and a sidebar — never goes away except in
-Focus mode.
+Navigation order, which is also priority order:
 
-### Persistent shell
+**Day · Planner · Projects/Tasks · Activity · Reports · Settings**
 
-| Element | Content |
-|---|---|
-| **Nav rail** (52px, left) | Five icons: Planner, Tasks, Activity, Reports, Settings. A dot appears on Planner when a past day is unreconciled. |
-| **Title bar** | Brand mark (which is the drift rail as a monogram), OFFLINE badge, timer chip, Pomodoro strip, the Recording indicator when Activity is sampling, a Reconcile button when a day is due, and Focus. |
-| **Sidebar** (260px, collapses to 48px below 1130px) | Projects with weekly-target bars, tags, and the backlog. Rows here are drag sources for the Planner. |
-| **Detail column** (≥1280px) | The task detail panel, which becomes an overlay sheet below that width. |
+Persistent shell throughout: timer chip, OFFLINE indicator, Recording
+indicator, Reconcile action, Focus action.
 
-### 3.1 Planner — *the primary screen*
+### 3.1 Day view — the primary operational screen
 
-A 24-hour vertical grid at 1-, 3- or 7-day spans. Not 07:00–21:00: night
-workers are real users and a clipped axis silently loses their data.
+A complete 24-hour table for one date, modelled on the workbook's time grid.
+This is where the user spends their reconciliation time, and it is the screen
+the product is organised around.
 
-- **Blocks** are plates positioned by time and sized by duration. Each one
-  carries a **drift rail** — a vertical two-track figure showing planned
-  against tracked, with the overrun continuing past the plate's bottom edge
-  into the gutter, so an overrun is legible without reading a number.
-- **Collisions** lay out side by side in equal columns, up to three, then
-  "+n more".
-- **Drag** moves and resizes, with three collision policies: default overlaps
-  with a warning tint, `Shift` pushes later non-fixed blocks down, `Alt`
-  shrinks to fit. `Esc` cancels and writes nothing. 15-minute snap, 5-minute
-  with `Alt`.
-- **Every drag has a keyboard equivalent.** `S` plots the selected task into
-  the next free slot; arrows nudge by 15 minutes; `Shift`+arrows resize.
-- **Fixed blocks** (meetings, imported calendar events) are never pushed and
-  never auto-shortened.
-- **Repeating blocks** carry a `↻` and a dotted right edge. `R` opens the
-  repeat picker; `⌫` on one asks which occurrences it means.
-- A now-cursor hairline tracks the current minute. It updates on a
-  minute-aligned timeout, not a one-second interval.
-- Completed blocks recede to grey and keep their rail — what a finished block
-  cost is the point of having drawn it.
+- **One row per 30-minute slot** by default; zoom to 5, 15, 30 or 60 minutes
+  **without changing stored precision**. The slot size is a lens, never a
+  quantisation of the data.
+- **Aligned layers per row**: planned block · confirmed actual (project/task or
+  life activity) · observed PC app/domain · classification.
+- **All 24 hours are always present, including empty ones.** Empty time is a
+  real state with its own visual treatment. It is never silently rendered as
+  "None", and it never disappears because nothing happened.
+- Non-colour indicators for planned, confirmed, observed, idle, private and
+  empty — the states must survive a greyscale screenshot.
+- Current-day and current-time marker.
+- Editing: drag, keyboard, split, merge, fill, repeat, multi-select.
+- Selected-day totals: work, each life area, sleep/rest, entertainment, PC use,
+  and gaps.
+- Filters: project, life area, work contribution, entertainment, confidence
+  state.
+- Previous/next date and "go to today".
 
-### 3.2 Tasks
+### 3.2 Planner — secondary
 
-The backlog, in six groups, in this order: **Overdue · Today · This week · No
-date · Someday · Completed**. Completed is pinned last, greyed and struck
-through, capped at 100 rows, with full contrast restored on hover and focus.
+The existing 24-hour planning grid, at **3-day, 7-day and month** spans. Blocks
+are intentions; actual sessions draw a drift rail against them. Drag and resize
+with 15-minute snap and full keyboard equivalents. Fixed and repeating blocks.
+Planned-but-unstarted and unplanned-but-tracked both stay visible.
 
-- **Capture bar** at the top parses as you type and shows chips for what it
-  found *before* you commit: `Fix login bug #dev ~45m !! ^tomorrow 9am` →
-  a title, a tag, a 45-minute estimate, priority 2, and a due date. A chip for
-  a project or tag that doesn't exist yet is marked as one that will be
-  created.
-- **Estimates** are a dropdown on a fixed ladder — 30 min, 1, 1.5, 2, 2.5, 3,
-  3.5, 4 hours, then **Rollover** for work that doesn't fit one sitting. A
-  value the parser produced that isn't on the ladder is kept as an extra rung
-  labelled *(from capture)* rather than being rounded away.
-- Each row carries a compact drift rail, so estimate accuracy is visible in the
-  list, not only after opening something.
-- **Subtasks are tasks**, capped at three levels deep. They schedule and track
-  independently and roll up for display only (`3/7 · 45m of 2h`); a parent's
-  own estimate is never silently overwritten.
+*(The 1-day span is dropped: the Day view replaces it and does more.)*
 
-### 3.3 Task detail
+### 3.3 Projects and tasks
 
-Three tabs: **Note** (markdown, autosaved on a 500ms debounce with a 3s max
-wait, force-flushed on blur/close/window-hide), **Sessions**, **Subtasks**.
+Projects with colour, archive state, weekly/monthly target and **one compact
+plain-text note**. Tasks with title, project, status, estimate, priority, due
+date/time, tags and **one compact plain-text note**. Subtasks to three levels,
+tracked independently, rolled up for display. Backlog groups: Overdue · Today ·
+This week · No date · Someday · Completed. Quick capture, timer, manual session
+correction, Pomodoro and Focus.
 
-The Sessions tab is where the record can be corrected: add a session you forgot
-to start, edit endpoints, re-attach one to a different block, delete one. Manual
-and recovered sessions are visually distinguished from timer sessions, because
-a record you can't tell apart from a measurement is worse than no record.
+No wiki, no Markdown editor, no attachments, no general notes area.
 
-### 3.4 Activity *(opt-in, off by default)*
+### 3.4 Activity
 
-Three panels, and the order is the argument:
+Opt-in foreground application and idle observation. **Window titles are a
+separate control, off by default.** A local browser-domain connector for
+supported browsers, communicating only with the local application. An
+against-the-plan view showing which apps and domains appeared during a planned
+block. Per-app and per-domain totals on the same time axis as the Planner.
+Exclusions applied before storage, retention choices, a pause that survives
+restart, delete-recent and delete-all.
 
-1. **Against the plan** — each block on the day with the applications actually
-   in front of you while it ran, as a stacked bar plus a sentence: *"Mostly
-   Slack · 42m of 1h plotted."* This is the only place in Fruit where an
-   intention meets an **observation** rather than another self-report, and it
-   is the reason the feature exists.
-2. **Where the day went** — per-app totals, longest first, with shares.
-3. **The day** — a timeline on the Planner's exact axis and hour height, so the
-   two screens can be compared by looking rather than by reading numbers off
-   both. It opens scrolled to the first thing that happened.
+### 3.5 Reports and reconciliation
 
-When Activity is off, this screen says so and offers the switch. When the
-platform can't do it, it prints the platform's own reason.
-
-### 3.5 Reports
-
-Three panels, no more.
-
-1. **Calibration** — trailing 30 days of `tracked ÷ estimate`, bucketed by
-   estimate size, **median not mean**, reported only at n ≥ 5 per bucket, with
-   a plain-language headline. Buckets below the threshold are shown greyed with
-   their sample count rather than hidden, so the user can see how close they
-   are to a readable number.
-2. **Planned vs tracked per project per week** — the same plot/track encoding as
-   the drift rail, rotated horizontal. Consistency of encoding across scales is
-   what makes this a visual language rather than a set of charts.
-3. **Weekly targets** with pace-to-date.
+**Dashboards and reports open to the month horizon by default**, with day and
+week drill-down. Daily reconciliation covering overruns, unstarted plans,
+unplanned work, observed-only PC time and empty hours. Trailing 30-day estimate
+calibration (median ratio, minimum sample threshold). Planned vs tracked by
+project and week. Life-area and sleep/rest target vs actual. Planned vs
+unplanned entertainment with YouTube/Twitch trends. Work contribution
+summaries — **which never apply to personal time**.
 
 ### 3.6 Settings
 
-General (theme, 12/24-hour) · Planner (span, hour height, snap) · Timer (idle
-threshold, sleep policy) · Pomodoro · **Activity** (the full privacy contract as
-controls — see §4) · **Data** (export JSON/CSV/ICS, import a calendar, integrity
-check, backups) · Shortcuts · About.
+General · Planner/month · Timer · Pomodoro · Activity privacy · Entertainment
+rules · Data and backup · Excel · Shortcuts · About.
 
-### Overlays
-
-| Overlay | Trigger | Behaviour |
-|---|---|---|
-| **Command palette** | `⌘K` | Fuzzy over the single command registry. Every action in the app is here. |
-| **Reconcile sheet** | `⌘R`, or the title-bar button | One item at a time, each with a default verb and one-key alternatives. Never blocks the app; `Esc` defers. |
-| **Focus mode** | `F` | Full-screen, one task, a large clock, four gradient backgrounds, controls that fade. |
-| **Shortcut sheet** | `?` | Generated from the same registry as the palette, so it cannot fall out of date. |
-| **Recovery modal** | Automatic | The one `aria-live="assertive"` surface in the app. Shown when Fruit was killed with a timer running. |
-| **Block dialogs** | `R`, `⌫` on a series | Repeat picker; series-scope prompt. |
-
-### The rule that governs all of it
-
-**Every action is reachable from the command palette and from a documented
-key.** This is enforced structurally rather than by review: there is one
-`COMMANDS` registry, and the palette, the keyboard handler and the shortcut
-sheet all read it. A command that isn't reachable both ways cannot be written.
+One command registry powers the palette, the keyboard handler and the shortcut
+sheet, so an action that is not reachable both ways cannot exist.
 
 ---
 
 ## 4. What data does it handle?
 
-One SQLite database, WAL mode, `foreign_keys=ON` per connection,
-`synchronous=NORMAL`, versioned by `PRAGMA user_version` with forward-only
-migrations.
+### 4.1 Four record types, one timeline
 
-### Entity map
+This is the central data decision and everything else follows from it.
 
-```
-                     ┌──────────┐
-                     │ project  │──weekly_target_sec
-                     └────┬─────┘
-                          │ 0..1
-                     ┌────▼─────┐        ┌─────┐
-              ┌──────│   task   │───────▶│ tag │  (many-to-many, task_tag)
-     parent_id└─────▶│          │        └─────┘
-     (≤3 deep)       └──┬────┬──┘
-                        │    │ 1..1
-                        │    └──────────▶┌──────┐
-                        │                │ note │  (markdown)
-                        │                └──────┘
-        ┌───────────────┘
-        │ 0..n                          0..n
-┌───────▼──────────┐  block_id  ┌────────────────┐
-│ scheduled_block  │◀───────────│  time_session  │
-│  THE INTENTION   │  (nullable)│  THE RECORD    │
-└───────┬──────────┘            └───────┬────────┘
-        │ series_id                     │
-        │ (self-grouping)               │ running_session_id
-        │                       ┌───────▼────────┐
-        │                       │   app_state    │ singleton, id = 1
-        │                       └────────────────┘
-        │
-   ┌────▼──────────┐   ┌───────────────┐   ┌──────────────┐   ┌─────────┐
-   │  day_review   │   │ activity_span │   │ *_tracked_   │   │ setting │
-   │ 1 per date    │   │ (opt-in, P2)  │   │ cache        │   │ k/v     │
-   └───────────────┘   └───────────────┘   └──────────────┘   └─────────┘
-```
-
-### The core entities
-
-| Entity | It answers | Key fields |
+| Record | Meaning | Confirmed actual time? |
 |---|---|---|
-| `project` | "what body of work is this part of" | `name`, `colour`, `kind`, `weekly_target_sec`, `is_archived` |
-| `task` | "what am I trying to get done" | `title`, `status`, `estimate_sec`, `is_rollover`, `due_date` **or** `due_at`, `priority`, `energy`, `parent_id`, `completed_at` |
-| `tag` / `task_tag` | "what kind of work is this" | a real table, so tags are renamable and queryable — not a JSON column |
-| `note` | freeform markdown, one per task | `markdown` |
-| **`scheduled_block`** | **"what I meant to do, and when"** | `starts_at`, `duration_sec`, `local_date`, `tz`, `is_fixed`, `rrule`, `series_id`, `external_uid` |
-| **`time_session`** | **"what actually happened"** | `started_at`, `ended_at`, `elapsed_sec`, `heartbeat_at`, `source`, `is_confirmed`, `block_id` |
-| `app_state` | "is a timer running" | singleton row, `running_session_id` |
-| `day_review` | "this day has been reconciled" | one row per local date, plus the day's totals and its calibration ratio |
-| `activity_span` | "which app was in front" | `started_at`, `ended_at`, `app_id`, `window_title` — opt-in |
-| `setting` | typed key/value | preferences, plus undo tombstones |
+| `scheduled_block` | What the user intended to do, and when | **No** — it is the plan |
+| `time_session` | Confirmed work on a project/task | **Yes** |
+| `life_entry` | Confirmed non-work time: life area, sleep/rest, routine | **Yes** |
+| `activity_span` | Automatic foreground app/domain observation | **Observed only** — confirmed only by reconciliation or an explicit rule |
 
-### The relationship that matters
+**Precedence when sources overlap:**
 
-**`scheduled_block` and `time_session` are separate and never merge.**
+1. confirmed `life_entry`
+2. confirmed `time_session`
+3. observed `activity_span`
+4. empty / unaccounted
 
-A session may exist with **no block** — that is unplanned work, and Reconcile
-offers to turn it into a retroactive block. A block may exist with **no
-session** — that is something you meant to do and didn't, and it is a finding,
-not a missing row. Both are meaningful states the interface renders, not edge
-cases it hides.
+The planned block is a **separate overlay** and is never substituted for actual
+time. An observation overlapping a confirmed session **enriches** it with
+application evidence — it does not add a second duration.
 
-This single decision is what makes drift computable per block, makes Reconcile
-possible, and makes calibration meaningful. Collapsing them into one "time
-entry" table — which most time trackers do — deletes the product.
+### 4.2 The counting invariant
 
-### Data rules
+> For any local date, the confirmed, observed-only, idle, private and empty
+> durations **sum to exactly the length of that day** — 24 hours, or 23 or 25
+> across a DST transition — and no interval is counted twice.
 
-1. **Instants** are `INTEGER` milliseconds, UTC. Never local, never seconds,
-   never text.
-2. **Calendar dates** are `TEXT 'YYYY-MM-DD'`, **local**. A due date with no
-   time is a date; storing it as an instant means flying to another timezone
-   silently moves your deadlines.
-3. **Durations** are `INTEGER` seconds. One unit everywhere.
-4. **Ids** are UUIDv7 — they sort by creation time, and two offline devices
-   never collide even though there is no sync today.
-5. **Anything derivable is derived.** Views `block_tracked` and `task_tracked`
-   are the truth; the `*_cache` tables are written in the same transaction as
-   every session mutation and can be regenerated from the views on demand. A
-   cache that cannot be rebuilt is not a cache, it is a second truth.
-6. **Deletes are soft**, with one documented exception: sessions are hard-
-   deleted with a tombstone, because a soft-deleted session would keep counting
-   toward drift while claiming to be gone.
-7. **Intentions and records never merge.** See above.
-8. **A session covers one contiguous *awake* interval.** See below.
+This is enforced in the core as a property test over random overlapping
+records, not asserted in the UI. It is the technical form of the product's
+promise, and MVP acceptance criteria 2, 4 and 8 all reduce to it.
 
-### Two data decisions worth stating in full
+### 4.3 Required slot states
 
-**A session is a segment, not a sitting.** You start a timer, close the lid, and
-reopen it three hours later. Counting on the monotonic clock keeps `elapsed_sec`
-honest at twenty minutes — but a single row spanning `09:00 → 12:10` is still a
-lie about *when* the work happened, and no amount of correct arithmetic fixes
-it. So a run is made of one or more segments, and a segment closes at every
-moment the record can no longer vouch for itself: the machine slept (close at
-the last heartbeat), input stopped past the idle threshold (close at the last
-input, after rolling the counter back), or you stopped. The Sessions tab shows
-`09:00–09:20` and `11:30–12:10` with a visible gap, rather than one row that
-quietly absorbs the meeting. Choosing "keep this time" reopens the segment and
-folds the span back in, because the user's judgement outranks the heuristic.
+Every Day-view slot can visibly be:
 
-**Recurring blocks are materialised rows, not a rule.** A repeating block is 90
-days of real `scheduled_block` rows sharing a `series_id`, topped up
-idempotently before each week load. The reason is rule 7 above: a session links
-to a block **by id**, so a virtual occurrence could not be tracked against,
-could not carry drift, and could not appear in Reconcile — a second-class block
-that looks identical and does less. Instances are placed by the seed's *local
-wall clock*, so a 09:00 series stays at 09:00 across a DST boundary.
+planned and completed as intended · planned with overrun · planned with
+underrun · planned but never started · unplanned confirmed activity ·
+observed but unconfirmed · idle/away · sleep/rest · intentionally
+private/untracked · **empty/unaccounted**.
 
-### Activity's data contract
+Empty time stays visible until the user fills it, marks it private, or
+deliberately accepts the gap.
 
-Activity is the only feature that records something the user did not type, so
-its rules are enforced in the storage layer rather than described in the UI:
+### 4.4 Entity map
 
-- Off by default. Application tracking and window-title tracking are
-  **separate** switches; titles stay off when apps are turned on, and turning
-  apps off turns titles off with them.
-- A per-app exclusion list and a list of title fragments. **Both are applied on
-  the way in** — an excluded app is never written, so it cannot resurface later
-  through a query, an export, or a backup. Filtering on read would be a promise
-  that only holds inside the UI.
-- Pause is a stored setting, so it survives a restart.
-- Retention is 30 days / 90 days / forever, purged automatically, with the next
-  purge date on screen. "Delete everything recorded" is one button.
-- Activity **never writes a `time_session`.** It observes; it does not fill in
-  your record for you. An app that decides for you what you were working on is
-  a different product with a different failure mode.
+```
+    ┌──────────┐                      ┌────────────┐
+    │ project  │ target               │ life_area  │ target, kind, colour
+    └────┬─────┘                      └─────┬──────┘
+         │ 0..1                             │ 1
+    ┌────▼─────┐   ┌─────┐                  │
+ ┌──│   task   │──▶│ tag │            ┌─────▼──────┐
+ └─▶│          │   └─────┘            │ life_entry │  CONFIRMED LIFE TIME
+    └──┬────┬──┘                      │ is_private │
+       │    └──▶ note (plain text)    └────────────┘
+       │ 0..n
+┌──────▼──────────┐  block_id  ┌────────────────┐
+│ scheduled_block │◀───────────│  time_session  │  CONFIRMED WORK TIME
+│  THE PLAN       │  nullable  │  contribution  │
+└─────────────────┘            └───────┬────────┘
+                                       │ running_session_id
+  ┌───────────────┐  ┌──────────────┐  │  ┌────────────┐
+  │  day_review   │  │ activity_span│  └─▶│ app_state  │
+  │ 1 per date    │  │ OBSERVED     │     └────────────┘
+  └───────────────┘  │ app, domain, │
+                     │ category     │     ┌────────────┐
+                     └──────────────┘     │  setting   │
+                                          └────────────┘
+```
 
-### Data in and out
+### 4.5 Entities
 
-- **Export**: JSON (round-trips exactly, ids included), CSV (tasks and
-  sessions), ICS (export-only). Written to the user's Downloads folder, and the
-  toast names the file — an export you can't find is an export you don't trust.
-- **Import**: JSON in merge / replace / append modes; `.ics` calendars,
-  read-only, as fixed blocks deduplicated on the VEVENT `UID`.
-- **Backups**: a `VACUUM INTO` snapshot on launch when the newest is over 24
-  hours old, 7 daily kept. Storing the live database in Dropbox, iCloud or
-  OneDrive is a known corruption path and the UI says so.
+| Entity | Answers | Key fields |
+|---|---|---|
+| `project` | what body of work | `name`, `colour`, `weekly_target_sec`, `monthly_target_sec`, `note`, `is_archived` |
+| `task` | what am I trying to get done | `title`, `status`, `estimate_sec`, `is_rollover`, `due_date`/`due_at`, `priority`, `parent_id`, `note` |
+| `tag` / `task_tag` | what kind of work | a real table — renamable and queryable |
+| **`life_area`** | which part of life | `name`, `colour`, `kind` (core / entertainment / rest / other), `monthly_target_sec` |
+| `scheduled_block` | **what I meant to do, and when** | `starts_at`, `duration_sec`, `local_date`, `tz`, `is_fixed`, `rrule`, `series_id`, `external_uid` |
+| `time_session` | **confirmed work** | `started_at`, `ended_at`, `elapsed_sec`, `heartbeat_at`, `source`, `contribution`, `block_id` |
+| **`life_entry`** | **confirmed non-work time** | `life_area_id`, `label`, `started_at`, `ended_at`, `local_date`, `tz`, `is_private`, `note` |
+| `activity_span` | **observed PC use** | `started_at`, `ended_at`, `app_id`, `window_title`, `domain`, `category`, `is_idle` |
+| `day_review` | this day is reconciled | one row per local date, plus the day's totals |
+| `app_state` | is a timer running | singleton |
+| `setting` | preferences, rules, undo tombstones | typed key/value |
+
+**Default life areas**, from the workbook: Personal/Spiritual · Family ·
+Wellbeing · Personal Development · Community Participation · Side Gig/Personal
+Admin · Friendship · Team Time · Fun · Sleep/Rest. Users may add their own.
+
+**Work contribution modes**, work records only: None · Attend · Support · Own ·
+Assist. Converting a work record to a life entry clears its contribution after
+confirmation. Life-area reports never group by contribution.
+
+### 4.6 Data rules
+
+1. Instants are `INTEGER` milliseconds, UTC.
+2. Calendar dates are `TEXT 'YYYY-MM-DD'`, **local**.
+3. Durations are `INTEGER` seconds.
+4. Ids are UUIDv7.
+5. Anything derivable is derived; caches are rebuildable from source records.
+6. Deletes are soft, with one documented exception (sessions carry a tombstone).
+7. **Plans and records never merge.**
+8. **The four record types never merge**, and precedence resolves overlap at
+   read time rather than by mutating anything.
+9. A session covers one contiguous *awake* interval.
+10. Activity exclusions are applied **before storage**, never on read.
+
+### 4.7 Entertainment classification
+
+`youtube.com`, `youtu.be` and `twitch.tv` are Entertainment by default, applied
+to observed browser time when domain tracking is on. The user can override any
+interval, domain, application, project, task or recurring pattern. A correction
+may create a **prospective** local rule; it never rewrites prior records
+without confirmation.
+
+Full URLs, page contents, searches, messages and video titles are **not
+required for the default rule and are not stored by default.**
+
+### 4.8 Data in and out — Excel first
+
+**Export** is a real `.xlsx` workbook: a month sheet visually close to the
+client's workbook, the complete time matrix *including blank slots*, daily and
+weekly totals, work by project/task and contribution, life-area and sleep/rest
+target vs actual, core / planned-entertainment / unplanned-entertainment /
+YouTube-Twitch totals, auditable formulas, and a note identifying which records
+are confirmed, observed or imported.
+
+**The export must never depend on cell fill colours for calculation.** Colour
+communicates category; structured values produce totals. Correcting that is one
+of the main reasons to replace the workbook.
+
+**Import** starts with a mapping and variance preview, never alters the source
+file, and requires the user to resolve duplicate or inconsistent periods before
+commit. **JSON** remains the exact backup/restore format. **CSV** is secondary.
+Automatic local snapshots daily, seven retained.
 
 ---
 
@@ -392,131 +337,150 @@ its rules are enforced in the storage layer rather than described in the UI:
 
 ### 5.1 Platform
 
-| | |
-|---|---|
-| **Targets** | macOS 12+, Windows 10+, Linux (X11 and Wayland) |
-| **Form** | Desktop application only. No web build, no mobile. |
-| **Verified today** | Windows 10/11 x64, MSVC toolchain. macOS and Linux are unbuilt — the platform-specific code is confined to `src-tauri/src/idle.rs` and `src-tauri/src/frontmost.rs`. |
+Windows 10+ only for MVP. macOS and Linux are explicitly out of scope. The
+existing cross-platform code is retained but untested and unsupported — see
+§5.8.
 
 ### 5.2 Stack
 
 ```
-src/                React 19 · Vite 6 · Zustand 5 · Tailwind v4 · TypeScript 5.7
-                    Formats DTOs. No SQL, no business logic, no derived values.
-                    Never owns elapsed time.
-src-tauri/          Tauri v2 · its own Cargo workspace
-                    Windows, tray, the one-second loop, OS idle, frontmost
-                    window, the IPC boundary. One thin wrapper per command.
-crates/fruit-core/  Rust · rusqlite (bundled SQLite) · chrono · chrono-tz
-                    · serde · uuid · thiserror
-                    Schema, migrations, the command layer, the timer state
-                    machine, the capture grammar, RRULE, ICS, calibration.
-                    No UI. No Tauri dependency.
+UI          React 19 · TypeScript · Vite · Zustand · Tailwind v4
+Desktop     Tauri v2
+Core        Rust, no UI dependency — fruit-core
+Storage     Embedded SQLite (rusqlite, bundled), forward-only migrations
+Browser     Minimal local Chrome/Edge connector          ← not yet built
+Export      Offline XLSX generation + JSON backup        ← not yet built
+Infra       None. No backend, account, telemetry, CDN or database server.
 ```
 
-**The `fruit-core` / `src-tauri` split is the load-bearing constraint.** Because
-the command layer has no Tauri dependency, invariants like *"at most one session
-has `ended_at IS NULL`"* are a 10,000-operation fuzz test, and *"45 minutes of
-sleep is not counted"* is a unit test with a fake clock — rather than something
-verified by clicking around a running app on a machine with a system webview.
-The cost is one crate boundary and a `Mutex<Store>` in the shell. The benefit is
-that the parts of this app that would be catastrophic to get wrong — the ones
-about *time* — are the parts under test.
+### 5.3 Architectural rules
 
-**Dependency policy.** New crates need a reason. The Windows frontmost-window
-implementation is raw `user32`/`kernel32` FFI rather than a binding crate,
-because it is four calls against a stable documented ABI. There is no charting
-library; the drift rail is CSS. There is no date-picker library.
+- The UI does not own elapsed time, execute SQL, or compute authoritative
+  totals.
+- Time, overlap, idle, recovery, recurrence, reconciliation and export
+  invariants live in the testable core.
+- Plans and records never merge; the four record types never merge.
+- Activity exclusions are applied before storage.
+- **No unexpected outbound network request, ever.**
+- Every derived summary can be regenerated from source records.
 
-### 5.3 Hosting and infrastructure
-
-**None.** There is no backend, no API, no database server, no CDN, no auth
-provider, no object store, no queue, no analytics endpoint, and no error
-reporting service. The complete deployment story is a signed installer per
-platform.
-
-This is a constraint rather than a convenience. Every one of those would be a
-place the user's record of their own working life could leak from, and the
-product's central claim is that there is no such place.
+The `fruit-core` / `src-tauri` split is load-bearing: because the core has no
+Tauri dependency, the counting invariant in §4.2 is a property test rather than
+something verified by clicking around an app on a machine with a webview.
 
 ### 5.4 Third-party integrations
 
 | Integration | Direction | Notes |
 |---|---|---|
-| **`.ics` calendar files** | **In only** | Read from a local file the user picks. No URL subscription, no CalDAV, no account. Fruit never writes back to a calendar. |
-| **OS idle detection** | Read | `GetLastInputInfo` (Windows), `CGEventSourceSecondsSinceLastEventType` (macOS), both permission-free. Linux returns nothing and falls back to input in Fruit's own window — narrower, and Settings says so. |
-| **OS frontmost window** | Read, opt-in | `GetForegroundWindow` + `QueryFullProcessImageNameW` (Windows). macOS needs an Accessibility grant and X11 needs `_NET_ACTIVE_WINDOW`; both are stubs that say they are stubs. **Wayland cannot do this at all, by design**, and says so next to the switch it would enable. |
-| **Everything else** | — | None. |
+| Windows foreground window + idle | Read | `GetForegroundWindow`, `QueryFullProcessImageNameW`, `GetLastInputInfo`. No permissions, no new crates. |
+| **Browser domain connector** | Read, local only | A minimal Chrome/Edge extension talking to the local app. **Required** for the YouTube/Twitch goal — application-level observation cannot distinguish them from any other tab. Not yet built; carries the largest single technical risk in the plan. |
+| `.ics` calendar files | **In only** | Local file, user-picked. No URL, no CalDAV, no account, no write-back. |
+| Excel `.xlsx` | In and out | Offline generation and parsing. No Office installation required. |
+| Everything else | — | None. |
 
-Fonts (Space Grotesk, Instrument Sans, Commit Mono) are bundled as `woff2`,
-never loaded from a CDN — a font request is a network request, and the OFFLINE
-badge has to be true.
+Fonts are bundled, never fetched — a font request is a network request.
 
-### 5.5 Security
+### 5.5 Security and privacy
 
-- **No SQL reaches the renderer.** `src/lib/ipc.ts` is the only file that talks
-  to the backend; every command is typed and intent-based. This is a security
-  decision, not a taste one: a webview that renders user-pasted markdown *and*
-  holds `sql:allow-execute` is one `dangerouslySetInnerHTML` away from arbitrary
-  SQL against the user's database.
-- **The capability file lists exactly the commands in use** — no `sql:*`, no
-  broad `fs:*`. The file picker is a Rust command, so the webview can receive a
-  user-chosen path and nothing else.
-- **Explicit CSP**, `default-src 'self'` with `object-src 'none'` and
-  `frame-src 'none'`; the asset protocol is disabled. The markdown renderer
-  builds React elements and never parses raw HTML, so `<img src=x onerror=…>` in
-  a note renders inert.
-- **Intent-based commands make invariants enforceable.** `start_timer` is not
-  "insert a row"; it is one transaction that stops any running session, opens a
-  new one and updates the singleton — three writes that must never land
-  separately.
+- No SQL reaches the renderer; `src/lib/ipc.ts` is the only path to the
+  backend and every command is typed and intent-based.
+- The capability file lists exactly the commands in use — no `sql:*`, no broad
+  `fs:*`. File pickers are Rust commands, so the webview receives a chosen path
+  and nothing else.
+- Explicit CSP, `default-src 'self'`, asset protocol disabled.
+- The browser connector must be local-only, minimum-permission, and must not
+  transmit URLs, page content or titles by default.
 
-### 5.6 Performance budgets
+### 5.6 Performance and quality budgets
 
-| Budget | Target | How it's held |
-|---|---|---|
-| Cold start to interactive | < 1.5s | One composed DTO per view, not N+1 per block |
-| Week load, 500 blocks | < 100ms | Indexed; guarded by query-plan tests that fail if an index stops being used |
-| Idle CPU, no timer | ~0% | The one-second loop runs **only** while a timer is running. The now-cursor uses a minute-aligned timeout. |
-| Installer | < 15MB per platform | `opt-level = "s"`, LTO, one codegen unit, `panic = "abort"` |
+| Budget | Target |
+|---|---|
+| Cold start to interactive | < 1.5s |
+| **Day view, populated 24-hour day** | **< 100ms** |
+| **Month dashboard, populated 31-day month** | **< 250ms** |
+| Week load, 500 blocks | < 100ms |
+| Idle CPU, no timer and no sample due | ~0% |
+| Data loss after forced close, sleep/wake or restart with a running timer | none |
 
-A one-second wake loop for a line that moves 0.6px per second is how an app
-lands in "using significant energy", and this audience notices that publicly.
+Full keyboard operation, visible focus, reduced-motion support, no important
+state by colour alone, usable from 960×640 and at 125% Windows text scaling.
 
-These are budgets with mechanisms behind them, not measurements. The query-plan
-tests are real and run; the wall-clock numbers have not been profiled on a
-packaged build, because that needs a machine `src-tauri` compiles on.
+### 5.7 Success measures
 
-### 5.7 Accessibility and UI constraints
+Baselined over the first seven days of production use:
 
-Full keyboard operation with no exceptions — drag is always an alternative,
-never the only path. Visible focus on every interactive element. **No state
-distinguishable by colour alone**: the drift encoding carries texture (dashed /
-solid / dotted / hatched), a badge, and an accessible name. Tabular figures on
-every changing numeral, so nothing jitters. `prefers-reduced-motion` disables
-every transition. The layout holds from 960×640 up, and at 125% OS text scaling.
+1. ≥90% of active PC time observed automatically when Activity is enabled.
+2. ≥80% of waking time classified or deliberately left unaccounted by daily
+   reconciliation.
+3. Daily reconciliation ≤5 minutes after the learning period; target 90 seconds.
+4. Every 30-minute slot accounted for without double-counting.
+5. ≥95% correct YouTube/Twitch classification after user exceptions.
+6. A measurable four-week reduction in unplanned entertainment.
+7. Excel exports reconcile to application totals with no unexplained variance.
+8. The product works with no account, server or internet connection.
 
-These are enforced by `scripts/check-ui.mjs` in a headless browser, across every
-view, at five viewport sizes.
+### 5.8 Open decisions
 
-### 5.8 Known open items
+Carried from the plan's §17 and still unanswered. Defaults chosen for now are
+in bold; each is reversible.
 
-Five things are honestly unverified and are the first to check on a machine with
-a desktop session:
+1. Windows-only, or must future macOS/Linux shape the architecture now?
+   *Working assumption:* **Windows-only for MVP, cross-platform code retained
+   but unsupported** — deleting it would cost more than leaving it.
+2. Supported browsers: Chrome, Edge, or both? *Working assumption:* **both**,
+   since a single Chromium extension covers them.
+3. Final contribution list, and what "None" means versus non-work time.
+   *Working assumption:* **None · Attend · Support · Own · Assist**, with
+   "None" meaning *work with no contribution mode recorded*, distinct from
+   non-work time, which has no contribution field at all.
+4. Day view default resolution and how empty time reads. *Working assumption:*
+   **30-minute rows; empty renders as a hatched, labelled "Unaccounted" row**,
+   because blank is indistinguishable from "not loaded".
+5. Entertainment intervention: notification-only, or a soft continue/cancel?
+   *Working assumption:* **notification-only for MVP.**
+6. Which historical month is the accepted Excel import/export reference?
+   **Blocked on the client.**
+7. Is the Fruit source in scope for reuse, or only its specification?
+   **Answered by the repository: the source exists here and is being reused.**
 
-- Measured contrast of Focus-mode text over all four gradient backgrounds.
-- Tray-icon legibility at 16px on a real menu bar.
-- A real `SIGKILL` mid-write (WAL and the 500ms note debounce are the mechanism;
-  it has not been fuzzed under an actual kill).
-- Second-instance focus behaviour.
-- The Windows frontmost-window FFI, and any change to `src-tauri` since the last
-  Windows build — this container has no system webview, so that crate cannot be
-  compiled here.
+---
+
+## 6. Where the current build stands against this specification
+
+| Area | State |
+|---|---|
+| Core, schema, migrations, timers, recovery, backups | **Built** — Phase 2 complete |
+| Plan/record separation, drift, reconcile, calibration | **Built** |
+| Planner (1/3/7-day) | **Built**; needs the month span, and the 1-day span retires |
+| Projects, tasks, subtasks, estimates, backlog | **Built** |
+| Recurring blocks, `.ics` import | **Built** |
+| Activity: app observation, idle, exclusions, retention | **Built** — Phase 3 minus the browser connector |
+| **Life areas and life entries** | **Not built** — blocks the Day view |
+| **Work contribution modes** | **Not built** |
+| **Day view** | **Not built** — the primary screen does not exist |
+| **Month dashboard** | **Not built** |
+| Browser domain connector, entertainment rules and budgets | **Not built** |
+| Excel import/export | **Not built** |
+| Task notes | Built as **Markdown**; the plan requires compact plain text |
+
+### A sequencing correction to the plan
+
+The roadmap places the Day view in Phase 4 (weeks 6–7) and life entries in
+Phase 5 (week 8). That order cannot work: §8.1 requires the Day view to show
+"actual project/task **or life activity**", and acceptance criteria 1, 2 and 9
+all depend on life entries existing. The Day view built without them would show
+only work and empty hours, which is not the screen being specified.
+
+**`life_area` / `life_entry`, contribution modes, and the precedence engine
+must land before or with the Day view.** They are treated here as the first
+half of Phase 4 rather than as Phase 5, which does not change the delivery date
+— it moves work earlier that Phase 4 would otherwise have blocked on.
 
 ---
 
 ## Related documents
 
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — why the layers sit where they do
-- [`ACCEPTANCE.md`](ACCEPTANCE.md) — every acceptance criterion and what covers it
-- [`SPEC-DEVIATIONS.md`](SPEC-DEVIATIONS.md) — where this build departs from the original brief, and why
+- [`ROADMAP.md`](ROADMAP.md) — the 12-week phases and what is done against them
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — why the layers and the time model are shaped this way
+- [`ACCEPTANCE.md`](ACCEPTANCE.md) — the 16 MVP criteria and what covers each
+- [`SPEC-DEVIATIONS.md`](SPEC-DEVIATIONS.md) — departures from the source specifications, and why

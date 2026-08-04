@@ -21,8 +21,10 @@ use crate::time::now_ms;
 mod activity;
 mod blocks;
 mod data;
+mod day;
 mod projects;
 mod reconcile;
+mod life;
 mod recurrence;
 mod reports;
 mod search;
@@ -32,6 +34,7 @@ mod timer;
 mod week;
 
 pub use activity::{ENABLED as ACTIVITY_ENABLED, PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS};
+pub use day::{resolve_day, Segment, SegmentOwner};
 pub use recurrence::{IcsImportSummary, SeriesScope, HORIZON_DAYS};
 pub use timer::{IdleReport, TimerRuntime};
 
@@ -70,6 +73,11 @@ impl Store {
             db_path,
         };
         store.repair_local_dates()?;
+        // Idempotent, and deliberately not inside `seed_first_run`: a database
+        // created before migration 0005 has no life areas and would otherwise
+        // never acquire them, leaving the Day view with nowhere to file
+        // non-work time.
+        store.seed_life_areas()?;
         Ok(store)
     }
 
@@ -141,6 +149,8 @@ impl Store {
             "project" => "project",
             "block" => "scheduled_block",
             "series" => return self.restore_series(&token.id),
+            "life_entry" => return self.restore_life_entry(&token.id),
+            "life_area" => return self.restore_life_area(&token.id),
             "session" => return self.restore_session(&token.id),
             other => return Err(AppError::invalid(format!("Cannot restore a {other}."))),
         };

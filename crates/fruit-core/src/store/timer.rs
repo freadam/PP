@@ -576,7 +576,8 @@ impl Store {
         self.conn
             .query_row(
                 "SELECT s.id, s.task_id, t.title, s.block_id, s.started_at, s.ended_at,
-                        s.elapsed_sec, s.heartbeat_at, s.source, s.is_confirmed, s.note
+                        s.elapsed_sec, s.heartbeat_at, s.source, s.is_confirmed, s.note,
+                        s.contribution
                    FROM time_session s JOIN task t ON t.id = s.task_id
                   WHERE s.id = ?1",
                 [id],
@@ -588,7 +589,8 @@ impl Store {
     pub(crate) fn sessions_for_task(&self, task_id: &str) -> Result<Vec<SessionRow>> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.task_id, t.title, s.block_id, s.started_at, s.ended_at,
-                    s.elapsed_sec, s.heartbeat_at, s.source, s.is_confirmed, s.note
+                    s.elapsed_sec, s.heartbeat_at, s.source, s.is_confirmed, s.note,
+                        s.contribution
                FROM time_session s JOIN task t ON t.id = s.task_id
               WHERE s.task_id = ?1 ORDER BY s.started_at DESC",
         )?;
@@ -740,5 +742,11 @@ fn map_session(r: &rusqlite::Row) -> rusqlite::Result<SessionRow> {
         source: r.get(8)?,
         is_confirmed: r.get::<_, i64>(9)? == 1,
         note: r.get(10)?,
+        // Work records only (Plan Rev 3 §7). `life_entry` has no counterpart,
+        // which is what makes "never on personal time" structural.
+        contribution: r
+            .get::<_, Option<String>>(11)?
+            .as_deref()
+            .and_then(Contribution::parse),
     })
 }

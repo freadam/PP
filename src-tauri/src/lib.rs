@@ -311,6 +311,100 @@ fn clear_activity(state: State<'_, AppState>) -> Res<i64> {
     with(&state, |s| s.clear_activity())
 }
 
+// ─── the unified day and life time (Plan Rev 3 §7, §8.1) ───────────────
+
+/// The Day view: 24 hours of one date, with the four record types resolved
+/// into a single non-double-counted timeline.
+#[tauri::command]
+fn get_day(
+    state: State<'_, AppState>,
+    date: String,
+    tz: String,
+    slot_minutes: Option<i64>,
+) -> Res<DayView> {
+    with(&state, |s| s.get_day(&date, &tz, slot_minutes))
+}
+
+#[tauri::command]
+fn get_life_areas(
+    state: State<'_, AppState>,
+    tz: String,
+    include_archived: Option<bool>,
+) -> Res<Vec<LifeAreaRow>> {
+    with(&state, |s| {
+        s.get_life_areas(&tz, include_archived.unwrap_or(false))
+    })
+}
+
+#[tauri::command]
+fn create_life_area(state: State<'_, AppState>, input: NewLifeArea) -> Res<LifeAreaRow> {
+    with(&state, |s| s.create_life_area(input))
+}
+
+#[tauri::command]
+fn update_life_area(
+    state: State<'_, AppState>,
+    id: String,
+    patch: LifeAreaPatch,
+) -> Res<LifeAreaRow> {
+    with(&state, |s| s.update_life_area(&id, patch))
+}
+
+#[tauri::command]
+fn delete_life_area(state: State<'_, AppState>, id: String) -> Res<UndoToken> {
+    with(&state, |s| s.delete_life_area(&id))
+}
+
+#[tauri::command]
+fn get_life_entries(
+    state: State<'_, AppState>,
+    date: String,
+    tz: String,
+) -> Res<Vec<LifeEntryRow>> {
+    with(&state, |s| s.life_entries_on(&date, &tz))
+}
+
+#[tauri::command]
+fn add_life_entry(state: State<'_, AppState>, input: NewLifeEntry) -> Res<LifeEntryRow> {
+    with(&state, |s| s.add_life_entry(input))
+}
+
+#[tauri::command]
+fn update_life_entry(
+    state: State<'_, AppState>,
+    id: String,
+    patch: LifeEntryPatch,
+) -> Res<LifeEntryRow> {
+    with(&state, |s| s.update_life_entry(&id, patch))
+}
+
+#[tauri::command]
+fn delete_life_entry(state: State<'_, AppState>, id: String) -> Res<UndoToken> {
+    with(&state, |s| s.delete_life_entry(&id))
+}
+
+/// Work records only — there is deliberately no life-entry equivalent.
+#[tauri::command]
+fn set_session_contribution(
+    state: State<'_, AppState>,
+    id: String,
+    contribution: Option<Contribution>,
+) -> Res<SessionRow> {
+    with(&state, |s| s.set_session_contribution(&id, contribution))
+}
+
+/// Reclassifies confirmed work as confirmed life time. The contribution mode
+/// does not travel, because the destination has nowhere to put one.
+#[tauri::command]
+fn convert_session_to_life(
+    state: State<'_, AppState>,
+    id: String,
+    life_area_id: String,
+    tz: String,
+) -> Res<LifeEntryRow> {
+    with(&state, |s| s.convert_session_to_life(&id, &life_area_id, &tz))
+}
+
 #[tauri::command]
 fn duplicate_block(state: State<'_, AppState>, id: String) -> Res<BlockRow> {
     with(&state, |s| s.duplicate_block(&id))
@@ -591,6 +685,17 @@ pub fn run() {
             get_tags,
             get_reports,
             get_reconcile_items,
+            get_day,
+            get_life_areas,
+            create_life_area,
+            update_life_area,
+            delete_life_area,
+            get_life_entries,
+            add_life_entry,
+            update_life_entry,
+            delete_life_entry,
+            set_session_contribution,
+            convert_session_to_life,
             schedule_recurring,
             unschedule_series,
             extend_series_to,

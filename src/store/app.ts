@@ -17,6 +17,8 @@ import { BREAK_DETAIL_COLUMN } from "../lib/useViewport";
 import type {
   ActivityDay,
   ActivityStatus,
+  DayView,
+  LifeAreaRow,
   BacklogView,
   LocalDate,
   ProjectRow,
@@ -28,7 +30,8 @@ import type {
   WeekView,
 } from "../lib/types";
 
-export type ViewName = "planner" | "tasks" | "activity" | "reports" | "settings";
+/** Day first: it is the primary operational screen (Plan Rev 3 §8.1). */
+export type ViewName = "day" | "planner" | "tasks" | "activity" | "reports" | "settings";
 
 /**
  * A task being dragged toward the planner (§4.3 — "sidebar backlog item" and
@@ -96,6 +99,12 @@ interface AppState {
   taskDrag: TaskDrag | null;
   blockDialog: BlockDialog | null;
 
+  // ─── the day (Plan Rev 3 §8.1) — the primary screen ──────────────────
+  day: DayView | null;
+  dayDate: LocalDate;
+  slotMinutes: number;
+  lifeAreas: LifeAreaRow[];
+
   // ─── activity (§3.5, P2) ─────────────────────────────────────────────
   activityStatus: ActivityStatus | null;
   activityDay: ActivityDay | null;
@@ -138,6 +147,9 @@ interface AppState {
   loadTasks: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadReports: () => Promise<void>;
+  loadDay: () => Promise<void>;
+  setDayDate: (d: LocalDate) => void;
+  setSlotMinutes: (m: number) => void;
   loadActivity: () => Promise<void>;
   setActivityDate: (d: LocalDate) => void;
   putActivitySetting: (key: string, value: unknown) => Promise<void>;
@@ -170,7 +182,7 @@ interface AppState {
 let toastSeq = 0;
 
 export const useApp = create<AppState>((set, get) => ({
-  view: "planner",
+  view: "day",
   overlay: null,
   theme: "dark",
   sidebarWidth: 260,
@@ -185,6 +197,11 @@ export const useApp = create<AppState>((set, get) => ({
   selectedBlockId: null,
   taskDrag: null,
   blockDialog: null,
+
+  day: null,
+  dayDate: fmt.today(),
+  slotMinutes: 30,
+  lifeAreas: [],
 
   activityStatus: null,
   activityDay: null,
@@ -223,12 +240,18 @@ export const useApp = create<AppState>((set, get) => ({
     const settings = await ipc.getSettings().catch(() => ({}) as Record<string, unknown>);
     const theme = (settings["general.theme"] as "dark" | "light" | "system") ?? "dark";
     const hourHeight = (settings["planner.hourHeight"] as number) ?? 56;
+    const slotMinutes = (settings["day.slotMinutes"] as number) ?? 30;
     const span = (settings["planner.span"] as 1 | 3 | 7) ?? 7;
     fmt.setHour12((settings["general.hour12"] as boolean) ?? false);
-    set({ theme, hourHeight, span });
+    set({ theme, hourHeight, span, slotMinutes });
     applyTheme(theme);
 
-    await Promise.all([get().loadWeek(), get().loadTasks(), get().loadProjects()]);
+    await Promise.all([
+      get().loadWeek(),
+      get().loadTasks(),
+      get().loadProjects(),
+      get().loadDay(),
+    ]);
     const timer = await ipc.getTimerState().catch(() => get().timer);
     const unreconciled = await ipc.getUnreconciledDays(fmt.today()).catch(() => []);
     // Status only, not the day's spans: the recording indicator has to be
@@ -247,6 +270,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ view, overlay: null });
     if (view === "reports" && !get().reports) void get().loadReports();
     if (view === "activity") void get().loadActivity();
+    if (view === "day") void get().loadDay();
   },
 
   setOverlay(overlay) {
@@ -318,6 +342,33 @@ export const useApp = create<AppState>((set, get) => ({
     const from = fmt.addDays(to, -27);
     const reports = await get().run(() => ipc.getReports(from, to, fmt.tz()));
     if (reports) set({ reports });
+  },
+
+  /**
+   * The Day view (Plan Rev 3 §8.1). One command returns the whole screen: the
+   * four record types are resolved into segments in Rust, and the renderer
+   * formats what it is handed. It never decides which layer wins — that is the
+   * precedence rule, and a second copy of it here is exactly the drift this
+   * architecture exists to prevent.
+   */
+  async loadDay() {
+    const [day, areas] = await Promise.all([
+      get().run(() => ipc.getDay(get().dayDate, fmt.tz(), get().slotMinutes)),
+      ipc.getLifeAreas(fmt.tz()).catch(() => [] as LifeAreaRow[]),
+    ]);
+    if (day) set({ day });
+    if (areas.length) set({ lifeAreas: areas });
+  },
+
+  setDayDate(dayDate) {
+    set({ dayDate });
+    void get().loadDay();
+  },
+
+  setSlotMinutes(slotMinutes) {
+    set({ slotMinutes });
+    void ipc.setSetting("day.slotMinutes", slotMinutes).catch(() => {});
+    void get().loadDay();
   },
 
   /**
@@ -515,6 +566,8 @@ export const useApp = create<AppState>((set, get) => ({
     }
     if (view === "reports") await get().loadReports();
     if (view === "activity") await get().loadActivity();
+    // The Day view reads sessions and blocks, so any mutation can change it.
+    if (view === "day") await get().loadDay();
   },
 }));
 

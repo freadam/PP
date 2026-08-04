@@ -196,6 +196,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Confirmed non-work time, so the Day view's primary screen has all four
+    // record types on it: a night's sleep that starts the previous evening, a
+    // lunch, and an evening the user marked private.
+    let sleep = store
+        .get_life_areas(&tz, false)?
+        .into_iter()
+        .find(|a| a.name == "Sleep/Rest")
+        .expect("seeded");
+    let wellbeing = store
+        .get_life_areas(&tz, false)?
+        .into_iter()
+        .find(|a| a.name == "Wellbeing")
+        .expect("seeded");
+    let today_start = fruit_core::time::day_start(today_date, &zone_);
+    for (area_id, label, from_h, to_h, private) in [
+        (sleep.id.clone(), Some("Sleep"), -1.0f64, 6.5, false),
+        (wellbeing.id.clone(), Some("Lunch and a walk"), 12.5, 13.5, false),
+        (wellbeing.id.clone(), None, 19.0, 20.0, true),
+    ] {
+        store.add_life_entry(NewLifeEntry {
+            life_area_id: area_id,
+            label: label.map(str::to_string),
+            started_at: today_start + (from_h * 3_600_000.0) as i64,
+            ended_at: today_start + (to_h * 3_600_000.0) as i64,
+            tz: tz.clone(),
+            is_private: private,
+            note: None,
+            replace_existing: false,
+        })?;
+    }
+
     let range = DateRange {
         from: format_date(monday),
         to: format_date(sunday),
@@ -242,6 +273,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!(store.unreconciled_days(&today, 10)?),
     );
     out.insert("get_timer_state".into(), json!(store.timer_state()?));
+    out.insert("get_day".into(), json!(store.get_day(&today, &tz, None)?));
+    out.insert("get_life_areas".into(), json!(store.get_life_areas(&tz, false)?));
+    out.insert(
+        "get_life_entries".into(),
+        json!(store.life_entries_on(&today, &tz)?),
+    );
     out.insert(
         "get_activity_day".into(),
         json!(store.get_activity_day(&today, &tz)?),

@@ -1,13 +1,48 @@
-# Acceptance criteria (§8), and what covers each one
+# Acceptance criteria, and what covers each one
 
 Three columns: the criterion, what verifies it, and whether that verification
 actually runs. Criteria that need a human or a real desktop window say so
 instead of being quietly marked green.
 
 ```bash
-cargo test                                  # F, D, and the U criteria below the UI
+cargo test                                  # M, F, D, and the U criteria below the UI
 node scripts/check-ui.mjs                   # I1, I3–I7, U10 (needs `npm run preview`)
 ```
+
+Two sets, and they nest. **M1–M16** are the MVP acceptance criteria from
+Project Plan Revision 3 — what the client signs off. **F/U/I/D** are the
+engineering criteria inherited from Fruit v2; several M criteria are satisfied
+by them, and the mapping is given below.
+
+---
+
+## MVP acceptance (M) — Project Plan Rev 3 §14
+
+To be demonstrated on the client's Windows PC.
+
+| # | Criterion | Covered by | Runs |
+|---|---|---|---|
+| M1 | The Day view shows all 24 hours for a date at 30-minute default resolution, **including empty/unaccounted time** | `a_day_accounts_for_every_second_exactly_once`; the Day view renders one row per slot from `get_day` | ✅ / view built |
+| M2 | Plans, confirmed sessions/life entries and observed activity are distinguishable and never double-count | `resolve_day` assigns each segment exactly one owner by precedence; `overlapping_records_never_double_count` fuzzes 200 random overlapping records | ✅ |
+| M3 | Planned-vs-tracked drift is accurate per block, task, project, week and calibration bucket | `f2_drift_is_per_block`, `f6_calibration_needs_five_samples_and_uses_the_median` | ✅ |
+| M4 | Projects and tasks support estimates, timers, sessions, subtasks and **one compact plain-text note each**; no Markdown or Obsidian workflow | Estimates/timers/sessions/subtasks all covered by F1/F4. **The note is still a Markdown renderer — not yet reduced.** | ❌ partial |
+| M5 | Contribution modes apply to **Work only** and clear when a record becomes life time | `contribution_is_work_only_and_clears_on_conversion` | ✅ |
+| M6 | Foreground app and idle capture when enabled, with pause, exclusions, retention and delete enforced | `activity_respects_the_privacy_contract`, `activity_purges_at_the_retention_limit` | ✅ |
+| M7 | YouTube and Twitch classify as Entertainment automatically; user exceptions work prospectively | **Not built** — needs the browser connector | ❌ |
+| M8 | A task timer overlapping PC activity **enriches** the interval instead of adding duplicate duration | `observation_enriches_a_confirmed_session_without_adding_time` | ✅ |
+| M9 | Manual life entries fill gaps, repeat, replace an interval with confirmation, and are editable later | `life_entries_fill_gaps_and_replace_with_confirmation`; repeat is **not built** | ❌ partial |
+| M10 | Daily reconciliation covers overruns, unstarted plans, unplanned work, **observed-only activity and empty hours** | First three covered by `f3_…` and the reconcile suite. Observed-only and empty hours are **not built**. | ❌ partial |
+| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Not built** | ❌ |
+| M12 | Reports open to a month summary by default; a month exports to `.xlsx` in the approved format with accurate totals | **Not built** | ❌ |
+| M13 | A historical workbook month imports through a preview with no silent loss and a variance report | **Not built** | ❌ |
+| M14 | Backup/restore succeeds on a clean profile; the product stays usable offline with no unexpected outbound connection | `d5_restore_from_snapshot`, `d6_export_import_round_trips_exactly`; I7 asserts zero external requests | ✅ |
+| M15 | Timers and activity segmentation recover safely after restart, sleep/wake or forced close | `u7_recovery_trims_to_the_last_heartbeat`, `d10_sleep_is_not_counted_by_default`, `sleep_splits_the_session_instead_of_spanning_it` | ✅ |
+| M16 | Primary actions reachable by keyboard; important states never colour-only | One `COMMANDS` registry (structural); `check-ui.mjs` U10 and I3 | ✅ |
+
+**7 of 16 fully covered, 3 partial, 6 not started.** The six untouched are
+entertainment (M7, M11), Excel (M12, M13), and the two halves of reconciling
+what the observer saw (M10). Every one of them is downstream of a component
+that does not exist yet — the browser connector or the XLSX writer.
 
 ---
 

@@ -136,6 +136,25 @@ pub fn week_start(date: NaiveDate) -> NaiveDate {
     date - Duration::days(dow)
 }
 
+/// The instants bounding the local calendar month containing `date`.
+///
+/// Month is the plan's default reporting horizon, so this is the range every
+/// target-versus-actual figure is measured over. Both ends are real local
+/// midnights, which is what keeps a month honest across a DST transition inside
+/// it — the month is not 30 × 24 hours, and pretending otherwise loses an hour
+/// twice a year.
+pub fn month_bounds(date: &str, tz: &Tz) -> Result<(Millis, Millis)> {
+    let d = parse_date(date)?;
+    let first = NaiveDate::from_ymd_opt(d.year(), d.month(), 1).ok_or_else(|| AppError::invalid("That date is out of range."))?;
+    let next = if d.month() == 12 {
+        NaiveDate::from_ymd_opt(d.year() + 1, 1, 1)
+    } else {
+        NaiveDate::from_ymd_opt(d.year(), d.month() + 1, 1)
+    }
+    .ok_or_else(|| AppError::invalid("That date is out of range."))?;
+    Ok((day_start(first, tz), day_start(next, tz)))
+}
+
 pub fn now_ms() -> Millis {
     Utc::now().timestamp_millis()
 }
