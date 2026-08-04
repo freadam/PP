@@ -250,6 +250,7 @@ impl Store {
             planned_sec: plans.iter().map(|p| p.duration_sec).sum(),
             confirmed_work_sec: 0,
             confirmed_life_sec: 0,
+            sleep_sec: 0,
             private_sec: 0,
             observed_only_sec: 0,
             idle_sec: 0,
@@ -281,6 +282,9 @@ impl Store {
                         t.private_sec += sec;
                     } else {
                         t.confirmed_life_sec += sec;
+                        if *area_kind == AreaKind::Rest {
+                            t.sleep_sec += sec;
+                        }
                     }
                     if *area_kind == AreaKind::Entertainment {
                         t.entertainment_sec += sec;
@@ -432,6 +436,7 @@ pub fn resolve_day(
                 to: b,
                 owner: winner,
                 evidence: Vec::new(),
+                has_distraction: false,
             }),
         }
     }
@@ -457,6 +462,12 @@ fn attach_evidence(segments: &mut [DaySegment], spans: &[ObservedSpan]) {
             let overlap = s.ended_at.min(seg.to) - s.started_at.max(seg.from);
             if overlap > 0 {
                 *totals.entry(s.app_id.clone()).or_insert(0) += overlap / 1000;
+                // Entertainment observed *inside* confirmed work. Not a
+                // duration — the work keeps the whole interval — but it is the
+                // finding the day view exists to surface.
+                if s.category.as_deref() == Some("entertainment") {
+                    seg.has_distraction = true;
+                }
             }
         }
         let mut evidence: Vec<AppTotal> = totals

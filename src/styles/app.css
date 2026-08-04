@@ -129,7 +129,9 @@ textarea::placeholder {
   min-width: 0;
 }
 
-/* §5.7 Nav rail — 52px, 20px icons, 40px targets, 2px `plot` indicator. */
+/* §5.7 Nav rail — icon over label, 2px `plot` indicator. The label is on
+   screen because this app has six destinations, not two, and an icon-only rail
+   costs a hover on every visit until the whole set is learnt. */
 .rail-nav {
   width: var(--rail-w);
   flex: none;
@@ -139,24 +141,33 @@ textarea::placeholder {
   flex-direction: column;
   align-items: center;
   padding-top: var(--s-8);
-  gap: var(--s-4);
+  gap: var(--s-2);
 }
 
 .rail-item {
   position: relative;
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
+  width: 64px;
+  height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   color: var(--muted);
   border-radius: var(--r-panel);
   transition: color var(--m-fast) var(--e-out);
+}
+.rail-label {
+  letter-spacing: 0.04em;
 }
 .rail-item:hover {
   color: var(--paper);
 }
 .rail-item[aria-current="page"] {
   color: var(--plot);
+}
+.rail-item[aria-current="page"] {
+  background: var(--raised);
 }
 .rail-item[aria-current="page"]::before {
   content: "";
@@ -1381,12 +1392,97 @@ textarea::placeholder {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  padding: 0 var(--s-16) var(--s-16);
+  padding: 0 var(--s-16) var(--s-12);
 }
-.day-table-wrap {
+
+/* The wireframe's context bar: navigation, zoom and the two actions, on one
+   line above the numbers. */
+.context-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  height: 50px;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s-12);
+}
+.context-bar h1 {
+  font-size: 1.05rem;
+  margin: 0 var(--s-6) 0 0;
+  font-weight: 500;
+}
+.segmented {
+  display: flex;
+}
+.segmented .btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.segmented .btn:first-child {
+  border-radius: var(--r-plate) 0 0 var(--r-plate);
+  margin-left: 0;
+}
+.segmented .btn:last-child {
+  border-radius: 0 var(--r-plate) var(--r-plate) 0;
+}
+/* A pressed segment has to beat its neighbours\' borders or the group reads as
+   one long control with a tinted word in it. */
+.segmented .btn[aria-pressed="true"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* Six cards, the wireframe\'s summary row. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--s-8);
+  flex: none;
+  margin-bottom: var(--s-8);
+}
+.card {
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: var(--s-8) var(--s-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-width: 0;
+}
+.card > .micro {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card > strong {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+/* Unaccounted is hatched, exactly like the rows it counts, so the eye connects
+   the figure to the thing it can act on. */
+.card[data-hatched="true"] {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--surface),
+    var(--surface) 6px,
+    color-mix(in srgb, var(--rule) 60%, var(--surface)) 6px,
+    color-mix(in srgb, var(--rule) 60%, var(--surface)) 9px
+  );
+}
+
+.day-body {
+  display: flex;
   min-height: 0;
+  gap: var(--s-12);
+  flex: 1;
+}
+.day-table-wrap {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
 }
 .day-table {
   width: 100%;
@@ -1397,7 +1493,7 @@ textarea::placeholder {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--surface);
+  background: var(--raised);
   border-bottom: 1px solid var(--line);
   padding: var(--s-6) var(--s-8);
   text-align: left;
@@ -1407,10 +1503,10 @@ textarea::placeholder {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.day-table thead th:first-child { width: 72px; }
-.day-table thead th:nth-child(2) { width: 22%; }
-.day-table thead th:nth-child(4) { width: 16%; }
-.day-table thead th:last-child   { width: 150px; }
+.day-table thead th:first-child { width: 64px; }
+.day-table thead th:nth-child(2) { width: 24%; }
+.day-table thead th:nth-child(4) { width: 15%; }
+.day-table thead th:last-child   { width: 168px; }
 
 .day-row > * {
   padding: var(--s-2) var(--s-8);
@@ -1418,18 +1514,34 @@ textarea::placeholder {
   vertical-align: middle;
   height: 26px;
 }
-/* A heavier rule at the hour, hairline between — the planner's rhythm, in a
+/* A heavier rule at the hour, hairline between — the planner\'s rhythm in a
    table. Without it 48 identical rows read as a wall of text. */
 .day-row[data-hour="true"] > * {
   border-top: 1px solid var(--line);
 }
+/* The now line spans the grid, as in the wireframe: a rule, not a tinted row,
+   because a tint is one more thing competing with six states. */
 .day-row[data-now="true"] > * {
-  box-shadow: inset 0 1px 0 var(--paper);
+  box-shadow: inset 0 2px 0 var(--paper);
+}
+.day-row[data-now="true"] .day-time::after {
+  content: "NOW";
+  margin-left: var(--s-4);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0 3px;
+  border-radius: 1px;
+}
+.day-row[data-selected="true"] > * {
+  background: var(--raised);
 }
 .day-row .day-time {
   color: var(--muted);
   font-weight: 400;
-  text-align: left;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* Unaccounted time is hatched and labelled, never blank: blank is
@@ -1437,11 +1549,11 @@ textarea::placeholder {
    here to act on (Plan Rev 3 §17.4). */
 .day-row[data-state="empty"] > * {
   background: repeating-linear-gradient(
-    45deg,
+    135deg,
     transparent,
     transparent 6px,
     color-mix(in srgb, var(--rule) 55%, transparent) 6px,
-    color-mix(in srgb, var(--rule) 55%, transparent) 7px
+    color-mix(in srgb, var(--rule) 55%, transparent) 9px
   );
 }
 .day-row[data-state="plannedNotStarted"] > * {
@@ -1462,6 +1574,8 @@ textarea::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left;
+  color: inherit;
 }
 .day-chip + .day-chip { margin-left: var(--s-8); }
 .day-chip > i {
@@ -1471,7 +1585,7 @@ textarea::placeholder {
   border-radius: 1px;
 }
 /* The plan is an outline, the record is solid — the same distinction the drift
-   rail makes, so the two screens teach the same vocabulary. */
+   rail makes, so the two screens teach one vocabulary. */
 .day-chip[data-plan="true"] {
   color: var(--muted);
 }
@@ -1482,6 +1596,9 @@ textarea::placeholder {
 .day-chip[data-owner="observed"],
 .day-chip[data-owner="idle"] {
   color: var(--muted);
+}
+.day-chip[data-owner]:hover {
+  color: var(--plot);
 }
 
 .day-fill {
@@ -1504,18 +1621,70 @@ textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* The day's arithmetic as one bar. It sums to the day exactly, because the
-   totals behind it do — the counting invariant, drawn. */
-.day-ledger {
-  padding: var(--s-8) 0 var(--s-12);
+.day-state .micro {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }
+
+/* The selected interval — the wireframe\'s right column. */
+.day-detail {
+  width: 268px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: var(--s-12);
+  overflow-y: auto;
+}
+.day-detail h2 {
+  font-size: var(--t-body);
+  margin: 0 0 var(--s-8);
+}
+.day-detail .field {
+  margin: var(--s-12) 0;
+}
+.day-detail .field > label {
+  display: block;
+  font-size: var(--t-micro);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--s-4);
+}
+.day-detail select,
+.day-detail .fake-input {
+  width: 100%;
+}
+.fake-input {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--raised);
+  min-height: 30px;
+  padding: var(--s-6) var(--s-8);
+  text-align: left;
+}
+.fake-input.note {
+  min-height: 64px;
+}
+.tag {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px var(--s-8);
+  font-size: var(--t-micro);
+  color: var(--muted);
+}
+
 .day-bar {
   display: flex;
   height: 8px;
   border-radius: 1px;
   overflow: hidden;
   background: var(--rule);
+  flex: none;
 }
 .day-bar > i {
   display: block;
@@ -1530,23 +1699,34 @@ textarea::placeholder {
   vertical-align: baseline;
 }
 .day-ledger-figures {
-  margin-top: var(--s-6);
+  margin: var(--s-6) 0 var(--s-8);
+  flex: none;
   flex-wrap: wrap;
   gap: var(--s-12);
   color: var(--muted);
 }
 .l-work     { background: var(--track); }
 .l-life     { background: var(--plot); }
-.l-private  { background: var(--faint); }
+.l-sleep    { background: var(--faint); }
+.l-fun      { background: var(--over); }
+.l-private  { background: color-mix(in srgb, var(--faint) 60%, var(--rule)); }
 .l-observed { background: color-mix(in srgb, var(--track) 45%, var(--rule)); }
 .l-idle     { background: var(--rule); }
 .l-empty    { background: repeating-linear-gradient(
-                45deg, var(--rule), var(--rule) 3px,
+                135deg, var(--rule), var(--rule) 3px,
                 color-mix(in srgb, var(--muted) 30%, var(--rule)) 3px,
                 color-mix(in srgb, var(--muted) 30%, var(--rule)) 4px); }
 
 .area-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: var(--s-4);
+}
+
+/* §5.8 — the day table has five columns and a detail panel. Below 1280px the
+   panel would squeeze the grid past legibility, so it drops out and selection
+   opens nothing rather than opening something unreadable. */
+@media (max-width: 1279px) {
+  .day-detail { display: none; }
+  .cards { grid-template-columns: repeat(3, 1fr); }
 }

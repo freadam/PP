@@ -159,6 +159,7 @@ message appears at the *link* step, which means everything before it compiled.
 
 ## Documents
 
+- [`docs/WIREFRAME-GAP.md`](docs/WIREFRAME-GAP.md) — the wireframes screen by screen, and what is still missing
 - [`docs/PRODUCT-SPEC.md`](docs/PRODUCT-SPEC.md) — the whole app in one document: what it does, who for, every screen, every entity, every constraint
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — why the layers are where they are
 - [`docs/ACCEPTANCE.md`](docs/ACCEPTANCE.md) — every §8 criterion, and what covers it

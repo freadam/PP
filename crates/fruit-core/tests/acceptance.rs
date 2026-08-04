@@ -931,7 +931,18 @@ fn boot_repairs_a_disagreeing_local_date() {
             .schedule_block(NewBlock {
                 task_id: Some(t.id),
                 label: None,
-                starts_at: fruit_core::time::now_ms(),
+                // 09:00 local today, not `now`: a 30-minute block started at
+                // the real wall clock crosses midnight when the suite happens
+                // to run late in the evening, and this test is about
+                // `local_date` repair rather than about midnight.
+                starts_at: fruit_core::time::day_start(
+                    fruit_core::time::parse_date(&local_date(
+                        fruit_core::time::now_ms(),
+                        &london(),
+                    ))
+                    .unwrap(),
+                    &london(),
+                ) + 9 * 3_600_000,
                 duration_sec: 1800,
                 tz: TZ.into(),
                 is_fixed: false,

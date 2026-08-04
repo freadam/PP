@@ -41,14 +41,30 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    non-double-counted timeline, with the counting invariant as a property test.
 2. ✅ **The Day view** — the 24-hour table on top of that model, with every
    hour present, four layers distinguishable, and a fill action on every gap.
-3. ⬅ The month dashboard and the Planner's month span. *(next)*
-4. The browser connector spike, then entertainment classification and budgets.
-5. Life-area targets and the notes reduction.
-6. Reconciling observed-only and empty time.
+3. ⬅ **The browser connector spike.** Four wireframe screens now wait on an
+   unproven capability — see `WIREFRAME-GAP.md`. It was a Phase 1 item and it
+   is still unspiked. *(next)*
+4. `get_month`, then the month dashboard and the Planner's month span.
+5. Reconciling observed-only and empty hours (M10), and life-area targets —
+   the two items on the gap list blocked on nothing.
+6. Entertainment classification, budgets and the reconcile evidence panel.
 7. Excel export, then Excel import.
 
 Items 1–3 close the plan's Phase 4 exit gate: *a full day reconciles without
 double-counting and the month dashboard matches source totals.*
+
+## Wireframe coverage
+
+`02_WIREFRAMES.html` specifies five screens. See
+[`WIREFRAME-GAP.md`](WIREFRAME-GAP.md) for the line-by-line comparison.
+
+| Screen | Coverage |
+|---|---|
+| Day | **built** — cards, five columns, now line, contribution in the classification, detail panel, filter, add-interval |
+| Planner | **partial** — no month span, no in-canvas backlog, two buttons unsurfaced |
+| Month dashboard | **missing** — needs `get_month` |
+| Reconcile | **partial** — no evidence panel, no observed-only or empty items |
+| Excel export | **missing** — needs the XLSX writer |
 
 ## Risks currently live
 

@@ -19,6 +19,7 @@ import type {
   ActivityStatus,
   DayView,
   LifeAreaRow,
+  LifeEntryRow,
   BacklogView,
   LocalDate,
   ProjectRow,
@@ -104,6 +105,8 @@ interface AppState {
   dayDate: LocalDate;
   slotMinutes: number;
   lifeAreas: LifeAreaRow[];
+  /** The day's life entries, for the detail panel's notes and labels. */
+  dayEntries: LifeEntryRow[];
 
   // ─── activity (§3.5, P2) ─────────────────────────────────────────────
   activityStatus: ActivityStatus | null;
@@ -202,6 +205,7 @@ export const useApp = create<AppState>((set, get) => ({
   dayDate: fmt.today(),
   slotMinutes: 30,
   lifeAreas: [],
+  dayEntries: [],
 
   activityStatus: null,
   activityDay: null,
@@ -352,12 +356,14 @@ export const useApp = create<AppState>((set, get) => ({
    * architecture exists to prevent.
    */
   async loadDay() {
-    const [day, areas] = await Promise.all([
+    const [day, areas, entries] = await Promise.all([
       get().run(() => ipc.getDay(get().dayDate, fmt.tz(), get().slotMinutes)),
       ipc.getLifeAreas(fmt.tz()).catch(() => [] as LifeAreaRow[]),
+      ipc.getLifeEntries(get().dayDate, fmt.tz()).catch(() => [] as LifeEntryRow[]),
     ]);
     if (day) set({ day });
     if (areas.length) set({ lifeAreas: areas });
+    set({ dayEntries: entries });
   },
 
   setDayDate(dayDate) {

@@ -1046,6 +1046,11 @@ pub struct DaySegment {
     /// segment owned by a confirmed session carries what the observer saw
     /// without the day summing to more than a day (M8).
     pub evidence: Vec<AppTotal>,
+    /// Confirmed work with entertainment observed inside it — the wireframe's
+    /// "Work + distraction". It is the one classification the user cannot
+    /// arrive at by looking at either layer alone, and the reason the two
+    /// layers are drawn on the same row.
+    pub has_distraction: bool,
 }
 
 /// The plan overlay. Deliberately outside the precedence order: an intention
@@ -1132,6 +1137,10 @@ pub struct DayTotals {
     pub planned_sec: i64,
     pub confirmed_work_sec: i64,
     pub confirmed_life_sec: i64,
+    /// Confirmed life time in a `rest` area. A subset of `confirmed_life_sec`,
+    /// broken out because the workbook reports sleep on its own line and a
+    /// third of the month landing in one bucket makes every other one unreadable.
+    pub sleep_sec: i64,
     pub private_sec: i64,
     pub observed_only_sec: i64,
     pub idle_sec: i64,

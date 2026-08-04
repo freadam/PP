@@ -583,6 +583,8 @@ export interface DaySegment {
   owner: SlotOwner;
   /** Evidence, not duration — see `attach_evidence` in day.rs. */
   evidence: AppTotal[];
+  /** Confirmed work with entertainment observed inside it. */
+  hasDistraction: boolean;
 }
 
 export interface DayPlan {
@@ -637,6 +639,8 @@ export interface DayTotals {
   plannedSec: number;
   confirmedWorkSec: number;
   confirmedLifeSec: number;
+  /** A subset of `confirmedLifeSec` — the workbook reports sleep on its own line. */
+  sleepSec: number;
   privateSec: number;
   observedOnlySec: number;
   idleSec: number;

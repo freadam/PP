@@ -185,7 +185,7 @@
   --e-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* §5.8 Layout arithmetic, so the breakpoints are checkable */
-  --rail-w: 52px;
+  --rail-w: 76px;
   --sidebar-w: 260px;
   --sidebar-collapsed-w: 48px;
   --detail-w: 360px;

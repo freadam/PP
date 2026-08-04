@@ -81,7 +81,7 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
   for (const [view, key] of [
     ["Day", "d"],
     ["Planner", "p"],
-    ["Tasks", "t"],
+    ["Projects", "t"],
     ["Activity", "a"],
     ["Reports", "r"],
     ["Settings", "s"],
@@ -149,7 +149,7 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
 // Every view, not just the one that happens to open first: Activity's timeline
 // and Settings' widest hint lines are the two most likely places for a stray
 // pixel of horizontal scroll, and neither is the default screen.
-const VIEWS = ["Day", "Planner", "Tasks", "Activity", "Reports", "Settings"];
+const VIEWS = ["Day", "Planner", "Projects", "Activity", "Reports", "Settings"];
 
 for (const [width, height, scale] of [
   [960, 640, 1],
