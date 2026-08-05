@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { IntegrityReport } from "../lib/types";
+import type { ConnectorStatus, IntegrityReport } from "../lib/types";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -293,6 +293,61 @@ export function Settings() {
 }
 
 /**
+ * Installing the browser connector, stated plainly rather than done silently.
+ *
+ * Registering a native-messaging host means writing a manifest that names this
+ * executable and an `HKCU` key pointing at it. An app that does that on first
+ * run has installed a browser hook without being asked — which is exactly the
+ * behaviour the rest of this section exists to rule out. So the app shows the
+ * two paths and the person puts the files there.
+ *
+ * The panel is deliberately not a wizard. A wizard would imply the app can
+ * verify the result, and it cannot: whether Chrome actually loaded the extension
+ * is something only Chrome knows. What the app *can* honestly report is whether
+ * samples have arrived, so that is the status line.
+ */
+function ConnectorInstall({ enabled }: { enabled: boolean }) {
+  const [status, setStatus] = useState<ConnectorStatus | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    void ipc.getConnectorStatus().then(setStatus).catch(() => setStatus(null));
+  }, [enabled]);
+
+  if (!enabled) return null;
+
+  return (
+    <Field
+      label="Browser extension"
+      hint="Chrome and Edge only. Fruit cannot see a tab's domain without it — an application sampler sees chrome.exe and nothing more."
+    >
+      {status ? (
+        <div className="stack" style={{ gap: 6 }}>
+          <p className="caption">
+            1 · Load <code className="data">{status.extensionDir}</code> in{" "}
+            <code className="data">chrome://extensions</code> with Developer mode on.
+          </p>
+          <p className="caption">
+            2 · Save the host manifest as{" "}
+            <code className="data">{status.hostManifestName}.json</code>, pointing{" "}
+            <code className="data">path</code> at{" "}
+            <code className="data">{status.exePath}</code> and{" "}
+            <code className="data">allowed_origins</code> at the extension&rsquo;s id.
+          </p>
+          <p className="caption">
+            {status.queuedSamples > 0
+              ? "The extension is connected — samples are arriving."
+              : "Nothing has arrived from a browser yet. That is expected until both steps are done and a browser window is in front."}
+          </p>
+        </div>
+      ) : (
+        <p className="caption">Checking…</p>
+      )}
+    </Field>
+  );
+}
+
+/**
  * Activity's privacy contract, as controls (§3.5, §7.2).
  *
  * Every promise the feature makes is a switch here, in the order someone
@@ -309,6 +364,7 @@ function ActivitySettings() {
   const run = useApp((s) => s.run);
   const toast = useApp((s) => s.toast);
   const [apps, setApps] = useState<string | null>(null);
+  const [domains, setDomains] = useState<string | null>(null);
   const [patterns, setPatterns] = useState<string | null>(null);
 
   useEffect(() => {
@@ -391,6 +447,40 @@ function ActivitySettings() {
           style={{ width: "100%", maxWidth: 420 }}
         />
       </Field>
+
+      {/* The connector sits between titles and exclusions on purpose: it is the
+          third and largest of the three things that can be observed, and this
+          is where someone worried about it will already be reading. */}
+      <Field
+        label="Track websites (browser connector)"
+        hint="Records the domain of the frontmost tab — youtube.com, never the page, the URL or the title. Its own switch, off even when applications are on, and it needs the browser extension below before it does anything."
+      >
+        <Switch
+          label="Track websites"
+          checked={s.domainsEnabled}
+          disabled={!supported || !s.enabled}
+          onChange={(v) => void put("activity.domainsEnabled", v)}
+        />
+      </Field>
+
+      <Field
+        label="Never record these websites"
+        hint="Comma-separated domains, e.g. bank.co.uk. An entry covers every subdomain of itself, and an excluded domain is dropped before it is written."
+      >
+        <input
+          value={domains ?? s.excludedDomains.join(", ")}
+          placeholder="bank.co.uk, nhs.uk"
+          disabled={!supported || !s.domainsEnabled}
+          onChange={(e) => setDomains(e.target.value)}
+          onBlur={(e) => {
+            setDomains(null);
+            commitList("activity.excludedDomains", e.target.value);
+          }}
+          style={{ width: "100%", maxWidth: 420 }}
+        />
+      </Field>
+
+      <ConnectorInstall enabled={s.domainsEnabled} />
 
       <Field
         label="Never record titles containing"

@@ -164,6 +164,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Value::Bool(true),
     )?;
     store.set_activity_setting("activity.titlesEnabled", Value::Bool(true))?;
+    store.set_activity_setting("activity.domainsEnabled", Value::Bool(true))?;
     // On *today*, because that is the day Activity opens on, and because the
     // first-run seed puts a plotted block there for the correlation panel to
     // compare against.
@@ -191,6 +192,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             store.record_activity(ActivitySample {
                 app_id: app_id.into(),
                 window_title: Some(title.into()),
+                domain: None,
+                at: start + step * 20_000,
+            })?;
+        }
+    }
+
+    // Browser observations, so the preview's "Work + distraction" row lights up
+    // for the reason the real app would light it up rather than because the
+    // fixture asserted it. The classification is genuinely computed — these
+    // rows carry `category: "entertainment"` because the seeded YouTube rule
+    // said so at write time.
+    //
+    // Recorded through `record_activity` with a domain, the same way the app
+    // rows above are, rather than through `record_browser_sample`. That entry
+    // point deliberately refuses a sample older than six hours — a queued
+    // observation from this morning is not evidence of anything — and a fixture
+    // laying out a whole day is exactly the case it refuses. Going through the
+    // shared write path keeps the classification and the exclusions honest
+    // while letting the fixture choose its own clock.
+    //
+    // The two stretches of YouTube are placed to produce the two *different*
+    // states the Day view distinguishes, because a fixture that only produces
+    // one of them leaves the other rendering path unexercised:
+    //
+    //   09:35 falls inside the confirmed morning session → **Work + distraction**.
+    //     The work keeps the whole interval; the entertainment is evidence, not
+    //     a second duration (M8). This is the finding the product exists for.
+    //   14:00 falls in an unclaimed stretch → **Observed entertainment**, which
+    //     is an item the reconciler will ask about rather than a fact.
+    for (from_min, minutes, domain) in [
+        (65i64, 10i64, "developer.mozilla.org"),
+        (35, 22, "www.youtube.com"),
+        (200, 12, "github.com"),
+        (300, 35, "youtube.com"),
+    ] {
+        let start = activity_base + from_min * 60_000;
+        for step in 0..(minutes * 3) {
+            store.record_activity(ActivitySample {
+                app_id: "chrome.exe".into(),
+                window_title: None,
+                domain: Some(domain.into()),
                 at: start + step * 20_000,
             })?;
         }
@@ -365,6 +407,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "support": "full",
             "supportNote": "Browser preview. In the desktop app this sentence comes from the platform itself.",
             "settings": store.activity_settings()?,
+        }),
+    );
+    out.insert("get_domain_rules".into(), json!(store.list_domain_rules()?));
+    out.insert(
+        "get_domain_totals".into(),
+        json!(store.domain_totals(&today, &tz)?),
+    );
+    // Paths are the shell's answer, like `support` above. The preview cannot
+    // know where the executable lives, and inventing a plausible one would be
+    // the kind of fixture that reads as real and is not.
+    out.insert(
+        "get_connector_status".into(),
+        json!({
+            "enabled": true,
+            "hostManifestName": "app.fruit.connector",
+            "extensionDir": "(the desktop app prints the real path here)",
+            "exePath": "(the desktop app prints the real path here)",
+            "queuedSamples": 0,
         }),
     );
     out.insert("get_rrule_presets".into(), json!(fruit_core::rrule::presets()));

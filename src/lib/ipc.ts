@@ -17,8 +17,12 @@ import type {
   BacklogView,
   CapturePreview,
   CollisionPolicy,
+  ConnectorStatus,
   DayReview,
   DeletedRow,
+  DomainCategory,
+  DomainRule,
+  DomainTotal,
   IdleActionKind,
   IntegrityReport,
   LocalDate,
@@ -267,6 +271,24 @@ export const getActivityDay = (date: LocalDate, tz: string) =>
   call<ActivityDay>("get_activity_day", { date, tz });
 
 export const clearActivity = () => call<number>("clear_activity", {});
+
+/* ─── browser connector (Plan Rev 3 §5.4) ─────────────────────────────── */
+
+export const getDomainRules = () => call<DomainRule[]>("get_domain_rules", {});
+
+/** Creates or replaces the rule for a domain — there is only ever one. */
+export const setDomainRule = (
+  domain: string,
+  category: DomainCategory,
+  lifeAreaId: string | null = null,
+) => call<DomainRule>("set_domain_rule", { domain, category, lifeAreaId });
+
+export const deleteDomainRule = (id: string) => call<void>("delete_domain_rule", { id });
+
+export const getDomainTotals = (date: LocalDate, tz: string) =>
+  call<DomainTotal[]>("get_domain_totals", { date, tz });
+
+export const getConnectorStatus = () => call<ConnectorStatus>("get_connector_status", {});
 
 /* ─── the unified day and life time (Plan Rev 3 §7, §8.1) ──────────────── */
 

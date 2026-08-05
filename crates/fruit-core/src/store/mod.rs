@@ -22,6 +22,7 @@ mod activity;
 mod blocks;
 mod data;
 mod day;
+mod domain_rules;
 mod excel;
 mod projects;
 mod reconcile;
@@ -37,6 +38,10 @@ mod week;
 
 pub use activity::{ENABLED as ACTIVITY_ENABLED, PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS};
 pub use day::{resolve_day, Segment, SegmentOwner};
+pub use domain_rules::{
+    DomainTotal, DEFAULT_RULES, DOMAINS_ENABLED as ACTIVITY_DOMAINS_ENABLED,
+    EXCLUDED_DOMAINS as ACTIVITY_EXCLUDED_DOMAINS,
+};
 pub use recurrence::{IcsImportSummary, SeriesScope, HORIZON_DAYS};
 pub use timer::{IdleReport, TimerRuntime};
 
@@ -80,6 +85,7 @@ impl Store {
         // never acquire them, leaving the Day view with nowhere to file
         // non-work time.
         store.seed_life_areas()?;
+        store.seed_domain_rules()?;
         Ok(store)
     }
 

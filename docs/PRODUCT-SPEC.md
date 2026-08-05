@@ -348,8 +348,8 @@ UI          React 19 · TypeScript · Vite · Zustand · Tailwind v4
 Desktop     Tauri v2
 Core        Rust, no UI dependency — fruit-core
 Storage     Embedded SQLite (rusqlite, bundled), forward-only migrations
-Browser     Minimal local Chrome/Edge connector          ← not yet built
-Export      Offline XLSX generation + JSON backup        ← not yet built
+Browser     Minimal local Chrome/Edge connector          — MV3 extension + native-messaging host
+Export      Offline XLSX generation + JSON backup        — rust_xlsxwriter
 Infra       None. No backend, account, telemetry, CDN or database server.
 ```
 
@@ -373,7 +373,7 @@ something verified by clicking around an app on a machine with a webview.
 | Integration | Direction | Notes |
 |---|---|---|
 | Windows foreground window + idle | Read | `GetForegroundWindow`, `QueryFullProcessImageNameW`, `GetLastInputInfo`. No permissions, no new crates. |
-| **Browser domain connector** | Read, local only | A minimal Chrome/Edge extension talking to the local app. **Required** for the YouTube/Twitch goal — application-level observation cannot distinguish them from any other tab. Not yet built; carries the largest single technical risk in the plan. |
+| **Browser domain connector** | Read, local only | A minimal Chrome/Edge MV3 extension talking to the local app over **native messaging** — no listening socket, no host permissions, so it cannot read a page. **Required** for the YouTube/Twitch goal: application-level observation cannot distinguish them from any other tab. Built and spiked; see [`SPIKE-BROWSER-CONNECTOR.md`](SPIKE-BROWSER-CONNECTOR.md). |
 | `.ics` calendar files | **In only** | Local file, user-picked. No URL, no CalDAV, no account, no write-back. |
 | Excel `.xlsx` | In and out | Offline generation and parsing. No Office installation required. |
 | Everything else | — | None. |
@@ -388,8 +388,14 @@ Fonts are bundled, never fetched — a font request is a network request.
   `fs:*`. File pickers are Rust commands, so the webview receives a chosen path
   and nothing else.
 - Explicit CSP, `default-src 'self'`, asset protocol disabled.
-- The browser connector must be local-only, minimum-permission, and must not
-  transmit URLs, page content or titles by default.
+- The browser connector is local-only, minimum-permission, and transmits a
+  **registrable domain and nothing else** — no URL, no query, no page content,
+  no title. The reduction happens twice: in the extension before anything is
+  sent, and again below the IPC boundary, because the extension is the part a
+  user can swap. It has its own switch, off even when application tracking is
+  on, and its own exclusion list matched after reduction so an entry covers
+  every subdomain. Its transport is native messaging rather than a localhost
+  port: an app badged OFFLINE cannot open a listening socket.
 
 ### 5.6 Performance and quality budgets
 
@@ -454,13 +460,15 @@ in bold; each is reversible.
 | Planner (1/3/7-day) | **Built**; needs the month span, and the 1-day span retires |
 | Projects, tasks, subtasks, estimates, backlog | **Built** |
 | Recurring blocks, `.ics` import | **Built** |
-| Activity: app observation, idle, exclusions, retention | **Built** — Phase 3 minus the browser connector |
-| **Life areas and life entries** | **Not built** — blocks the Day view |
-| **Work contribution modes** | **Not built** |
-| **Day view** | **Not built** — the primary screen does not exist |
-| **Month dashboard** | **Not built** |
-| Browser domain connector, entertainment rules and budgets | **Not built** |
-| Excel import/export | **Not built** |
+| Activity: app observation, idle, exclusions, retention | **Built** |
+| Life areas and life entries | **Built** |
+| Work contribution modes | **Built** — on `time_session` only, so "never on personal time" is structural |
+| Day view | **Built** — the primary screen, at 5/15/30/60-minute resolution |
+| Month dashboard | **Built** — `get_month` is `get_day` summed, so the two cannot disagree |
+| Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
+| Entertainment budgets and planned windows | **Not built** — no longer blocked |
+| Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
+| Excel **import** | **Not built** (M13) |
 | Task notes | Built as **Markdown**; the plan requires compact plain text |
 
 ### A sequencing correction to the plan

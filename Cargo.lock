@@ -151,6 +151,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "fruit-connector-host"
+version = "0.1.0"
+dependencies = [
+ "fruit-core",
+ "tempfile",
+]
+
+[[package]]
 name = "fruit-core"
 version = "0.1.0"
 dependencies = [

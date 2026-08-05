@@ -2,7 +2,7 @@
 # `src-tauri` is deliberately its own workspace: linking it needs a system
 # webview (webkit2gtk on Linux), and `fruit-core` must stay testable on a
 # machine that has none. See docs/ARCHITECTURE.md.
-members = ["crates/fruit-core"]
+members = ["crates/fruit-core", "crates/fruit-connector-host"]
 exclude = ["src-tauri"]
 resolver = "2"
 
@@ -14,6 +14,7 @@ license = "MIT"
 
 [workspace.dependencies]
 fruit-core = { path = "crates/fruit-core" }
+fruit-connector-host = { path = "crates/fruit-connector-host" }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
 chrono-tz = "0.10"
 rusqlite = { version = "0.32", features = ["bundled", "functions"] }

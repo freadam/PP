@@ -17,6 +17,11 @@ Three layers, and the boundaries between them are the whole design.
 │  Schema, migrations, intent-based commands, the timer state machine, │
 │  the capture grammar, calibration. No UI. No Tauri dependency.       │
 └─────────────────────────────────────────────────────────────────────┘
+
+  crates/fruit-connector-host/   The browser connector's native-messaging
+  connector/                     host, and the MV3 extension it talks to.
+                                 Off to the side: a separate process, not a
+                                 layer. See below.
 ```
 
 ## Why `fruit-core` has no Tauri dependency
@@ -32,6 +37,41 @@ passes `quick_check`" is a test that builds a real v1 database and migrates it.
 The cost is one extra crate boundary and a `Mutex<Store>` in the shell. The
 benefit is that the parts of this app that would be catastrophic to get wrong —
 the ones about *time* — are the parts under test.
+
+## Why the browser connector is a fourth process
+
+`crates/fruit-connector-host` has no Tauri dependency either, and for a reason
+that is not the same as `fruit-core`'s.
+
+Chrome launches the host itself — a second invocation of `fruit.exe`, detected by
+the `chrome-extension://` origin Chrome passes as its first argument. That
+process **must not open the database**: two processes on one SQLite file is the
+corruption path the single-instance plugin exists to prevent. So the host writes
+to an append-only spool in the app data directory, and the app drains it on the
+activity tick it already runs.
+
+That leaves the host as pure I/O plus framing — Chrome's 4-byte native-endian
+length prefix, and the partial-read cases a naive loop gets wrong. It is the most
+breakable code in the feature and it lives in `src-tauri`'s blast radius, which
+cannot be compiled without a system webview. Pulling it into its own crate is
+what lets `cargo test` cover it at all; the shell just re-exports it.
+
+The hand-off deliberately avoids both a localhost socket (reachable by every
+process on the machine, and an app badged OFFLINE cannot open one) and a named
+pipe (correct, but `unsafe` Windows code bought on a spike to save twenty seconds
+of latency on a twenty-second signal). See
+[`SPIKE-BROWSER-CONNECTOR.md`](SPIKE-BROWSER-CONNECTOR.md).
+
+## Why an observation's category is stored, not joined
+
+`activity_span.category` is stamped at write time from the domain rules in force
+then, rather than derived on read by joining to `domain_rule`.
+
+The join would be less data and would look more obviously correct. It is wrong
+here: a rule added in September would rewrite what August said you were doing.
+A record of what you did must not move under someone who later changes their mind
+about a domain — the rule decides new spans, and old ones keep their verdict.
+There is an acceptance test for exactly this, because no screen can show it.
 
 ## Why SQL never reaches the renderer
 

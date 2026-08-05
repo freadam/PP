@@ -18,6 +18,7 @@
 //! ```
 
 pub mod clock;
+pub mod connector;
 pub mod db;
 pub mod error;
 pub mod ids;
@@ -25,6 +26,7 @@ pub mod model;
 pub mod ics;
 pub mod parser;
 pub mod rrule;
+pub mod spool;
 pub mod store;
 pub mod time;
 

@@ -81,8 +81,13 @@ impl Store {
         Ok(ActivitySettings {
             enabled: flag(ENABLED, false),
             titles_enabled: flag(TITLES_ENABLED, false),
+            // Its own switch, off even when apps are on: which *website* is a
+            // materially bigger claim on someone's privacy than which
+            // application. Same shape as titles, for the same reason.
+            domains_enabled: flag(super::domain_rules::DOMAINS_ENABLED, false),
             paused: flag(PAUSED, false),
             excluded_apps: list(EXCLUDED_APPS),
+            excluded_domains: list(super::domain_rules::EXCLUDED_DOMAINS),
             excluded_title_patterns: list(TITLE_PATTERNS),
             retention_days: retention,
             next_purge_at: self.next_purge_at(retention)?,
@@ -124,6 +129,23 @@ impl Store {
             return Ok(false);
         }
 
+        // A domain is stripped the way a title is: the surrounding record still
+        // stands, only the more sensitive field is withheld. Doing it here and
+        // not only in `record_browser_sample` means no future caller can write a
+        // domain past the switch by taking a different route in.
+        let domain = sample
+            .domain
+            .as_deref()
+            .filter(|_| self.domains_enabled())
+            .and_then(crate::connector::registrable_domain)
+            .filter(|d| !self.domain_is_excluded(d));
+        // Stamped now, from the rules in force now — never re-derived on read.
+        // See migrations/0006_domain_rules.sql.
+        let category = match &domain {
+            Some(d) => self.classify_domain(d)?.map(|c| c.as_str()),
+            None => None,
+        };
+
         let title = if settings.titles_enabled {
             sample.window_title.as_deref().and_then(|t| {
                 let hit = settings
@@ -141,18 +163,25 @@ impl Store {
         };
 
         let at = sample.at;
-        let previous: Option<(i64, i64, String, Option<String>)> = self
+        let previous: Option<(i64, i64, String, Option<String>, Option<String>)> = self
             .conn
             .query_row(
-                "SELECT id, ended_at, app_id, window_title FROM activity_span
+                "SELECT id, ended_at, app_id, window_title, domain FROM activity_span
                   ORDER BY ended_at DESC LIMIT 1",
                 [],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
             )
             .ok();
 
-        if let Some((id, ended_at, prev_app, prev_title)) = previous {
-            let same = prev_app == app_id && prev_title.as_deref() == title.as_deref();
+        if let Some((id, ended_at, prev_app, prev_title, prev_domain)) = previous {
+            // The domain is part of "same thing", not incidental to it. A
+            // browser is one app, so without this ten minutes of YouTube and ten
+            // of GitHub coalesce into one span labelled with whichever arrived
+            // first — and the entertainment figure the product exists to reduce
+            // would be measuring the wrong interval.
+            let same = prev_app == app_id
+                && prev_title.as_deref() == title.as_deref()
+                && prev_domain.as_deref() == domain.as_deref();
             let contiguous = at >= ended_at && at - ended_at <= COALESCE_GAP_MS;
             let short_enough = (at - ended_at) / 1000 < MAX_SPAN_SEC;
             if same && contiguous && short_enough {
@@ -165,9 +194,10 @@ impl Store {
         }
 
         self.conn.execute(
-            "INSERT INTO activity_span (started_at, ended_at, app_id, window_title, is_idle)
-             VALUES (?1, ?2, ?3, ?4, 0)",
-            params![at, at + SAMPLE_INTERVAL_MS, app_id, title],
+            "INSERT INTO activity_span
+               (started_at, ended_at, app_id, window_title, domain, category, is_idle)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)",
+            params![at, at + SAMPLE_INTERVAL_MS, app_id, title, domain, category],
         )?;
         Ok(true)
     }
@@ -282,21 +312,25 @@ impl Store {
     pub fn set_activity_setting(&mut self, key: &str, value: Value) -> Result<ActivitySettings> {
         // A closed allow-list: the renderer cannot invent an activity key and
         // have it silently persisted as a flag nothing reads.
-        const ALLOWED: [&str; 6] = [
+        const ALLOWED: [&str; 8] = [
             ENABLED,
             TITLES_ENABLED,
+            super::domain_rules::DOMAINS_ENABLED,
             PAUSED,
             EXCLUDED_APPS,
+            super::domain_rules::EXCLUDED_DOMAINS,
             TITLE_PATTERNS,
             RETENTION_DAYS,
         ];
         if !ALLOWED.contains(&key) {
             return Err(AppError::invalid(format!("'{key}' isn't an Activity setting.")));
         }
-        // Turning app tracking off turns titles off with it. Leaving titles
-        // "on" underneath a disabled switch is how a re-enable surprises someone.
+        // Turning app tracking off turns titles and domains off with it. Leaving
+        // either "on" underneath a disabled switch is how a re-enable surprises
+        // someone.
         if key == ENABLED && value == Value::Bool(false) {
             self.set_setting(TITLES_ENABLED, &Value::Bool(false))?;
+            self.set_setting(super::domain_rules::DOMAINS_ENABLED, &Value::Bool(false))?;
         }
         self.set_setting(key, &value)?;
         self.activity_settings()

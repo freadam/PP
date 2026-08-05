@@ -51,6 +51,16 @@ const VERB_HINT: Partial<Record<ReconcileVerb, string>> = {
   reviseEstimate: "Makes the next estimate better",
 };
 
+/**
+ * The verbs that are a verdict about a *website* rather than about an interval.
+ *
+ * "Record as life time" says this domain is not work; "attach to a work task"
+ * says it is how work gets done. The rest — accept, ignore, mark private — are
+ * decisions about one hour, and putting a rule behind a shrug is how someone
+ * ends up with a classifier they did not mean to train.
+ */
+const RULE_VERBS = new Set<ReconcileVerb>(["recordAsLife", "assignToTask"]);
+
 const KIND_TAG: Record<ReconcileKind, string> = {
   overran: "Overrun",
   neverStarted: "Planned, not started",
@@ -72,6 +82,8 @@ export function ReconcileSheet() {
   const [chosen, setChosen] = useState<Record<string, ReconcileVerb>>({});
   const [areaFor, setAreaFor] = useState<Record<string, string>>({});
   const [done, setDone] = useState<Set<string>>(new Set());
+  /** Which items should also write a prospective domain rule. */
+  const [applyRule, setApplyRule] = useState<Set<string>>(new Set());
   const [review, setReview] = useState<DayReview | null>(null);
 
   useEffect(() => {
@@ -87,6 +99,7 @@ export function ReconcileSheet() {
   }, [date]);
 
   const current = items?.[index];
+  const ruleDomain = current?.evidence?.domain ?? null;
   const summary = useMemo(() => {
     if (!items) return null;
     return {
@@ -111,6 +124,7 @@ export function ReconcileSheet() {
       durationSec: item.suggestedDurationSec,
       taskId: item.taskId,
       lifeAreaId: areaFor[item.id] ?? areas[0]?.id ?? null,
+      ruleForDomain: applyRule.has(item.id) ? (item.evidence?.domain ?? null) : null,
     }));
     const result = await useApp
       .getState()
@@ -274,13 +288,48 @@ export function ReconcileSheet() {
                     </div>
                   )}
 
-                  <p className="caption" style={{ marginTop: 12 }}>
-                    {/* The wireframe's "apply to future activity" needs a rules
-                        table and the browser connector, neither of which exists.
-                        Saying so beats a checkbox that quietly does nothing. */}
-                    Rules that apply a choice to future activity arrive with the browser
-                    connector. For now each interval is decided on its own.
-                  </p>
+                  {/* The wireframe's "apply my choice to future activity in this
+                      context". It appears only for a claim with a domain behind
+                      it: an application name is not durable enough to key a rule
+                      on, and a checkbox that is inert half the time teaches
+                      people to ignore it.
+
+                      Unticked by default, and it says which way it applies. A
+                      rule made by accident is a rule that quietly mislabels a
+                      month, and one that reached backwards would rewrite days
+                      already signed off. */}
+                  {ruleDomain && RULE_VERBS.has(chosen[current.id] ?? current.defaultAction) ? (
+                    <label className="row" style={{ marginTop: 12, gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={applyRule.has(current.id)}
+                        onChange={(e) =>
+                          setApplyRule((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(current.id);
+                            else next.delete(current.id);
+                            return next;
+                          })
+                        }
+                      />
+                      <span className="stack" style={{ gap: 2 }}>
+                        <span>
+                          Apply this to future activity on{" "}
+                          <span className="data">{ruleDomain}</span>
+                        </span>
+                        <span className="caption">
+                          From now on, not retrospectively — days you have already closed keep
+                          the record you left them with.
+                        </span>
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="caption" style={{ marginTop: 12 }}>
+                      {ruleDomain
+                        ? "This choice says nothing about the site itself, so there is no rule to make from it."
+                        : "This interval is decided on its own — there is no website behind it to make a rule from."}
+                    </p>
+                  )}
                 </>
               ) : null}
             </section>

@@ -21,6 +21,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 fruit-core = { path = "../crates/fruit-core" }
+fruit-connector-host = { path = "../crates/fruit-connector-host" }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-log = "2"

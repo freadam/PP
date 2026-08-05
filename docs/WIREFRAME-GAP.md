@@ -6,9 +6,11 @@ Reconcile, Excel Export).
 Legend: **✅ built** · **◐ partial** · **❌ missing** · **⛔ blocked** (needs a
 component that does not exist yet, named in the row).
 
-The headline: **all five screens are built.** What remains is one component —
-the **browser connector** — and the features that need it. It is still unspiked
-and is now the only thing on this list blocking anything.
+The headline: **all five screens are built, and nothing on this list is blocked
+on a missing component.** The **browser connector** — which gated four of the
+five screens through every previous revision of this document — is spiked and
+built; see [`SPIKE-BROWSER-CONNECTOR.md`](SPIKE-BROWSER-CONNECTOR.md). What
+remains is ordinary work.
 
 ---
 
@@ -29,11 +31,11 @@ and is now the only thing on this list blocking anything.
 | Six summary cards, Unaccounted hatched | ✅ | **Sleep is its own card**, split out of Life — a third of every month lands in one bucket otherwise. Needed `sleep_sec` in `DayTotals`. |
 | Five columns: Time · Planned · Actual · PC evidence · Classification | ✅ | |
 | Classification shows contribution — "Work · Own" | ✅ | |
-| "Work + distraction" | ◐ ⛔ | The state, the DTO field (`hasDistraction`) and the rendering are built. It can never fire until the **browser connector** classifies a domain as entertainment. |
-| "Observed Entertainment" | ◐ ⛔ | Same: rendering built, classification blocked on the connector. |
+| "Work + distraction" | ✅ | Fires. Entertainment observed *inside* confirmed work is evidence, not a second duration — the work keeps the whole interval (M8). The fixture demonstrates it from real Rust rather than asserting it. |
+| "Observed Entertainment" | ✅ | The observed row names the **site**, not `chrome.exe`, which was the entire point of the connector. |
 | Empty rows visible and labelled | ✅ | Hatched and labelled "Unaccounted", per plan §17.4. |
 | NOW line | ✅ | A rule across the row plus a NOW tag in the gutter. |
-| Right detail panel: time, tags, project/task, **contribution dropdown**, PC evidence, note, Split / Edit | ◐ | Everything except **Split**. Contribution is settable, and reclassifying work → life is there too (it clears the contribution by construction). |
+| Right detail panel: time, tags, project/task, **contribution dropdown**, PC evidence, note, Split / Edit | ◐ | Everything except **Split**. Contribution is settable, reclassifying work → life is there (it clears the contribution by construction), and an observed segment shows its domain rather than its browser. |
 | Filter | ◐ | Five presets (Everything · Unaccounted · Needs a decision · Work · Life). It filters **rows only** and says so — the totals stay the whole day, because a filter that changed the arithmetic would make the counting invariant unverifiable by eye. Per-project and per-area filters not yet. |
 | + Add interval | ✅ | Opens the fill dialog with an adjustable range. |
 | Split / merge / repeat / multi-select editing (plan §8.1) | ❌ | Fill is the only edit. These are the next Day-view increment. |
@@ -57,10 +59,10 @@ figure here and the same figure on a day cannot disagree.
 |---|---|---|
 | Month anchor + ‹ This month › + Day/Week/Month segmented | ✅ | Day jumps to the Day screen — it *is* the day horizon. Week keeps the calibration and project panels, which are about estimate accuracy rather than about how the month went. |
 | Cards: Accounted % · Work · Life · Sleep · Entertainment · Unaccounted | ✅ | Measured against the days that have **happened**. A fresh August on the 4th is otherwise "6% accounted", which is arithmetically true and a useless headline — the missing 27 days are the future, not a gap. |
-| Entertainment planned-vs-unplanned line chart | ◐ | Solid (unplanned) is real. Dashed (planned) is flat zero, and that is the correct reading rather than a placeholder: with no way to plan an entertainment window, every minute is unplanned by definition. The chart says so underneath. |
+| Entertainment planned-vs-unplanned line chart | ◐ | Solid (unplanned) is real, and now has a real source — observed domains classified at write time. Dashed (planned) is still flat zero, and that remains the correct reading rather than a placeholder: with no way to plan an entertainment window, every minute is unplanned by definition. Planned windows are the next increment here, and they are no longer blocked. |
 | Data-quality heatmap + "n unreconciled days · Nh observed-only" | ✅ | Shade is coverage, the numeral is always present, a corner mark is "never reviewed". Future days are outlined and never marked as a problem. |
 | Life-area targets vs actual bars | ✅ | An area with a target and no time still gets a row — a zero against a target is the most actionable row there is. |
-| Monthly findings + "Review source intervals" | ✅ | Findings are computed in Rust; the button opens the worst day on the Day screen. The YouTube/Twitch split needs the connector, so the entertainment finding is currently one line rather than two. |
+| Monthly findings + "Review source intervals" | ✅ | Findings are computed in Rust; the button opens the worst day on the Day screen. The YouTube/Twitch split now has a source — `domain_totals` — and splitting the entertainment finding into per-domain lines is a reporting change rather than a capability. |
 | "Export month to Excel" | ◐ | Present and enabled — a disabled control cannot take keyboard focus, so it would be invisible to the users most likely to look for it. It explains why it cannot run. |
 
 ## 4. Reconcile — **built**
@@ -77,7 +79,7 @@ and nine unexplained hours is not reconciled, and the sheet had no way to say so
 | Queue with ✓ progress and "Defer remaining" | ✅ | Per-item ticks, "n of m", and a **pinned** footer — a day with twenty unaccounted hours has twenty items, and "Close the day" must never be something you scroll to find. |
 | **Numbered** choices with a recommended default | ✅ | `1`–`4` pick, `Enter` takes the recommendation. The recommendation is a heavier border rather than a fill: the other choices are equally legitimate and must not read as discouraged. Each carries its own consequence line. |
 | Item kinds: planned-not-started, **observed-only**, **empty**, overrun, unplanned | ✅ | Observed-only and empty come from `resolve_day`'s segments, not a query of their own — the reconciler asks about exactly the intervals the Day view shows, or the two screens disagree about what is left to decide. |
-| "Apply my choice to future activity in this context" | ❌ ⛔ | Prospective rules need the connector and a rules table. The panel says so rather than showing a checkbox that quietly does nothing. |
+| "Apply my choice to future activity in this context" | ✅ | A real checkbox now, shown only for a claim with a **domain** behind it — an application name is not durable enough to key a rule on, and a control that is inert half the time teaches people to ignore it. Unticked by default, and it states that it applies forwards only: `activity_span.category` is stamped at write time, so a rule made today cannot rewrite a month already signed off. There is an acceptance test for exactly that, because no screen can show it. |
 | "Split interval" | ❌ | Still the missing verb, here and on the Day view. |
 
 ## 5. Excel Export — **built**
@@ -108,24 +110,27 @@ ZIP + OPC + SharedStrings writer would have been ~600 lines of worse code.
 
 ## What this changes about the build order
 
-Three components gate almost everything left:
+All three gating components are now built:
 
-1. **Browser connector** — gates Day-view distraction and entertainment
-   classification, the dashboard's entertainment panel and findings, the
-   reconcile evidence panel and prospective rules. Still unspiked, still the
-   largest risk in the plan, and it now has **four** screens waiting on it
-   rather than one.
+1. ~~**Browser connector**~~ — **built.** It gated Day-view distraction and
+   entertainment classification, the dashboard's entertainment panel and
+   findings, the reconcile evidence panel and prospective rules. All four are
+   live. Three field assumptions remain, and they need a Windows machine with
+   Chrome rather than more code — see the spike report.
 2. ~~**`get_month`**~~ — **built.** The dashboard is done.
 3. ~~**XLSX writer**~~ — **built.** The export screen is done.
 
-The connector is the *only* missing component. One item is blocked on nothing:
+**Nothing left on this list is blocked on a capability that does not exist.**
+What remains is work:
 
-- **Workbook import** (M13) — the export's inverse. Needs a reader and a mapping
-  preview, but no new capability.
+- **Workbook import** (M13) — the export's inverse. A reader and a mapping
+  preview; no new capability.
+- **Split** — still the missing verb, on the Day view and in the reconciler.
+- **Entertainment budgets and planned windows** — the reduction half of the
+  primary outcome. The measurement half now exists.
+- **Per-project and per-area Day filters**, and Day-view editing beyond fill:
+  merge, repeat, multi-select.
+- **`Ctrl K` button in the topbar** — the palette works, it just has no visible
+  affordance.
 
-Everything else — entertainment classification and budgets, "Work + distraction"
-actually firing, the YouTube/Twitch split in Monthly findings, prospective rules
-— waits on the connector. It has been the top of this list since the first gap
-analysis and it is still unspiked.
-
-Recommended order: the connector spike, then workbook import, then Split.
+Recommended order: workbook import, then entertainment budgets, then Split.

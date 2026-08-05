@@ -182,3 +182,52 @@ makes the loss explicit, asks for its scope, and is undoable in one step.
 
 If this proves annoying in use, the fix is a rule editor that shows what it is
 about to discard — not a quiet rewrite.
+
+---
+
+## 10. The browser connector reduces domains without the Public Suffix List
+
+**Plan Rev 3 §5.4** requires the connector to record a domain rather than a URL.
+It does not say how a hostname becomes a domain, and the correct answer is the
+Public Suffix List — ~10,000 rules maintained by Mozilla.
+
+This build ships a list of about thirty two-part suffixes instead, and falls back
+to the last two labels for everything else.
+
+The PSL changes monthly. An offline app that bundles a copy is an offline app
+that carries a stale copy, misgroups domains, and never finds out. The failure is
+silent and gets worse over time.
+
+The small list is right for `youtube.com`, `twitch.tv`, `bbc.co.uk` and the
+overwhelming majority of what this feature is pointed at. Where it is wrong, the
+symptom is that two sites under an unusual suffix group together — visible, local
+to one rule, and correctable by the user in the same breath as everything else,
+because the classification is confirmed in the reconciler anyway.
+
+If the client meets a suffix this gets wrong, the fix is one entry in
+`MULTI_PART`, not a dependency.
+
+---
+
+## 11. The connector hands over a file, not a pipe
+
+**Plan Rev 3 §5.4** says the extension talks to "the local app". It does not, and
+the app is single-instance for a reason: the host process Chrome spawns cannot
+open the database without recreating the two-writers corruption path.
+
+The textbook hand-off is a named pipe. This build appends to a file in the app
+data directory and drains it on the activity tick.
+
+A pipe needs `CreateNamedPipeW`, a Windows-specific crate, `unsafe`, and a server
+thread — none of which can be compiled or tested on the machine this was built
+on, and all of it bought to save twenty seconds of latency on a signal whose own
+sampling interval is twenty seconds. A file gets the user profile's ACL, the same
+protection the database has, and survives Fruit being closed while Chrome runs —
+which a pipe does not.
+
+The bounds that make it safe are `MAX_SPOOL_BYTES`, `MAX_SAMPLE_AGE_MS` and the
+enabled-sentinel, all covered by tests in `fruit_core::spool`.
+
+If latency ever matters — it does not for a twenty-second signal — the pipe is a
+drop-in replacement for `spool::append` and `spool::drain`, and nothing above
+them changes.

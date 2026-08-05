@@ -1,0 +1,13 @@
+[package]
+name = "fruit-connector-host"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Chrome native-messaging host for Fruit's browser connector. No Tauri dependency, so its read loop stays testable on a machine with no system webview."
+
+[dependencies]
+fruit-core.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

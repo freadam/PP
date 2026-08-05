@@ -104,8 +104,12 @@ export interface ActivitySettings {
   enabled: boolean;
   /** Separate from `enabled`, and off even when apps are on. */
   titlesEnabled: boolean;
+  /** The browser connector. Its own switch, for the same reason titles are. */
+  domainsEnabled: boolean;
   paused: boolean;
   excludedApps: string[];
+  /** Registrable domains. An entry covers every subdomain of itself. */
+  excludedDomains: string[];
   excludedTitlePatterns: string[];
   /** 30 / 90 / 0 for forever. */
   retentionDays: number;
@@ -117,6 +121,36 @@ export interface ActivityStatus {
   /** Why this platform can or cannot do it — always shown, never implied. */
   supportNote: string;
   settings: ActivitySettings;
+}
+
+// ─── browser connector (Plan Rev 3 §5.4) ───────────────────────────────
+
+/** Three values, not `AreaKind`'s four: no domain implies rest. */
+export type DomainCategory = "core" | "entertainment" | "other";
+
+export interface DomainRule {
+  id: string;
+  domain: string;
+  category: DomainCategory;
+  lifeAreaId: string | null;
+  /** Shipped with the app. Editing one makes it yours. */
+  isBuiltin: boolean;
+}
+
+export interface DomainTotal {
+  domain: string;
+  /** `null` when no rule covered it — a question, not a failure. */
+  category: DomainCategory | null;
+  seconds: number;
+}
+
+export interface ConnectorStatus {
+  enabled: boolean;
+  hostManifestName: string;
+  extensionDir: string;
+  exePath: string;
+  /** Bytes queued by the host and not yet drained. */
+  queuedSamples: number;
 }
 
 export interface ActivitySpanRow {
@@ -309,6 +343,12 @@ export interface ReconcileEvidence {
   adjacent: string[];
   /** The privacy promise, restated where it counts. */
   storage: string;
+  /**
+   * The registrable domain behind this claim, when the browser connector made
+   * it. Present exactly when a prospective rule is possible — an application
+   * name is not something durable enough to key a rule on.
+   */
+  domain: string | null;
 }
 
 export interface ReconcileItem {
@@ -343,6 +383,12 @@ export interface ReconcileAction {
   estimateSec?: number | null;
   /** For `recordAsLife`. */
   lifeAreaId?: string | null;
+  /**
+   * "Apply my choice to future activity in this context." Set to the item's
+   * domain to write a rule alongside the decision. Prospective only — days
+   * already reconciled keep the verdict they were written with.
+   */
+  ruleForDomain?: string | null;
 }
 
 export interface DayReview {

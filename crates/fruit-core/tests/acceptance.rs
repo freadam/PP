@@ -108,6 +108,7 @@ fn f1_full_loop_through_the_command_layer() {
                 task_id: None,
                 estimate_sec: None,
                 life_area_id: None,
+                rule_for_domain: None,
             }],
             TZ,
         )
@@ -182,6 +183,7 @@ fn f3_unplanned_session_becomes_a_retroactive_block() {
                 task_id: None,
                 estimate_sec: None,
                 life_area_id: None,
+                rule_for_domain: None,
             }],
             TZ,
         )
@@ -1570,6 +1572,7 @@ fn activity_respects_the_privacy_contract() {
     let sample = |app: &str, title: &str, at: i64| ActivitySample {
         app_id: app.into(),
         window_title: Some(title.into()),
+        domain: None,
         at,
     };
 
@@ -1652,6 +1655,7 @@ fn activity_samples_coalesce_into_spans() {
             .record_activity(ActivitySample {
                 app_id: "code.exe".into(),
                 window_title: None,
+                domain: None,
                 at: at(2025, 7, 30, 9, 0) + minute * 60_000,
             })
             .unwrap();
@@ -1660,6 +1664,7 @@ fn activity_samples_coalesce_into_spans() {
         .record_activity(ActivitySample {
             app_id: "mail.exe".into(),
             window_title: None,
+            domain: None,
             at: at(2025, 7, 30, 9, 10),
         })
         .unwrap();
@@ -1692,6 +1697,7 @@ fn activity_correlates_with_the_block_underneath_it() {
             .record_activity(ActivitySample {
                 app_id: "code.exe".into(),
                 window_title: None,
+                domain: None,
                 at: at(2025, 7, 30, 9, 0) + minute * 60_000,
             })
             .unwrap();
@@ -1701,6 +1707,7 @@ fn activity_correlates_with_the_block_underneath_it() {
             .record_activity(ActivitySample {
                 app_id: "slack.exe".into(),
                 window_title: None,
+                domain: None,
                 at: at(2025, 7, 30, 9, 0) + minute * 60_000,
             })
             .unwrap();
@@ -1739,6 +1746,7 @@ fn activity_purges_at_the_retention_limit() {
         .record_activity(ActivitySample {
             app_id: "code.exe".into(),
             window_title: None,
+            domain: None,
             at: at(2025, 7, 30, 9, 0),
         })
         .unwrap();
@@ -1841,6 +1849,7 @@ fn observation_enriches_a_confirmed_session_without_adding_time() {
             .record_activity(ActivitySample {
                 app_id: "slack.exe".into(),
                 window_title: None,
+                domain: None,
                 at: at(2025, 7, 30, 9, 0) + minute * 60_000,
             })
             .unwrap();
@@ -2115,6 +2124,7 @@ fn wire_shape_is_camel_case() {
         .record_activity(ActivitySample {
             app_id: "code.exe".into(),
             window_title: None,
+            domain: None,
             at: at(2025, 7, 30, 14, 0),
         })
         .unwrap();
@@ -2277,6 +2287,7 @@ fn month_load_stays_inside_its_budget() {
                 .record_activity(ActivitySample {
                     app_id: "code.exe".into(),
                     window_title: None,
+                    domain: None,
                     at: at(2025, 7, day, 19, 0) + minute * 60_000,
                 })
                 .unwrap();
@@ -2482,6 +2493,98 @@ fn the_export_never_names_private_time_unless_asked() {
         .any(|c| c.label == "Therapy"), "only when explicitly asked");
 }
 
+/// The browser connector, end to end: an observed domain becomes a reconcile
+/// item that names the *site* rather than the browser, and a prospective rule
+/// made from that decision classifies tomorrow **without touching yesterday**.
+///
+/// The backwards half is the one worth a test. `activity_span.category` is
+/// stamped at write time exactly so that a rule cannot rewrite a month someone
+/// has already signed off, and that is a property nothing in the UI can show.
+#[test]
+fn a_rule_made_while_reconciling_classifies_forwards_and_never_backwards() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 23, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_DOMAINS_ENABLED, true.into())
+        .unwrap();
+
+    // An hour on a site no rule covers, so the app has no opinion about it yet.
+    for minute in 0..60 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "chrome.exe".into(),
+                window_title: None,
+                domain: Some("news.example.com".into()),
+                at: at(2025, 7, 30, 11, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+
+    let items = store.get_reconcile_items("2025-07-30", TZ).unwrap();
+    let observed = items
+        .iter()
+        .find(|i| i.kind == ReconcileKind::ObservedOnly)
+        .expect("the observed hour is on the list");
+    // The site, not the browser. Naming it `chrome.exe` is the exact failure the
+    // connector exists to fix.
+    assert!(observed.title.contains("example.com"), "{}", observed.title);
+
+    let evidence = observed.evidence.as_ref().unwrap();
+    assert_eq!(evidence.source, "Browser connector");
+    assert!(evidence.storage.contains("Domain only"));
+    assert_eq!(
+        evidence.domain.as_deref(),
+        Some("example.com"),
+        "a rule needs something durable to key on"
+    );
+
+    let area = store.get_life_areas(TZ, false).unwrap()[0].id.clone();
+    store
+        .apply_reconcile(
+            "2025-07-30",
+            vec![ReconcileAction {
+                item_id: observed.id.clone(),
+                verb: ReconcileVerb::RecordAsLife,
+                starts_at: observed.starts_at,
+                duration_sec: Some(3600),
+                task_id: None,
+                estimate_sec: None,
+                life_area_id: Some(area),
+                rule_for_domain: evidence.domain.clone(),
+            }],
+            TZ,
+        )
+        .unwrap();
+
+    // Forwards: tomorrow's visit is classified without being asked about again.
+    assert_eq!(
+        store.classify_domain("news.example.com").unwrap(),
+        Some(DomainCategory::Entertainment)
+    );
+    clock.advance(24 * 3600 * 1000);
+    store
+        .record_activity(ActivitySample {
+            app_id: "chrome.exe".into(),
+            window_title: None,
+            domain: Some("news.example.com".into()),
+            at: at(2025, 7, 31, 11, 0),
+        })
+        .unwrap();
+    let tomorrow = store.domain_totals("2025-07-31", TZ).unwrap();
+    assert_eq!(tomorrow[0].category, Some(DomainCategory::Entertainment));
+
+    // Backwards: yesterday is exactly as it was left. The hour was reconciled
+    // as life time by hand, and the observation underneath it still carries the
+    // verdict it was written with — which was none.
+    let yesterday = store.domain_totals("2025-07-30", TZ).unwrap();
+    assert_eq!(
+        yesterday[0].category, None,
+        "the rule reached backwards and reclassified a day already closed"
+    );
+}
+
 /// M10 — reconciliation covers **observed-only time and empty hours**, not just
 /// the three block-shaped problems.
 ///
@@ -2502,6 +2605,7 @@ fn reconcile_covers_observed_only_and_empty_hours() {
             .record_activity(ActivitySample {
                 app_id: "chrome.exe".into(),
                 window_title: None,
+                domain: None,
                 at: at(2025, 7, 30, 11, 0) + minute * 60_000,
             })
             .unwrap();
@@ -2580,6 +2684,7 @@ fn reconciling_an_empty_hour_fills_it() {
                 task_id: None,
                 estimate_sec: None,
                 life_area_id: Some(family),
+                rule_for_domain: None,
             }],
             TZ,
         )
@@ -2607,6 +2712,7 @@ fn reconciling_an_empty_hour_fills_it() {
                 task_id: None,
                 estimate_sec: None,
                 life_area_id: None,
+                rule_for_domain: None,
             }],
             TZ,
         )

@@ -15,6 +15,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0003_rollover.sql"),
     include_str!("../migrations/0004_recurrence_and_activity.sql"),
     include_str!("../migrations/0005_life_and_contribution.sql"),
+    include_str!("../migrations/0006_domain_rules.sql"),
 ];
 
 pub fn schema_version() -> i64 {

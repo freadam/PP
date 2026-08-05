@@ -294,6 +294,7 @@ impl Store {
                             } else {
                                 "Application name only. No window title unless you enabled titles.".into()
                             },
+                            domain: domain.clone(),
                         }),
                         default_action: if is_entertainment {
                             ReconcileVerb::RecordAsLife
@@ -443,6 +444,29 @@ impl Store {
                 .item_id
                 .split_once(':')
                 .ok_or_else(|| AppError::invalid("Malformed reconcile item id."))?;
+
+            // "Apply my choice to future activity in this context" (wireframe 4).
+            //
+            // The rule is written *before* the decision it came from, and it is
+            // deliberately prospective only: `activity_span.category` is stamped
+            // at write time, so a rule made today classifies tomorrow and leaves
+            // every day already reconciled exactly as the user left it. A rule
+            // that reached backwards would silently rewrite a month someone has
+            // already signed off.
+            if let Some(domain) = &action.rule_for_domain {
+                let category = match action.verb {
+                    // The user has just called this interval personal time. What
+                    // that means for a *domain* is "not work", which is the
+                    // entertainment bucket the reduction target is measured in.
+                    ReconcileVerb::RecordAsLife => DomainCategory::Entertainment,
+                    // Attached to a task: this domain is how work gets done.
+                    ReconcileVerb::AssignToTask => DomainCategory::Core,
+                    // Anything else is not a verdict about the domain, and
+                    // inventing one would put a rule behind a shrug.
+                    _ => continue,
+                };
+                self.set_domain_rule(domain, category, action.life_area_id.clone())?;
+            }
             match action.verb {
                 ReconcileVerb::Accept | ReconcileVerb::Ignore | ReconcileVerb::LeaveUnscheduled => {}
 

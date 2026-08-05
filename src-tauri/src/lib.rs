@@ -7,6 +7,7 @@
 //! Commands are intent-based, one transaction each. The renderer holds no SQL
 //! strings, and the capability file lists exactly the commands below.
 
+pub use fruit_connector_host as connector;
 mod frontmost;
 mod idle;
 
@@ -293,12 +294,93 @@ fn get_activity_settings(state: State<'_, AppState>) -> Res<ActivityStatus> {
 
 #[tauri::command]
 fn set_activity_setting(
+    app: AppHandle,
     state: State<'_, AppState>,
     key: String,
     value: Value,
 ) -> Res<ActivityStatus> {
     with(&state, |s| s.set_activity_setting(&key, value))?;
+    // The sentinel the connector host reads has to move with the switch, not on
+    // the next twenty-second tick: "I turned it off" must mean nothing further
+    // is written, immediately.
+    let dir = data_dir(&app);
+    with(&state, |s| s.drain_browser_spool(&dir))?;
     get_activity_settings(state)
+}
+
+/* ─── browser connector (Plan Rev 3 §5.4) ──────────────────────────────── */
+
+#[tauri::command]
+fn get_domain_rules(state: State<'_, AppState>) -> Res<Vec<DomainRuleRow>> {
+    with(&state, |s| s.list_domain_rules())
+}
+
+#[tauri::command]
+fn set_domain_rule(
+    state: State<'_, AppState>,
+    domain: String,
+    category: DomainCategory,
+    life_area_id: Option<String>,
+) -> Res<DomainRuleRow> {
+    with(&state, |s| s.set_domain_rule(&domain, category, life_area_id))
+}
+
+#[tauri::command]
+fn delete_domain_rule(state: State<'_, AppState>, id: String) -> Res<()> {
+    with(&state, |s| s.delete_domain_rule(&id))
+}
+
+#[tauri::command]
+fn get_domain_totals(
+    state: State<'_, AppState>,
+    date: String,
+    tz: String,
+) -> Res<Vec<fruit_core::store::DomainTotal>> {
+    with(&state, |s| s.domain_totals(&date, &tz))
+}
+
+/// What Settings needs to explain the connector: whether it is on, and the two
+/// paths a person has to put a file at to install it.
+///
+/// Installation is not automatic and the screen says so. Writing a native-host
+/// manifest means writing a registry key under `HKCU`, and an app that does that
+/// silently on first run has installed a browser extension hook without asking —
+/// which is precisely the behaviour the privacy contract exists to rule out.
+#[tauri::command]
+fn get_connector_status(app: AppHandle, state: State<'_, AppState>) -> Res<ConnectorStatus> {
+    let dir = data_dir(&app);
+    // The extension ships as a bundled resource, so the path shown is one that
+    // actually exists on the installed machine. Printing a plausible-looking
+    // path that is not there is worse than printing nothing.
+    let extension_dir = app
+        .path()
+        .resolve("connector", tauri::path::BaseDirectory::Resource)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "(not found — reinstall Fruit)".into());
+    Ok(ConnectorStatus {
+        enabled: with(&state, |s| Ok(s.domains_enabled()))?,
+        host_manifest_name: connector::HOST_MANIFEST_NAME.into(),
+        extension_dir,
+        exe_path: std::env::current_exe()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        queued_samples: fruit_core::spool::spool_path(&dir)
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(0),
+    })
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConnectorStatus {
+    enabled: bool,
+    host_manifest_name: String,
+    extension_dir: String,
+    exe_path: String,
+    /// Bytes waiting to be drained. Non-zero here with `enabled` false is the
+    /// signature of a host still running against a switch that has gone off.
+    queued_samples: u64,
 }
 
 #[tauri::command]
@@ -681,6 +763,26 @@ pub fn run() {
                     let _ = handle.emit("backup:failed", err.to_string());
                 }
             }
+            // The host process resolves this directory itself, without Tauri.
+            // If the two ever disagree the host spools somewhere nothing drains
+            // and the connector silently records nothing — so it is checked on
+            // every launch rather than left to be discovered in the field.
+            let data = data_dir(&handle);
+            match connector::host_data_dir() {
+                Some(host_dir) if host_dir == data => {}
+                other => log::error!(
+                    "connector.datadir.mismatch resolved={} host={}",
+                    data.display(),
+                    other.map(|p| p.display().to_string()).unwrap_or_else(|| "none".into())
+                ),
+            }
+            // Publishes the "domains may be recorded" bit the host reads. Doing
+            // it at boot means a crash cannot leave the host writing after the
+            // user switched it off.
+            if let Err(err) = store.drain_browser_spool(&data) {
+                log::error!("connector.boot.failed code={}", err.code());
+            }
+
             let _ = store.purge_expired();
             match store.purge_activity() {
                 Ok(n) if n > 0 => log::info!("activity.purge.removed n={n}"),
@@ -744,6 +846,11 @@ pub fn run() {
             set_activity_setting,
             get_activity_day,
             clear_activity,
+            get_domain_rules,
+            set_domain_rule,
+            delete_domain_rule,
+            get_domain_totals,
+            get_connector_status,
             get_unreconciled_days,
             search,
             parse_capture,
@@ -836,12 +943,24 @@ fn spawn_activity_loop(app: AppHandle) {
         if !enabled || paused {
             continue;
         }
+        // The browser connector's spool rides the same tick. It is drained
+        // before the foreground sample is taken, so a browser observation and
+        // the "chrome.exe was frontmost" sample for the same instant arrive in
+        // the order they happened rather than inverted.
+        let dir = data_dir(&app);
+        match store.drain_browser_spool(&dir) {
+            Ok(n) if n > 0 => log::info!("connector.drained n={n}"),
+            Ok(_) => {}
+            Err(err) => log::error!("connector.drain.failed code={}", err.code()),
+        }
+
         let Some(front) = frontmost::current() else {
             continue;
         };
         let sample = fruit_core::model::ActivitySample {
             app_id: front.app_id,
             window_title: front.window_title,
+            domain: None,
             at: fruit_core::time::now_ms(),
         };
         match store.record_activity(sample) {

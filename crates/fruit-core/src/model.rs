@@ -523,6 +523,11 @@ pub struct ReconcileEvidence {
     /// What sits either side of this interval, for orientation.
     pub adjacent: Vec<String>,
     pub storage: String,
+    /// The registrable domain this claim came from, when it came from the
+    /// browser connector. Present only when a *prospective rule* is possible —
+    /// the sheet offers "apply this to future activity" exactly when there is
+    /// something durable to key a rule on, which an application name is not.
+    pub domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -578,6 +583,14 @@ pub struct ReconcileAction {
     pub estimate_sec: Option<i64>,
     /// For `RecordAsLife`.
     pub life_area_id: Option<String>,
+    /// "Apply my choice to future activity in this context" (wireframe 4).
+    ///
+    /// Set to the item's observed domain to write a rule alongside the decision,
+    /// so tomorrow's YouTube is classified without being asked about again.
+    /// `None` means "this interval only", which stays the default: a rule made
+    /// by accident is a rule that quietly mislabels a month.
+    #[serde(default)]
+    pub rule_for_domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -677,8 +690,14 @@ pub struct ActivitySettings {
     pub enabled: bool,
     /// Separate from `enabled`, and off even when apps are on (§3.5).
     pub titles_enabled: bool,
+    /// Whether the browser connector's domains may be recorded. Independent of
+    /// `enabled`, and off by default.
+    pub domains_enabled: bool,
     pub paused: bool,
     pub excluded_apps: Vec<String>,
+    /// Registrable domains never written, matched after reduction so an entry
+    /// covers every subdomain.
+    pub excluded_domains: Vec<String>,
     pub excluded_title_patterns: Vec<String>,
     /// 30 / 90 / 0 for forever.
     pub retention_days: i64,
@@ -691,7 +710,54 @@ pub struct ActivitySettings {
 pub struct ActivitySample {
     pub app_id: String,
     pub window_title: Option<String>,
+    /// Set only by the browser connector, and only ever a registrable domain.
+    /// `None` from the foreground-window sampler, which cannot see one.
+    #[serde(default)]
+    pub domain: Option<String>,
     pub at: Millis,
+}
+
+/// What an observed domain is taken to mean. Deliberately three values, not the
+/// four of `AreaKind`: `rest` is something a person asserts about themselves and
+/// no domain implies it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DomainCategory {
+    Core,
+    Entertainment,
+    Other,
+}
+
+impl DomainCategory {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "core" => Self::Core,
+            "entertainment" => Self::Entertainment,
+            "other" => Self::Other,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Core => "core",
+            Self::Entertainment => "entertainment",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// One row of "this domain means this".
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainRuleRow {
+    pub id: String,
+    pub domain: String,
+    pub category: DomainCategory,
+    pub life_area_id: Option<String>,
+    /// Shipped with the app and never edited. A rule the user has touched is
+    /// theirs, and the Settings list says so rather than silently replacing it
+    /// on the next update.
+    pub is_builtin: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
