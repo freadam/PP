@@ -1,16 +1,28 @@
 /**
- * The Reconcile sheet (§3.7) — the single highest-leverage feature in the spec.
+ * The Reconcile sheet (wireframe screen 4) — the single highest-leverage
+ * feature in the spec, and the one the ninety-second daily target is spent in.
  *
- * Modal, one screen, entirely keyboard-driven. It never blocks the app: `Esc`
- * defers, and a deferred day stays available for seven days before it is
- * auto-accepted (U11).
+ * Three columns, and the split is the argument:
+ *
+ *   **queue** — how many decisions are left, and which are done. Reconciling is
+ *     a finite job, and a screen that hides how finite is a screen people quit.
+ *   **decision** — one item, its explanation, and numbered choices with one
+ *     recommended. Numbers because the fastest path through seven items is
+ *     seven keystrokes.
+ *   **evidence** — where the claim came from. Only observed items have it, and
+ *     they are the only ones asking the user to accept a *machine's* assertion
+ *     rather than their own. Its last line is the privacy promise, restated at
+ *     the moment someone is looking at a record of what they did.
+ *
+ * Modal, entirely keyboard-driven, and it never blocks the app: `Esc` defers,
+ * and a deferred day stays available for seven days before auto-accepting (U11).
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { DayReview, ReconcileItem, ReconcileVerb } from "../lib/types";
+import type { DayReview, ReconcileItem, ReconcileKind, ReconcileVerb } from "../lib/types";
 
 const VERB_LABEL: Record<ReconcileVerb, string> = {
   accept: "Accept",
@@ -22,32 +34,44 @@ const VERB_LABEL: Record<ReconcileVerb, string> = {
   moveToTomorrow: "Move to tomorrow",
   leaveUnscheduled: "Leave unscheduled",
   createRetroBlock: "Create block",
-  assignToTask: "Assign to task",
+  assignToTask: "Attach to a work task",
   logAsBreak: "Log as break",
-  ignore: "Ignore",
+  ignore: "Leave it unaccounted",
+  recordAsLife: "Record as life time",
+  markPrivate: "Mark private / intentionally untracked",
 };
 
-/** One-key actions (§3.7). Every verb also reaches the command palette. */
-const VERB_KEY: Partial<Record<ReconcileVerb, string>> = {
-  accept: "A",
-  rescheduleRemainder: "R",
-  split: "S",
-  drop: "D",
-  markDone: "M",
-  moveToTomorrow: "T",
-  createRetroBlock: "B",
-  ignore: "I",
+/** A one-line consequence, where the verb's name doesn't carry it. */
+const VERB_HINT: Partial<Record<ReconcileVerb, string>> = {
+  assignToTask: "Preserves the observation as evidence rather than replacing it",
+  recordAsLife: "Pick a life area — this is what makes the hour count",
+  markPrivate: "Accounted for, nothing recorded about it",
+  ignore: "It stays a gap, and the month's account says so",
+  accept: "Record what happened, and move on",
+  reviseEstimate: "Makes the next estimate better",
+};
+
+const KIND_TAG: Record<ReconcileKind, string> = {
+  overran: "Overrun",
+  neverStarted: "Planned, not started",
+  untrackedGap: "Untracked gap",
+  unplannedSession: "Unplanned work",
+  observedOnly: "Observed only",
+  empty: "Unaccounted",
 };
 
 export function ReconcileSheet() {
   const close = useApp((s) => s.setOverlay);
   const unreconciled = useApp((s) => s.unreconciled);
   const explicitDate = useApp((s) => s.reconcileDate);
+  const areas = useApp((s) => s.lifeAreas);
   const date = explicitDate ?? unreconciled[0] ?? fmt.addDays(fmt.today(), -1);
 
   const [items, setItems] = useState<ReconcileItem[] | null>(null);
   const [index, setIndex] = useState(0);
   const [chosen, setChosen] = useState<Record<string, ReconcileVerb>>({});
+  const [areaFor, setAreaFor] = useState<Record<string, string>>({});
+  const [done, setDone] = useState<Set<string>>(new Set());
   const [review, setReview] = useState<DayReview | null>(null);
 
   useEffect(() => {
@@ -55,86 +79,79 @@ export function ReconcileSheet() {
       .getReconcileItems(date, fmt.tz())
       .then((list) => {
         setItems(list);
-        // Each item type has a default action; the sheet is pre-filled so
-        // holding Enter is a legitimate way through.
+        // Every item has a default; the sheet is pre-filled so holding Enter is
+        // a legitimate way through a day you have nothing to say about.
         setChosen(Object.fromEntries(list.map((i) => [i.id, i.defaultAction])));
       })
       .catch(() => setItems([]));
   }, [date]);
 
   const current = items?.[index];
+  const summary = useMemo(() => {
+    if (!items) return null;
+    return {
+      planned: items.reduce((n, i) => n + i.plannedSec, 0),
+      tracked: items.reduce((n, i) => n + i.trackedSec, 0),
+    };
+  }, [items]);
+
+  const choose = (verb: ReconcileVerb) => {
+    if (!current) return;
+    setChosen((c) => ({ ...c, [current.id]: verb }));
+    setDone((d) => new Set(d).add(current.id));
+    if (index < (items?.length ?? 0) - 1) setIndex(index + 1);
+  };
 
   const apply = async () => {
     if (!items) return;
-    const { run, refresh, toast } = useApp.getState();
     const actions = items.map((item) => ({
       itemId: item.id,
       verb: chosen[item.id] ?? item.defaultAction,
       startsAt: item.suggestedSlot,
       durationSec: item.suggestedDurationSec,
       taskId: item.taskId,
+      lifeAreaId: areaFor[item.id] ?? areas[0]?.id ?? null,
     }));
-    const result = await run(
-      () => ipc.applyReconcile(date, actions, fmt.tz()),
-      "Couldn't reconcile that day.",
-    );
-    if (!result) return;
-    setReview(result);
-    toast(result.takeaway);
-    const remaining = await ipc.getUnreconciledDays(fmt.today()).catch(() => []);
-    useApp.setState({ unreconciled: remaining, reconcileDate: null });
-    await refresh();
+    const result = await useApp
+      .getState()
+      .run(() => ipc.applyReconcile(date, actions, fmt.tz()), "Couldn't close the day.");
+    if (result) {
+      setReview(result);
+      await useApp.getState().refresh();
+    }
   };
 
+  /* One key per choice, plus Enter for the recommended one. Seven items should
+     take seven keystrokes (§3.7). */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (review) return;
-      if (e.key === "ArrowDown" || e.key === "j") {
+      if (review || !current) return;
+      if (e.key === "Enter") {
         e.preventDefault();
-        setIndex((i) => Math.min((items?.length ?? 1) - 1, i + 1));
-      } else if (e.key === "ArrowUp" || e.key === "k") {
+        choose(chosen[current.id] ?? current.defaultAction);
+        return;
+      }
+      const n = Number(e.key);
+      if (n >= 1 && n <= current.available.length) {
         e.preventDefault();
-        setIndex((i) => Math.max(0, i - 1));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (items && index >= items.length - 1) void apply();
-        else setIndex((i) => i + 1);
-      } else if (current) {
-        const hit = current.available.find(
-          (v) => VERB_KEY[v]?.toLowerCase() === e.key.toLowerCase(),
-        );
-        if (hit) {
-          e.preventDefault();
-          setChosen((c) => ({ ...c, [current.id]: hit }));
-        }
+        choose(current.available[n - 1]!);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [items, index, current, review]);
-
-  const summary = useMemo(() => {
-    if (!items) return null;
-    const planned = items.reduce((n, i) => n + i.plannedSec, 0);
-    const tracked = items.reduce((n, i) => n + i.trackedSec, 0);
-    return { planned, tracked };
-  }, [items]);
+  }, [current, chosen, review, index, items]);
 
   return (
     <>
       <div className="scrim" onClick={() => close(null)} />
-      <div className="modal modal-wide overlay" role="dialog" aria-modal="true" aria-label="Reconcile">
-        <div className="sheet-head">
-          <strong className="title grow">Reconcile · {fmt.longDate(date)}</strong>
-          {items && !review && (
-            <span className="data caption">
-              {Math.min(index + 1, items.length)} of {items.length}
-            </span>
-          )}
-        </div>
-
+      <div
+        className="reconcile-modal overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Reconcile"
+      >
         {review ? (
-          <div className="sheet-body stack">
+          <div className="decision">
             <p className="display" style={{ fontSize: "1.125rem" }}>
               {review.takeaway}
             </p>
@@ -143,140 +160,175 @@ export function ReconcileSheet() {
               {fmt.duration(review.trackedSec)} · unplanned{" "}
               {fmt.duration(review.unplannedSec)}
             </p>
-            {/* §2.3 — the streak is stated where it is earned, once, in plain
-                caption type. It is not a badge, a flame or a thing you can
-                lose: closing the day is the habit, and this is the receipt. */}
             {review.streakDays > 1 && (
-              <p className="caption">
-                {review.streakDays} days reconciled in a row.
-              </p>
+              <p className="caption">{review.streakDays} days reconciled in a row.</p>
             )}
-            <div className="row">
-              <button className="btn btn-primary" autoFocus onClick={() => close(null)}>
-                Done
-              </button>
-            </div>
-          </div>
-        ) : !items ? (
-          <div className="sheet-body">
-            <p className="caption">Reading the day…</p>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="sheet-body stack">
-            <p className="caption">
-              Nothing to reconcile on {fmt.longDate(date)} — the plot and the track agree.
-            </p>
-            <button className="btn btn-primary" onClick={() => void apply()}>
-              Close the day
+            <button className="btn btn-primary" autoFocus onClick={() => close(null)}>
+              Done
             </button>
           </div>
         ) : (
           <>
-            <div style={{ maxHeight: "52vh", overflow: "auto" }}>
-              {items.map((item, i) => (
-                <div
-                  key={item.id}
-                  className="reconcile-item"
-                  style={{
-                    background: i === index ? "var(--raised)" : undefined,
-                    boxShadow: i === index ? "inset 2px 0 0 var(--plot)" : undefined,
-                  }}
-                  onClick={() => setIndex(i)}
-                >
-                  <div className="row spread">
-                    <strong>{item.title}</strong>
-                    <span className="micro" style={{ color: "var(--faint)" }}>
-                      {item.kind === "overran"
-                        ? "overran"
-                        : item.kind === "neverStarted"
-                          ? "never started"
-                          : item.kind === "unplannedSession"
-                            ? "unplanned"
-                            : "gap"}
+            <aside className="queue">
+              <h3>
+                Reconcile · {items ? Math.min(index + 1, items.length) : 0} of{" "}
+                {items?.length ?? 0}
+              </h3>
+              <p className="caption">{fmt.longDate(date)}</p>
+              <div className="queue-list stack" style={{ gap: 4 }}>
+                {(items ?? []).map((item, i) => (
+                  <button
+                    key={item.id}
+                    className="queue-item"
+                    aria-current={i === index || undefined}
+                    data-done={done.has(item.id) || undefined}
+                    onClick={() => setIndex(i)}
+                  >
+                    <span className="micro">
+                      {done.has(item.id) ? "✓ " : ""}
+                      {KIND_TAG[item.kind]}
                     </span>
+                    <span className="queue-when data micro">
+                      {item.startsAt ? fmt.clock(item.startsAt) : ""}
+                      {item.driftSec !== 0 && ` · ${fmt.drift(item.driftSec)}`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {/* Pinned, not pushed to the bottom of a list: a day with
+                  twenty unaccounted hours has twenty items, and "Close the day"
+                  must never be something you scroll to find. Deferring is a
+                  first-class outcome — a sheet that cannot be left is a sheet
+                  people stop opening (U11). */}
+              <div className="queue-foot stack" style={{ gap: 4 }}>
+                <button className="btn" onClick={() => close(null)}>
+                  Defer remaining <span className="kbd">Esc</span>
+                </button>
+                <button className="btn btn-primary" onClick={() => void apply()}>
+                  Close the day
+                </button>
+              </div>
+            </aside>
+
+            <section className="decision">
+              {!items ? (
+                <p className="caption">Reading the day…</p>
+              ) : items.length === 0 ? (
+                <>
+                  <p className="caption">
+                    Nothing to reconcile on {fmt.longDate(date)} — the plot, the record and the
+                    clock all agree.
+                  </p>
+                  <button className="btn btn-primary" onClick={() => void apply()}>
+                    Close the day
+                  </button>
+                </>
+              ) : current ? (
+                <>
+                  <span className="tag">{KIND_TAG[current.kind]}</span>
+                  <h2 className="title">{current.title}</h2>
+                  <p className="caption">{current.explanation}</p>
+
+                  <div className="stack" style={{ gap: 6, marginTop: 12 }}>
+                    {current.available.map((verb, i) => {
+                      const isDefault = verb === current.defaultAction;
+                      return (
+                        <button
+                          key={verb}
+                          className="choice"
+                          data-recommended={isDefault || undefined}
+                          data-chosen={chosen[current.id] === verb || undefined}
+                          onClick={() => choose(verb)}
+                        >
+                          <b>
+                            <span className="data">{i + 1}</span> · {VERB_LABEL[verb]}
+                          </b>
+                          {isDefault && current.recommendation ? (
+                            <span className="caption">{current.recommendation}</span>
+                          ) : (
+                            VERB_HINT[verb] && <span className="caption">{VERB_HINT[verb]}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <p className="caption data" style={{ margin: "4px 0 8px" }}>
-                    {item.plannedSec > 0 && <>plotted {fmt.duration(item.plannedSec)} · </>}
-                    tracked {fmt.duration(item.trackedSec)}
-                    {item.driftSec !== 0 && item.plannedSec > 0 && (
-                      <> · drift {fmt.drift(item.driftSec)}</>
-                    )}
-                  </p>
-
-                  {item.plannedSec > 0 && (
-                    <span className="rail-bar" style={{ maxWidth: 320 }}>
-                      <span className="plot" style={{ left: 0, width: "60%" }} />
-                      <span
-                        className="track"
-                        style={{
-                          width: `${Math.min(60, (item.trackedSec / Math.max(1, item.plannedSec)) * 60)}%`,
-                        }}
-                      />
-                      {item.driftSec > 0 && (
-                        <span
-                          className="tail"
-                          style={{
-                            left: "60%",
-                            width: `${Math.min(40, (item.driftSec / Math.max(1, item.plannedSec)) * 60)}%`,
-                          }}
-                        />
-                      )}
-                    </span>
+                  {/* The area picker only appears for the verb that needs one —
+                      a dropdown that is inert for four of five choices is noise. */}
+                  {chosen[current.id] === "recordAsLife" && (
+                    <div className="field" style={{ marginTop: 12 }}>
+                      <label htmlFor="rec-area">Life area</label>
+                      <select
+                        id="rec-area"
+                        value={areaFor[current.id] ?? areas[0]?.id ?? ""}
+                        onChange={(e) =>
+                          setAreaFor((a) => ({ ...a, [current.id]: e.target.value }))
+                        }
+                      >
+                        {areas.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   )}
 
-                  <div className="reconcile-verbs">
-                    {item.available.map((verb) => (
-                      <button
-                        key={verb}
-                        className="btn"
-                        aria-pressed={(chosen[item.id] ?? item.defaultAction) === verb}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setChosen((c) => ({ ...c, [item.id]: verb }));
-                        }}
-                      >
-                        {VERB_KEY[verb] && <span className="kbd">{VERB_KEY[verb]}</span>}
-                        {VERB_LABEL[verb]}
-                      </button>
-                    ))}
-                  </div>
+                  <p className="caption" style={{ marginTop: 12 }}>
+                    {/* The wireframe's "apply to future activity" needs a rules
+                        table and the browser connector, neither of which exists.
+                        Saying so beats a checkbox that quietly does nothing. */}
+                    Rules that apply a choice to future activity arrive with the browser
+                    connector. For now each interval is decided on its own.
+                  </p>
+                </>
+              ) : null}
+            </section>
 
-                  {item.suggestedSlot &&
-                    (chosen[item.id] === "rescheduleRemainder" ||
-                      chosen[item.id] === "moveToTomorrow") && (
-                      <p className="caption data" style={{ marginTop: 8 }}>
-                        → {fmt.longDate(fmt.toLocalDate(new Date(item.suggestedSlot)))} at{" "}
-                        {fmt.clock(item.suggestedSlot)} ({fmt.duration(item.suggestedDurationSec)})
-                      </p>
-                    )}
-                </div>
-              ))}
-            </div>
-
-            <div className="reconcile-foot caption">
-              <span>
-                <span className="kbd">↑↓</span> move
-              </span>
-              <span>
-                <span className="kbd">Enter</span> apply
-              </span>
-              <span>
-                <span className="kbd">Esc</span> finish later
-              </span>
-              <span className="grow" />
-              {summary && (
-                <span className="data">
-                  {fmt.duration(summary.planned)} plotted · {fmt.duration(summary.tracked)} tracked
-                </span>
+            <aside className="evidence">
+              <h3>Evidence</h3>
+              {current?.evidence ? (
+                <>
+                  <Field label="Source">{current.evidence.source}</Field>
+                  <Field label="Subject">{current.evidence.subject}</Field>
+                  <Field label="Confidence">{current.evidence.confidence}</Field>
+                  {current.evidence.adjacent.length > 0 && (
+                    <Field label="Adjacent time">
+                      {current.evidence.adjacent.map((a) => (
+                        <div key={a} className="data micro">
+                          {a}
+                        </div>
+                      ))}
+                    </Field>
+                  )}
+                  <Field label="Storage">{current.evidence.storage}</Field>
+                </>
+              ) : (
+                <p className="caption">
+                  {current
+                    ? "Nothing observed here — this item is about your own record, not the machine's."
+                    : ""}
+                </p>
               )}
-              <button className="btn btn-primary" onClick={() => void apply()}>
-                Apply
-              </button>
-            </div>
+              {summary && (
+                <p className="caption" style={{ marginTop: 12 }}>
+                  This day: plotted <span className="data">{fmt.duration(summary.planned)}</span>,
+                  tracked <span className="data">{fmt.duration(summary.tracked)}</span>.
+                </p>
+              )}
+            </aside>
           </>
         )}
       </div>
     </>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <div className="fake-input">{children}</div>
+    </div>
   );
 }

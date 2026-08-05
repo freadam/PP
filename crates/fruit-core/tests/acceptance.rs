@@ -107,6 +107,7 @@ fn f1_full_loop_through_the_command_layer() {
                 duration_sec: None,
                 task_id: None,
                 estimate_sec: None,
+                life_area_id: None,
             }],
             TZ,
         )
@@ -180,6 +181,7 @@ fn f3_unplanned_session_becomes_a_retroactive_block() {
                 duration_sec: None,
                 task_id: None,
                 estimate_sec: None,
+                life_area_id: None,
             }],
             TZ,
         )
@@ -2478,4 +2480,138 @@ fn the_export_never_names_private_time_unless_asked() {
         .iter()
         .flatten()
         .any(|c| c.label == "Therapy"), "only when explicitly asked");
+}
+
+/// M10 — reconciliation covers **observed-only time and empty hours**, not just
+/// the three block-shaped problems.
+///
+/// Those two are what make a day's account trustworthy rather than merely
+/// tidy: a day with three reconciled blocks and nine unexplained hours is not
+/// reconciled, and until now the sheet had no way to say so.
+#[test]
+fn reconcile_covers_observed_only_and_empty_hours() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 23, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    let t = task(&mut store, "Refactor auth");
+
+    // An hour of observation nobody confirmed…
+    for minute in 0..60 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "chrome.exe".into(),
+                window_title: None,
+                at: at(2025, 7, 30, 11, 0) + minute * 60_000,
+            })
+            .unwrap();
+    }
+    // …with confirmed work either side, so the evidence panel has neighbours.
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2025, 7, 30, 10, 0),
+            ended_at: at(2025, 7, 30, 11, 0),
+            note: None,
+        })
+        .unwrap();
+    life(&mut store, "Wellbeing", at(2025, 7, 30, 12, 0), at(2025, 7, 30, 13, 0));
+    let _ = clock;
+
+    let items = store.get_reconcile_items("2025-07-30", TZ).unwrap();
+
+    let observed = items
+        .iter()
+        .find(|i| i.kind == ReconcileKind::ObservedOnly)
+        .expect("the observed hour is on the list");
+    assert!(observed.title.contains("chrome.exe"));
+    assert!(observed.explanation.contains("No confirmed activity"));
+
+    // The evidence panel: provenance, and the privacy promise restated.
+    let evidence = observed.evidence.as_ref().expect("observed items carry evidence");
+    assert_eq!(evidence.source, "Foreground window");
+    assert!(evidence.confidence.contains("frontmost"));
+    assert!(
+        evidence.storage.contains("Application name only"),
+        "the storage line is the promise, stated where it counts: {}",
+        evidence.storage
+    );
+    assert_eq!(evidence.adjacent.len(), 2, "what sits either side");
+    assert!(evidence.adjacent[0].contains("Refactor auth"));
+    assert!(evidence.adjacent[1].contains("Wellbeing"));
+
+    // And the empty hours are items too.
+    let empties: Vec<_> = items
+        .iter()
+        .filter(|i| i.kind == ReconcileKind::Empty)
+        .collect();
+    assert!(!empties.is_empty(), "unaccounted hours are reconcilable");
+    assert!(empties.iter().all(|i| i.starts_at.is_some() && i.ends_at.is_some()));
+
+    // Every new item offers the verbs that can actually resolve it.
+    for item in items
+        .iter()
+        .filter(|i| matches!(i.kind, ReconcileKind::ObservedOnly | ReconcileKind::Empty))
+    {
+        assert!(item.available.contains(&ReconcileVerb::RecordAsLife));
+        assert!(item.available.contains(&ReconcileVerb::MarkPrivate));
+        assert!(item.recommendation.is_some(), "the default explains itself");
+    }
+}
+
+/// Resolving an observed hour writes a real record, and the day's arithmetic
+/// moves — which is the whole point of reconciling it.
+#[test]
+fn reconciling_an_empty_hour_fills_it() {
+    let (mut store, _) = store_at(at(2025, 7, 30, 23, 0));
+    let before = store.get_day("2025-07-30", TZ, None).unwrap().totals.empty_sec;
+    assert_eq!(before, 24 * 3600);
+
+    let family = area(&store, "Family").id;
+    store
+        .apply_reconcile(
+            "2025-07-30",
+            vec![ReconcileAction {
+                item_id: format!("empty:{}", at(2025, 7, 30, 18, 0)),
+                verb: ReconcileVerb::RecordAsLife,
+                starts_at: Some(at(2025, 7, 30, 18, 0)),
+                duration_sec: Some(2 * 3600),
+                task_id: None,
+                estimate_sec: None,
+                life_area_id: Some(family),
+            }],
+            TZ,
+        )
+        .unwrap();
+
+    let after = store.get_day("2025-07-30", TZ, None).unwrap().totals;
+    assert_eq!(after.confirmed_life_sec, 2 * 3600);
+    assert_eq!(after.empty_sec, 22 * 3600, "the hours moved, they did not vanish");
+    assert_eq!(
+        after.confirmed_work_sec + after.confirmed_life_sec + after.private_sec
+            + after.observed_only_sec + after.idle_sec + after.empty_sec,
+        after.day_sec,
+        "and the day still tiles exactly"
+    );
+
+    // Private accounts for time without recording anything about it.
+    store
+        .apply_reconcile(
+            "2025-07-30",
+            vec![ReconcileAction {
+                item_id: format!("empty:{}", at(2025, 7, 30, 21, 0)),
+                verb: ReconcileVerb::MarkPrivate,
+                starts_at: Some(at(2025, 7, 30, 21, 0)),
+                duration_sec: Some(3600),
+                task_id: None,
+                estimate_sec: None,
+                life_area_id: None,
+            }],
+            TZ,
+        )
+        .unwrap();
+    let after = store.get_day("2025-07-30", TZ, None).unwrap().totals;
+    assert_eq!(after.private_sec, 3600);
+    assert_eq!(after.confirmed_life_sec, 2 * 3600, "private is its own bucket");
 }

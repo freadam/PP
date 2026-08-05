@@ -2136,3 +2136,142 @@ textarea::placeholder {
     display: none;
   }
 }
+
+/* ─── Reconcile: three columns (wireframe screen 4) ──────────────────────
+   queue · decision · evidence. The split is the argument — how much is left,
+   what to decide, and where the claim came from. */
+
+.reconcile-modal {
+  position: fixed;
+  inset: 70px 8vw 40px 8vw;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 220px 1fr 240px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--overlay-shadow);
+  overflow: hidden;
+}
+.reconcile-modal .queue {
+  border-right: 1px solid var(--line);
+  background: var(--ink);
+  padding: var(--s-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  min-height: 0;
+}
+/* The list scrolls; the actions do not. */
+.queue-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.queue-foot {
+  flex: none;
+  padding-top: var(--s-8);
+  border-top: 1px solid var(--line);
+}
+.queue-foot .btn {
+  justify-content: center;
+}
+.reconcile-modal .queue h3,
+.reconcile-modal .evidence h3 {
+  margin: 0;
+  font-size: var(--t-label);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.queue-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--surface);
+  padding: var(--s-6) var(--s-8);
+  color: var(--paper);
+}
+.queue-item[aria-current="true"] {
+  border-color: var(--plot);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+/* Done is a tick and a recession, never a strikethrough: the item is still
+   reachable and still editable until the day is closed. */
+.queue-item[data-done="true"] {
+  color: var(--muted);
+}
+.queue-when {
+  display: block;
+  color: var(--faint);
+}
+
+.reconcile-modal .decision {
+  padding: var(--s-20) var(--s-24);
+  overflow-y: auto;
+}
+.reconcile-modal .decision h2 {
+  margin: var(--s-8) 0 var(--s-4);
+  font-size: var(--t-title);
+}
+.choice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--raised);
+  padding: var(--s-8) var(--s-12);
+  color: var(--paper);
+}
+.choice > b {
+  display: block;
+  font-weight: 500;
+}
+.choice > .caption {
+  display: block;
+}
+/* The recommendation is a heavier border, not a fill: the other choices are
+   equally legitimate and must not read as discouraged. */
+.choice[data-recommended="true"] {
+  border-width: 2px;
+  border-color: var(--muted);
+}
+.choice[data-chosen="true"] {
+  border-color: var(--plot);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+
+.reconcile-modal .evidence {
+  border-left: 1px solid var(--line);
+  background: var(--ink);
+  padding: var(--s-16);
+  overflow-y: auto;
+}
+.reconcile-modal .evidence .field {
+  margin: var(--s-12) 0;
+}
+.reconcile-modal .evidence .field > label {
+  display: block;
+  font-size: var(--t-micro);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: var(--s-4);
+}
+
+@media (max-width: 1129px) {
+  .reconcile-modal {
+    inset: 56px 2vw 24px 2vw;
+    grid-template-columns: 180px 1fr;
+  }
+  /* Below this width the evidence column would squeeze the decision past
+     legibility. It folds away rather than shrinking — the decision is the
+     thing that has to stay readable. */
+  .reconcile-modal .evidence {
+    display: none;
+  }
+}

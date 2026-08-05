@@ -274,7 +274,11 @@ export type ReconcileKind =
   | "overran"
   | "neverStarted"
   | "untrackedGap"
-  | "unplannedSession";
+  | "unplannedSession"
+  /** The machine saw something and nobody said what it was (M10). */
+  | "observedOnly"
+  /** An hour with no record and no observation at all (M10). */
+  | "empty";
 
 export type ReconcileVerb =
   | "accept"
@@ -288,7 +292,24 @@ export type ReconcileVerb =
   | "createRetroBlock"
   | "assignToTask"
   | "logAsBreak"
-  | "ignore";
+  | "ignore"
+  /** Confirm an interval as life time in a named area. */
+  | "recordAsLife"
+  /** Accounted for on purpose, nothing recorded about it. */
+  | "markPrivate";
+
+/**
+ * Where a machine's claim came from. Only observed items carry this — they are
+ * the only ones asking the user to accept an assertion they did not make.
+ */
+export interface ReconcileEvidence {
+  source: string;
+  subject: string;
+  confidence: string;
+  adjacent: string[];
+  /** The privacy promise, restated where it counts. */
+  storage: string;
+}
 
 export interface ReconcileItem {
   id: string;
@@ -306,6 +327,11 @@ export interface ReconcileItem {
   available: ReconcileVerb[];
   suggestedSlot: Millis | null;
   suggestedDurationSec: number;
+  /** What this item is and why it is on the list. */
+  explanation: string;
+  /** Why the default verb is the default. Shown on the recommended choice. */
+  recommendation: string | null;
+  evidence: ReconcileEvidence | null;
 }
 
 export interface ReconcileAction {
@@ -315,6 +341,8 @@ export interface ReconcileAction {
   durationSec?: number | null;
   taskId?: string | null;
   estimateSec?: number | null;
+  /** For `recordAsLife`. */
+  lifeAreaId?: string | null;
 }
 
 export interface DayReview {

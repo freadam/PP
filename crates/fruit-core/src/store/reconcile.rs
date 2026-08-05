@@ -13,6 +13,21 @@ use crate::model::*;
 use crate::parser::human_duration;
 use crate::time::{day_end, day_start, local_date, parse_date, zone, Millis};
 
+/// How a confirmed segment reads on the evidence panel.
+fn owner_label(owner: &SlotOwner) -> String {
+    match owner {
+        SlotOwner::Life { label, area_name, is_private, .. } => {
+            if *is_private {
+                "Private".into()
+            } else {
+                label.clone().unwrap_or_else(|| area_name.clone())
+            }
+        }
+        SlotOwner::Work { task_title, .. } => task_title.clone(),
+        _ => String::new(),
+    }
+}
+
 /// §3.7: gaps shorter than this are life, not drift.
 const GAP_THRESHOLD_SEC: i64 = 20 * 60;
 const ON_ESTIMATE_TOLERANCE_SEC: i64 = 60;
@@ -70,6 +85,14 @@ impl Store {
                     drift_sec: -planned,
                     starts_at: Some(starts_at),
                     ends_at: Some(starts_at + planned * 1000),
+                    explanation: format!(
+                        "You plotted {} and never started it. Nothing was tracked against this block.",
+                        human_duration(planned)
+                    ),
+                    recommendation: Some(
+                        "Moving it keeps the intention; dropping it admits the plan was wrong. Both are honest — leaving it is what isn't.".into(),
+                    ),
+                    evidence: None,
                     default_action: ReconcileVerb::MoveToTomorrow,
                     available: vec![
                         ReconcileVerb::MoveToTomorrow,
@@ -96,6 +119,16 @@ impl Store {
                     starts_at: Some(starts_at),
                     ends_at: Some(starts_at + planned * 1000),
                     // Accepting records the overrun — the honest default.
+                    explanation: format!(
+                        "Plotted {}, tracked {} — {} over. The estimate is the thing that was wrong, not the work.",
+                        human_duration(planned),
+                        human_duration(tracked_sec),
+                        human_duration(drift.abs())
+                    ),
+                    recommendation: Some(
+                        "Accepting records what happened. Revising the estimate is what makes the next one better.".into(),
+                    ),
+                    evidence: None,
                     default_action: ReconcileVerb::Accept,
                     available: vec![
                         ReconcileVerb::Accept,
@@ -142,6 +175,14 @@ impl Store {
                 drift_sec: elapsed,
                 starts_at: Some(started_at),
                 ends_at: ended_at,
+                explanation: format!(
+                    "{} of work with nothing plotted against it. Real work the plan didn't know about.",
+                    human_duration(elapsed)
+                ),
+                recommendation: Some(
+                    "A retroactive block is how the plan learns this kind of work exists.".into(),
+                ),
+                evidence: None,
                 default_action: ReconcileVerb::Accept,
                 // Creating the retroactive block is how the plan learns (§3.7).
                 available: vec![ReconcileVerb::Accept, ReconcileVerb::CreateRetroBlock],
@@ -171,19 +212,177 @@ impl Store {
                 drift_sec: 0,
                 starts_at: Some(gap_from),
                 ends_at: Some(gap_to),
+                explanation: format!(
+                    "{} inside your planned hours with no session against it.",
+                    human_duration(seconds)
+                ),
+                recommendation: None,
+                evidence: None,
                 default_action: ReconcileVerb::Ignore,
                 available: vec![
                     ReconcileVerb::Ignore,
                     ReconcileVerb::AssignToTask,
                     ReconcileVerb::LogAsBreak,
+                    ReconcileVerb::RecordAsLife,
+                    ReconcileVerb::MarkPrivate,
                 ],
                 suggested_slot: Some(gap_from),
                 suggested_duration_sec: seconds,
             });
         }
 
+        // ── observed-only, and hours nobody accounted for (M10) ────────
+        //
+        // These come from `resolve_day`, not from a query of their own: the
+        // reconciler must be asking about exactly the intervals the Day view
+        // shows, or the two screens disagree about what is left to decide.
+        let areas = self.get_life_areas(tz, false)?;
+        let entertainment = areas.iter().find(|a| a.kind == AreaKind::Entertainment);
+        for segment in self.get_day(date, tz, None)?.segments {
+            let seconds = (segment.to - segment.from) / 1000;
+            if seconds < GAP_THRESHOLD_SEC {
+                continue; // a few minutes is life, not drift (§3.7)
+            }
+            match &segment.owner {
+                SlotOwner::Observed { app_id, domain, category } => {
+                    let subject = domain.clone().unwrap_or_else(|| app_id.clone());
+                    let is_entertainment = category.as_deref() == Some("entertainment");
+                    items.push(ReconcileItem {
+                        id: format!("observed:{}", segment.from),
+                        kind: ReconcileKind::ObservedOnly,
+                        title: format!(
+                            "{subject} · {}–{}",
+                            clock(segment.from, tz),
+                            clock(segment.to, tz)
+                        ),
+                        block_id: None,
+                        task_id: None,
+                        session_id: None,
+                        planned_sec: 0,
+                        tracked_sec: 0,
+                        drift_sec: 0,
+                        starts_at: Some(segment.from),
+                        ends_at: Some(segment.to),
+                        explanation: format!(
+                            "{} observed {subject} in the foreground for {}. No confirmed activity covers this time.",
+                            if domain.is_some() { "The browser connector" } else { "Fruit" },
+                            human_duration(seconds)
+                        ),
+                        recommendation: Some(if is_entertainment {
+                            "Recommended from the default rule for this domain.".into()
+                        } else {
+                            "Attaching it to a task keeps the observation as evidence rather than replacing it.".into()
+                        }),
+                        evidence: Some(ReconcileEvidence {
+                            source: if domain.is_some() {
+                                "Browser connector".into()
+                            } else {
+                                "Foreground window".into()
+                            },
+                            subject,
+                            confidence: if domain.is_some() {
+                                "High · active foreground tab".into()
+                            } else {
+                                "High · frontmost application".into()
+                            },
+                            adjacent: self.adjacent_labels(segment.from, segment.to, date, tz)?,
+                            // The privacy promise, restated at the moment it
+                            // matters — which is the moment someone is looking
+                            // at a record of what they did.
+                            storage: if domain.is_some() {
+                                "Domain only. No full URL or page title.".into()
+                            } else {
+                                "Application name only. No window title unless you enabled titles.".into()
+                            },
+                        }),
+                        default_action: if is_entertainment {
+                            ReconcileVerb::RecordAsLife
+                        } else {
+                            ReconcileVerb::AssignToTask
+                        },
+                        available: vec![
+                            ReconcileVerb::RecordAsLife,
+                            ReconcileVerb::AssignToTask,
+                            ReconcileVerb::MarkPrivate,
+                            ReconcileVerb::Ignore,
+                        ],
+                        suggested_slot: Some(segment.from),
+                        suggested_duration_sec: seconds,
+                    });
+                }
+                SlotOwner::Empty => {
+                    items.push(ReconcileItem {
+                        id: format!("empty:{}", segment.from),
+                        kind: ReconcileKind::Empty,
+                        title: format!(
+                            "Unaccounted · {}–{}",
+                            clock(segment.from, tz),
+                            clock(segment.to, tz)
+                        ),
+                        block_id: None,
+                        task_id: None,
+                        session_id: None,
+                        planned_sec: 0,
+                        tracked_sec: 0,
+                        drift_sec: 0,
+                        starts_at: Some(segment.from),
+                        ends_at: Some(segment.to),
+                        explanation: format!(
+                            "{} with no record and nothing observed. The machine wasn't watching and neither was the timer.",
+                            human_duration(seconds)
+                        ),
+                        recommendation: Some(
+                            "Filling it is what makes the month's account trustworthy. Marking it private accounts for it without recording anything.".into(),
+                        ),
+                        evidence: None,
+                        default_action: ReconcileVerb::RecordAsLife,
+                        available: vec![
+                            ReconcileVerb::RecordAsLife,
+                            ReconcileVerb::AssignToTask,
+                            ReconcileVerb::MarkPrivate,
+                            ReconcileVerb::Ignore,
+                        ],
+                        suggested_slot: Some(segment.from),
+                        suggested_duration_sec: seconds,
+                    });
+                }
+                _ => {}
+            }
+        }
+        let _ = entertainment;
+
         let _ = now;
         Ok(items)
+    }
+
+    /// What sits either side of an interval, for the evidence panel. Being able
+    /// to see "10:30 Team call · 12:00 Lunch" is usually enough to remember what
+    /// the hour between them was.
+    fn adjacent_labels(
+        &self,
+        from: Millis,
+        to: Millis,
+        date: &str,
+        tz: &str,
+    ) -> Result<Vec<String>> {
+        let day = self.get_day(date, tz, None)?;
+        let mut out = Vec::new();
+        if let Some(before) = day
+            .segments
+            .iter()
+            .filter(|s| s.to <= from && s.owner.is_confirmed())
+            .next_back()
+        {
+            out.push(format!("{} {}", clock(before.from, tz), owner_label(&before.owner)));
+        }
+        if let Some(after) = day
+            .segments
+            .iter()
+            .find(|s| s.from >= to && s.owner.is_confirmed())
+        {
+            out.push(format!("{} {}", clock(after.from, tz), owner_label(&after.owner)));
+        }
+        Ok(out)
     }
 
     /// Gaps longer than 20 minutes between the day's first planned start and
@@ -246,6 +445,40 @@ impl Store {
                 .ok_or_else(|| AppError::invalid("Malformed reconcile item id."))?;
             match action.verb {
                 ReconcileVerb::Accept | ReconcileVerb::Ignore | ReconcileVerb::LeaveUnscheduled => {}
+
+                // Turns an observation, or an hour of nothing, into a record.
+                ReconcileVerb::RecordAsLife | ReconcileVerb::MarkPrivate => {
+                    let (Some(started_at), Some(seconds)) =
+                        (action.starts_at, action.duration_sec)
+                    else {
+                        return Err(AppError::invalid(
+                            "Recording an interval needs its start and length.",
+                        ));
+                    };
+                    let area = match &action.life_area_id {
+                        Some(id) => id.clone(),
+                        // Private has to land somewhere; the flag is what
+                        // matters, and the area is never shown for it.
+                        None => self
+                            .get_life_areas(tz, false)?
+                            .first()
+                            .map(|a| a.id.clone())
+                            .ok_or_else(|| AppError::invalid("No life areas exist."))?,
+                    };
+                    self.add_life_entry(NewLifeEntry {
+                        life_area_id: area,
+                        label: None,
+                        started_at,
+                        ended_at: started_at + seconds * 1000,
+                        tz: tz.to_string(),
+                        is_private: action.verb == ReconcileVerb::MarkPrivate,
+                        note: None,
+                        // The interval being reconciled is by definition not
+                        // confirmed, so there is nothing to replace.
+                        replace_existing: false,
+                    })?;
+                    let _ = (kind, raw_id);
+                }
 
                 ReconcileVerb::Drop => {
                     if kind == "block" {

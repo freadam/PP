@@ -6,9 +6,9 @@ Reconcile, Excel Export).
 Legend: **✅ built** · **◐ partial** · **❌ missing** · **⛔ blocked** (needs a
 component that does not exist yet, named in the row).
 
-The headline: **four of the five screens are built.** Reconcile is the one that
-is still partial. Every ❌ below is blocked on the **browser connector**, which
-is now the only missing component in the plan — and it is still unspiked.
+The headline: **all five screens are built.** What remains is one component —
+the **browser connector** — and the features that need it. It is still unspiked
+and is now the only thing on this list blocking anything.
 
 ---
 
@@ -63,20 +63,22 @@ figure here and the same figure on a day cannot disagree.
 | Monthly findings + "Review source intervals" | ✅ | Findings are computed in Rust; the button opens the worst day on the Day screen. The YouTube/Twitch split needs the connector, so the entertainment finding is currently one line rather than two. |
 | "Export month to Excel" | ◐ | Present and enabled — a disabled control cannot take keyboard focus, so it would be invisible to the users most likely to look for it. It explains why it cannot run. |
 
-## 4. Reconcile — **partial**
+## 4. Reconcile — **built**
 
-The existing sheet handles overruns, never-started blocks and unplanned
-sessions. The wireframe's version is a different, better shape.
+Rebuilt to the wireframe's three-column shape, and **M10 is closed**: observed-only
+time and empty hours are reconcilable items now, which is what makes a day's
+account trustworthy rather than merely tidy. A day with three reconciled blocks
+and nine unexplained hours is not reconciled, and the sheet had no way to say so.
 
 | Wireframe | State | Note |
 |---|---|---|
-| Modal over the ghosted day | ◐ | Modal exists; no ghosted day behind it. |
-| Three columns: queue · decision · **evidence** | ❌ | The evidence panel — Source, Domain, Confidence, Adjacent time, and the **Storage** line ("Domain only · no full URL/title") — does not exist. That last line is the privacy promise stated at the moment of use, which is the only moment it counts. |
-| Queue with ✓ progress and "Defer remaining" | ◐ | Progress is "n of m"; no per-item ticks, no defer-all. |
-| **Numbered** choices with a recommended default | ◐ | Verbs exist with one-key alternatives, but not numbered `1..4 / S`, and no "recommended" marking. |
-| Item kinds: recovered timer, planned-not-started, **observed-only**, **empty**, overrun | ◐ ⛔ | The first, second and last exist. **Observed-only and empty hours do not** — they are plan acceptance M10, and both now have the data behind them (`observedOnlySec`, `emptySec`) but no reconcile item. |
-| "Apply my choice to future Twitch activity in this context" | ❌ ⛔ | Prospective rule creation. Needs the connector and a rules table. |
-| "Split interval" | ❌ | Same missing verb as the Day view's Split. |
+| Modal over the ghosted day | ✅ | Scrim over whatever view you were on; the day stays visible behind it. |
+| Three columns: queue · decision · **evidence** | ✅ | The evidence panel — Source, Subject, Confidence, Adjacent time, **Storage** — appears for observed items only, because they are the only ones asking you to accept a *machine's* claim. The Storage line is the privacy promise restated at the moment someone is looking at a record of what they did. |
+| Queue with ✓ progress and "Defer remaining" | ✅ | Per-item ticks, "n of m", and a **pinned** footer — a day with twenty unaccounted hours has twenty items, and "Close the day" must never be something you scroll to find. |
+| **Numbered** choices with a recommended default | ✅ | `1`–`4` pick, `Enter` takes the recommendation. The recommendation is a heavier border rather than a fill: the other choices are equally legitimate and must not read as discouraged. Each carries its own consequence line. |
+| Item kinds: planned-not-started, **observed-only**, **empty**, overrun, unplanned | ✅ | Observed-only and empty come from `resolve_day`'s segments, not a query of their own — the reconciler asks about exactly the intervals the Day view shows, or the two screens disagree about what is left to decide. |
+| "Apply my choice to future activity in this context" | ❌ ⛔ | Prospective rules need the connector and a rules table. The panel says so rather than showing a checkbox that quietly does nothing. |
+| "Split interval" | ❌ | Still the missing verb, here and on the Day view. |
 
 ## 5. Excel Export — **built**
 
@@ -116,14 +118,14 @@ Three components gate almost everything left:
 2. ~~**`get_month`**~~ — **built.** The dashboard is done.
 3. ~~**XLSX writer**~~ — **built.** The export screen is done.
 
-The connector is now the *only* missing component in the plan. Two items are
-blocked on nothing:
+The connector is the *only* missing component. One item is blocked on nothing:
 
-- **Reconciling observed-only and empty hours** — M10, and both figures already
-  come out of `get_day`. This is the last piece of the Reconcile screen that
-  does not need the connector.
 - **Workbook import** (M13) — the export's inverse. Needs a reader and a mapping
   preview, but no new capability.
 
-Recommended order from here: the connector spike, then M10 reconcile items,
-then workbook import.
+Everything else — entertainment classification and budgets, "Work + distraction"
+actually firing, the YouTube/Twitch split in Monthly findings, prospective rules
+— waits on the connector. It has been the top of this list since the first gap
+analysis and it is still unspiked.
+
+Recommended order: the connector spike, then workbook import, then Split.

@@ -498,6 +498,31 @@ pub struct ReconcileItem {
     /// or tomorrow (§3.7 auto-suggest).
     pub suggested_slot: Option<Millis>,
     pub suggested_duration_sec: i64,
+    /// The sentence under the title: what this item is and why it is on the
+    /// list. Written here so the decision copy has one author.
+    pub explanation: String,
+    /// Why the default verb is the default. Shown on the recommended choice.
+    pub recommendation: Option<String>,
+    /// Where the claim came from — populated for observed items, which are the
+    /// only ones whose subject is something the machine asserted.
+    pub evidence: Option<ReconcileEvidence>,
+}
+
+/// The evidence panel (wireframe screen 4, right column).
+///
+/// It exists because an observed item asks the user to accept a *machine's*
+/// claim, and the only fair way to ask is to show the claim's provenance. The
+/// `storage` line is the privacy promise restated at the moment it matters —
+/// which is the moment someone is looking at a record of what they did.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReconcileEvidence {
+    pub source: String,
+    pub subject: String,
+    pub confidence: String,
+    /// What sits either side of this interval, for orientation.
+    pub adjacent: Vec<String>,
+    pub storage: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -507,6 +532,14 @@ pub enum ReconcileKind {
     NeverStarted,
     UntrackedGap,
     UnplannedSession,
+    /// The machine saw an application and nobody said what the time was (M10).
+    /// The only item kind whose *subject* is a machine claim rather than a
+    /// human one, which is why it is the one that ships an evidence panel.
+    ObservedOnly,
+    /// An hour of the day with no record and no observation at all (M10).
+    /// Reconciling it is the difference between a day that is 60% accounted for
+    /// and one that is 60% accounted for *and you know why*.
+    Empty,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -524,6 +557,11 @@ pub enum ReconcileVerb {
     AssignToTask,
     LogAsBreak,
     Ignore,
+    /// Confirm an interval as life time in a named area — the verb that turns
+    /// an observation into a record.
+    RecordAsLife,
+    /// Accounted for on purpose, nothing recorded about it.
+    MarkPrivate,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -538,6 +576,8 @@ pub struct ReconcileAction {
     pub task_id: Option<String>,
     /// For `ReviseEstimate`.
     pub estimate_sec: Option<i64>,
+    /// For `RecordAsLife`.
+    pub life_area_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

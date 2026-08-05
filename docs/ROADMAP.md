@@ -14,7 +14,7 @@ what is missing.
 | **3. Activity capture** | Weeks 5–6 | **partial** | Foreground application observation, idle segmentation, exclusions applied before storage, retention with automatic purge, pause that survives restart, delete-all. Privacy contract enforced below the IPC boundary. | The local browser connector, and therefore domain-level classification. Without it the 90%-capture and 95%-YouTube/Twitch measures cannot be met. |
 | **4. Day, Planner and dashboard** | Weeks 6–7 | **in progress** | The life-time model and precedence engine; the **Day view** at 5/15/30/60-minute resolution with empty hours, four distinguishable layers, a per-gap fill action and a day ledger. Planner at 1/3/7-day spans with drift, collisions, recurrence. | The month dashboard and the Planner's month span. Day-view editing beyond fill: split, merge, repeat, multi-select. Filters. |
 | **5. Projects, tasks and life tracking** | Week 8 | **partial** | Backlog with six groups, estimates on a fixed ladder, timers, manual session correction, subtasks to three levels. Life areas and entries, and work contribution modes, both landed early in Phase 4. | Target-vs-actual reporting for life areas, life-area management UI, and the reduction of task notes from Markdown to compact plain text. |
-| **6. Reconcile, calibrate, reduce entertainment** | Week 9 | **partial** | Daily reconcile over overruns, unstarted plans and unplanned work. Drift per block. Trailing 30-day calibration, median, n ≥ 5. | Reconciling **observed-only time and empty hours**. Entertainment budgets, planned entertainment windows, threshold notifications, planned-vs-unplanned reporting. |
+| **6. Reconcile, calibrate, reduce entertainment** | Week 9 | **partial** | Daily reconcile in the wireframe's three-column shape: queue, numbered choices with a stated recommendation, and an evidence panel for machine claims. Covers overruns, unstarted plans, unplanned work, **observed-only time and empty hours** (M10). Drift per block. Trailing 30-day calibration. | Entertainment budgets, planned entertainment windows, threshold notifications, planned-vs-unplanned reporting — all downstream of the connector. |
 | **7. Excel migration and export** | Week 10 | **partial** | The `.xlsx` month export: three sheets, a preview that is the sheet, options, and a reconciliation table putting the app's figures beside the sheet's own. Totals are formulas over the month sheet, not pasted numbers. JSON round-trips exactly; CSV exists. | Workbook **import** with mapping and variance preview (M13). |
 | **8. Private beta and hardening** | Week 11 | **not started** | UI checks run headless at five viewport sizes on every view. | Seven consecutive days on the client's PC. Performance profiling on a packaged build. |
 | **9. Release candidate** | Week 12 | **not started** | — | Installer, user guide, release notes, acceptance sign-off. |
@@ -46,9 +46,10 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    is still unspiked. *(next)*
 4. ✅ `get_month`, the month dashboard, the Planner's month span, and the Excel
    export screen with its workbook writer.
-5. Reconciling observed-only and empty hours (M10), then workbook import (M13)
-   — the two items blocked on nothing.
-6. Entertainment classification, budgets and the reconcile evidence panel.
+5. ✅ Reconciling observed-only and empty hours (M10), in the wireframe's
+   three-column sheet.
+6. Workbook import (M13) — the last item blocked on nothing.
+7. Entertainment classification and budgets, once the connector exists.
 
 Items 1–3 close the plan's Phase 4 exit gate: *a full day reconciles without
 double-counting and the month dashboard matches source totals.*
@@ -63,7 +64,7 @@ double-counting and the month dashboard matches source totals.*
 | Day | **built** — cards, five columns, now line, contribution in the classification, detail panel, filter, add-interval |
 | Planner | **built** — month span as a calendar, in-canvas backlog, Import calendar and + Plan block |
 | Month dashboard | **built** — six cards, entertainment trend, data-quality heatmap, life-area targets, findings |
-| Reconcile | **partial** — no evidence panel, no observed-only or empty items |
+| Reconcile | **built** — three columns, evidence panel, numbered choices, observed-only and empty items (M10) |
 | Excel export | **built** — preview, options, reconciliation table, three-sheet workbook with real formulas |
 
 ## Risks currently live
