@@ -73,20 +73,7 @@ export function Reports() {
           ))}
         </div>
         <span className="grow" />
-        {/* Enabled, not greyed. A disabled control cannot take focus, so a
-            keyboard user has no way to discover it exists or why it doesn't
-            work — and this app's convention is that an action explains itself
-            (§3.10: what failed · why · the action). */}
-        <button
-          className="btn btn-primary"
-          onClick={() =>
-            useApp
-              .getState()
-              .toast(
-                "Excel export isn't built yet. The month's figures are all here — the .xlsx writer is the missing piece.",
-              )
-          }
-        >
+        <button className="btn btn-primary" onClick={() => go("export")}>
           Export month to Excel
         </button>
       </div>

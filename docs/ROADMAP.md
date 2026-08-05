@@ -15,7 +15,7 @@ what is missing.
 | **4. Day, Planner and dashboard** | Weeks 6–7 | **in progress** | The life-time model and precedence engine; the **Day view** at 5/15/30/60-minute resolution with empty hours, four distinguishable layers, a per-gap fill action and a day ledger. Planner at 1/3/7-day spans with drift, collisions, recurrence. | The month dashboard and the Planner's month span. Day-view editing beyond fill: split, merge, repeat, multi-select. Filters. |
 | **5. Projects, tasks and life tracking** | Week 8 | **partial** | Backlog with six groups, estimates on a fixed ladder, timers, manual session correction, subtasks to three levels. Life areas and entries, and work contribution modes, both landed early in Phase 4. | Target-vs-actual reporting for life areas, life-area management UI, and the reduction of task notes from Markdown to compact plain text. |
 | **6. Reconcile, calibrate, reduce entertainment** | Week 9 | **partial** | Daily reconcile over overruns, unstarted plans and unplanned work. Drift per block. Trailing 30-day calibration, median, n ≥ 5. | Reconciling **observed-only time and empty hours**. Entertainment budgets, planned entertainment windows, threshold notifications, planned-vs-unplanned reporting. |
-| **7. Excel migration and export** | Week 10 | **not started** | JSON export/import round-trips exactly; CSV exists. | The `.xlsx` month export in the workbook's shape, workbook import with mapping and variance preview. |
+| **7. Excel migration and export** | Week 10 | **partial** | The `.xlsx` month export: three sheets, a preview that is the sheet, options, and a reconciliation table putting the app's figures beside the sheet's own. Totals are formulas over the month sheet, not pasted numbers. JSON round-trips exactly; CSV exists. | Workbook **import** with mapping and variance preview (M13). |
 | **8. Private beta and hardening** | Week 11 | **not started** | UI checks run headless at five viewport sizes on every view. | Seven consecutive days on the client's PC. Performance profiling on a packaged build. |
 | **9. Release candidate** | Week 12 | **not started** | — | Installer, user guide, release notes, acceptance sign-off. |
 
@@ -44,12 +44,11 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
 3. ⬅ **The browser connector spike.** Four wireframe screens now wait on an
    unproven capability — see `WIREFRAME-GAP.md`. It was a Phase 1 item and it
    is still unspiked. *(next)*
-4. ✅ `get_month` and the month dashboard. *(The Planner's month span remains —
-   31 columns needs a calendar layout, not a parameter.)*
-5. Reconciling observed-only and empty hours (M10) — the one item on the gap
-   list blocked on nothing.
+4. ✅ `get_month`, the month dashboard, the Planner's month span, and the Excel
+   export screen with its workbook writer.
+5. Reconciling observed-only and empty hours (M10), then workbook import (M13)
+   — the two items blocked on nothing.
 6. Entertainment classification, budgets and the reconcile evidence panel.
-7. Excel export, then Excel import.
 
 Items 1–3 close the plan's Phase 4 exit gate: *a full day reconciles without
 double-counting and the month dashboard matches source totals.*
@@ -62,10 +61,10 @@ double-counting and the month dashboard matches source totals.*
 | Screen | Coverage |
 |---|---|
 | Day | **built** — cards, five columns, now line, contribution in the classification, detail panel, filter, add-interval |
-| Planner | **partial** — no month span, no in-canvas backlog, two buttons unsurfaced |
+| Planner | **built** — month span as a calendar, in-canvas backlog, Import calendar and + Plan block |
 | Month dashboard | **built** — six cards, entertainment trend, data-quality heatmap, life-area targets, findings |
 | Reconcile | **partial** — no evidence panel, no observed-only or empty items |
-| Excel export | **missing** — needs the XLSX writer |
+| Excel export | **built** — preview, options, reconciliation table, three-sheet workbook with real formulas |
 
 ## Risks currently live
 

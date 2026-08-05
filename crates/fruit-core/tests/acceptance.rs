@@ -2329,3 +2329,153 @@ fn a_month_in_progress_is_measured_against_the_days_that_happened() {
     // elapsed-relative, because a total is a fact and a ratio is a judgement.
     assert_eq!(month.totals.day_sec, 31 * 24 * 3600);
 }
+
+// ─── M12 / M13: Excel export (Plan Rev 3 §10) ──────────────────────────
+
+/// The preview and the file are the same matrix, and the workbook is a real
+/// `.xlsx` — a ZIP whose first entries are the OPC parts Excel expects.
+#[test]
+fn the_month_exports_as_a_real_workbook() {
+    let (mut store, clock) = store_at(at(2025, 7, 15, 12, 0));
+    let t = task(&mut store, "Refactor auth");
+    life(&mut store, "Sleep/Rest", at(2025, 7, 3, 0, 0), at(2025, 7, 3, 7, 0));
+    life(&mut store, "Fun", at(2025, 7, 4, 20, 0), at(2025, 7, 4, 22, 0));
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(90 * 60_000);
+    store.stop_timer().unwrap();
+
+    let options = ExcelOptions {
+        include_observed: true,
+        include_unaccounted: true,
+        include_private_labels: false,
+    };
+    let preview = store.preview_excel("2025-07", TZ, &options).unwrap();
+
+    assert_eq!(preview.day_headers.len(), 31);
+    assert_eq!(preview.slot_labels.len(), 48, "half-hour rows");
+    assert_eq!(preview.slot_labels[0], "00:00");
+    assert_eq!(preview.slot_labels[47], "23:30");
+    assert_eq!(preview.rows.len(), 48);
+    assert!(preview.rows.iter().all(|r| r.len() == 31), "a full matrix");
+    assert!(preview.file_name.ends_with(".xlsx"));
+
+    // The blank slots are present as cells, not missing (M1 carried into Excel).
+    assert!(
+        preview.rows.iter().flatten().any(|c| c.kind == "gap"),
+        "unaccounted time has to survive the export"
+    );
+    assert!(preview.rows.iter().flatten().any(|c| c.kind == "rest"));
+    assert!(preview.rows.iter().flatten().any(|c| c.kind == "entertainment"));
+    assert!(preview.rows.iter().flatten().any(|c| c.kind == "work"));
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("July 2025 Tracking.xlsx");
+    let result = store.write_excel("2025-07", TZ, &path, &options).unwrap();
+    assert_eq!(result.sheets.len(), 3, "month table, summary, source mapping");
+
+    let bytes = std::fs::read(&path).unwrap();
+    assert!(bytes.len() > 4_000, "a real workbook, not a stub");
+    assert_eq!(&bytes[..2], b"PK", "xlsx is a ZIP container");
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        text.contains("[Content_Types].xml") && text.contains("xl/workbook.xml"),
+        "the OPC parts Excel needs are present"
+    );
+}
+
+/// The reconciliation table is the export's whole claim to being trustworthy:
+/// the app's figure, the sheet's own figure, and the difference.
+///
+/// The variance is expected to be non-zero and bounded — the sheet is a
+/// half-hour grid and the record is to the second, so a 90-minute session
+/// occupies three slots and reads as 90 minutes while a 20-minute one reads as
+/// 30. Success measure 7 is "no *unexplained* variance"; rounding is explained,
+/// and this asserts it stays within one slot per day.
+#[test]
+fn the_export_reconciles_against_its_own_cells() {
+    let (mut store, _) = store_at(at(2025, 7, 15, 12, 0));
+    for day in 1..=10 {
+        life(&mut store, "Sleep/Rest", at(2025, 7, day, 0, 0), at(2025, 7, day, 7, 0));
+        life(&mut store, "Wellbeing", at(2025, 7, day, 12, 0), at(2025, 7, day, 13, 0));
+    }
+
+    let preview = store
+        .preview_excel("2025-07", TZ, &ExcelOptions {
+            include_observed: true,
+            include_unaccounted: true,
+            include_private_labels: false,
+        })
+        .unwrap();
+
+    let accounted = preview
+        .variances
+        .iter()
+        .find(|v| v.measure == "Accounted")
+        .unwrap();
+    assert_eq!(
+        accounted.app_sec, 80 * 3600,
+        "ten days of seven hours' sleep plus an hour each"
+    );
+    assert_eq!(
+        accounted.variance_sec, 0,
+        "whole-half-hour records round to nothing"
+    );
+
+    // Every measure is reported, whether or not it moved.
+    assert_eq!(preview.variances.len(), 3);
+    assert!(preview.variances.iter().any(|v| v.measure == "Unaccounted"));
+    assert!(preview.variances.iter().any(|v| v.measure == "Observed only"));
+}
+
+/// Private time is exported by duration and never by name — the promise
+/// Settings makes, carried through to the file someone might email.
+#[test]
+fn the_export_never_names_private_time_unless_asked() {
+    let (mut store, _) = store_at(at(2025, 7, 15, 12, 0));
+    let area = area(&store, "Personal/Spiritual").id;
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: area,
+            label: Some("Therapy".into()),
+            started_at: at(2025, 7, 2, 18, 0),
+            ended_at: at(2025, 7, 2, 19, 0),
+            tz: TZ.into(),
+            is_private: true,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    let hidden = store
+        .preview_excel("2025-07", TZ, &ExcelOptions {
+            include_observed: true,
+            include_unaccounted: true,
+            include_private_labels: false,
+        })
+        .unwrap();
+    let labels: Vec<&str> = hidden
+        .rows
+        .iter()
+        .flatten()
+        .map(|c| c.label.as_str())
+        .collect();
+    assert!(labels.contains(&"Private"), "the hour is in the sheet");
+    assert!(
+        !labels.contains(&"Therapy") && !labels.contains(&"Personal/Spiritual"),
+        "…but nothing about what it was"
+    );
+    assert!(hidden.source_note.contains("not named"));
+
+    let shown = store
+        .preview_excel("2025-07", TZ, &ExcelOptions {
+            include_observed: true,
+            include_unaccounted: true,
+            include_private_labels: true,
+        })
+        .unwrap();
+    assert!(shown
+        .rows
+        .iter()
+        .flatten()
+        .any(|c| c.label == "Therapy"), "only when explicitly asked");
+}

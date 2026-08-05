@@ -17,6 +17,12 @@ pub enum AppError {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Writing the month workbook (§10). Its own variant rather than a
+    /// stringly-typed `Invalid`, so the renderer can tell "the export failed"
+    /// from "you asked for something impossible".
+    #[error("couldn't write that workbook: {0}")]
+    Excel(#[from] rust_xlsxwriter::XlsxError),
+
     #[error("{0} not found")]
     NotFound(&'static str),
 
@@ -55,6 +61,7 @@ impl AppError {
             AppError::Db(_) => "db",
             AppError::Serde(_) => "serde",
             AppError::Io(_) => "io",
+            AppError::Excel(_) => "excel",
             AppError::NotFound(_) => "not_found",
             AppError::Invalid(_) => "invalid",
             AppError::CrossesMidnight => "crosses_midnight",

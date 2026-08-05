@@ -717,3 +717,46 @@ export interface MonthView {
   findings: MonthFinding[];
   plannedEntertainmentNote: string | null;
 }
+
+// ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────
+
+export interface ExcelOptions {
+  includeObserved: boolean;
+  includeUnaccounted: boolean;
+  /** Off by default. Private *duration* is always exported; this names the area. */
+  includePrivateLabels: boolean;
+}
+
+export interface ExcelVariance {
+  measure: string;
+  appSec: number;
+  sheetSec: number;
+  varianceSec: number;
+}
+
+export interface ExcelCell {
+  label: string;
+  /** work · life · entertainment · rest · observed · gap · private */
+  kind: string;
+  colour: string | null;
+}
+
+export interface ExcelPreview {
+  month: string;
+  label: string;
+  fileName: string;
+  dayHeaders: string[];
+  slotLabels: string[];
+  /** `rows[slot][day]` — the whole month matrix, blanks included. */
+  rows: ExcelCell[][];
+  variances: ExcelVariance[];
+  unreconciledDays: number;
+  sourceNote: string;
+}
+
+export interface ExcelExportResult {
+  path: string;
+  sheets: string[];
+  rowsWritten: number;
+  variances: ExcelVariance[];
+}

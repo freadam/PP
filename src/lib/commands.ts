@@ -80,6 +80,7 @@ export const COMMANDS: Command[] = [
   { id: "span-1", title: "1-day span", group: "Planner", keys: "1", run: () => app().setSpan(1), when: inPlanner },
   { id: "span-3", title: "3-day span", group: "Planner", keys: "3", run: () => app().setSpan(3), when: inPlanner },
   { id: "span-7", title: "7-day span", group: "Planner", keys: "7", run: () => app().setSpan(7), when: inPlanner },
+  { id: "span-month", title: "Month span", group: "Planner", keys: "M", run: () => app().setSpan("month"), when: inPlanner },
   { id: "today", title: "Jump to today", group: "Planner", keys: "T", run: () => app().setAnchor(fmt.today()) },
   { id: "prev", title: "Previous period", group: "Planner", keys: "←", run: () => app().shiftPeriod(-1), when: inPlanner },
   { id: "next", title: "Next period", group: "Planner", keys: "→", run: () => app().shiftPeriod(1), when: inPlanner },
@@ -237,6 +238,12 @@ export const COMMANDS: Command[] = [
       const r = await app().run(() => ipc.runIntegrityCheck(), "Couldn't run the check.");
       if (r) app().toast(`Integrity: ${r.quickCheck}, ${r.foreignKeyViolations} FK violations.`);
     },
+  },
+  {
+    id: "export-excel",
+    title: "Export a month to Excel",
+    group: "Data",
+    run: () => app().go("export"),
   },
   {
     id: "export-json",

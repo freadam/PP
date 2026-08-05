@@ -19,6 +19,7 @@ import { Reports } from "./views/Reports";
 import { Settings } from "./views/Settings";
 import { Activity } from "./views/Activity";
 import { Day } from "./views/Day";
+import { ExcelExport } from "./views/ExcelExport";
 import { Focus } from "./views/Focus";
 import { ReconcileSheet } from "./views/Reconcile";
 import { BlockDialogs } from "./components/BlockDialogs";
@@ -106,6 +107,7 @@ export default function App() {
           {view === "tasks" && <Tasks />}
           {view === "reports" && <Reports />}
           {view === "settings" && <Settings />}
+          {view === "export" && <ExcelExport />}
           {view === "activity" && <Activity />}
         </main>
         {detail && detailMode === "column" && overlay !== "focus" && (

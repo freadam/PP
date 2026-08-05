@@ -1896,3 +1896,243 @@ textarea::placeholder {
     grid-template-columns: 1fr;
   }
 }
+
+/* ─── Planner: in-canvas backlog and the month span (wireframe screen 2) ── */
+
+.planner-layout {
+  display: flex;
+  gap: var(--s-12);
+  min-height: 0;
+  flex: 1;
+}
+.planner-canvas {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Beside the grid, not across the window: "what needs a slot" and "where are
+   the slots" are one question. */
+.planner-backlog {
+  width: 220px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  padding: var(--s-12);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+}
+.planner-backlog h3 {
+  margin: 0;
+  font-size: var(--t-label);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.task-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--raised);
+  padding: var(--s-6) var(--s-8);
+  cursor: grab;
+}
+.task-card:active {
+  cursor: grabbing;
+}
+.task-card > b {
+  display: block;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-card[aria-selected="true"] {
+  border-color: var(--plot);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+
+/* A month is a calendar, not 31 hour-columns: at a legible width those need
+   3,400px. So it drops the time axis and keeps what the horizon is for. */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--s-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  padding: var(--s-8);
+  overflow-y: auto;
+}
+.month-head {
+  text-align: center;
+  color: var(--muted);
+  padding-bottom: var(--s-4);
+}
+.month-cell {
+  min-height: 74px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--surface);
+  padding: var(--s-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  align-items: stretch;
+  text-align: left;
+}
+.month-cell[data-pad="true"] {
+  border-style: dashed;
+  border-color: var(--rule);
+  background: none;
+}
+.month-cell[data-today="true"] {
+  border-color: var(--plot);
+}
+.month-cell[data-past="true"] {
+  background: color-mix(in srgb, var(--surface) 60%, var(--ink));
+}
+/* Reconciled is a corner mark, not a fill — the fill already means "past". */
+.month-cell[data-reconciled="true"] {
+  box-shadow: inset -6px 6px 0 -4px var(--done);
+}
+.month-date {
+  color: var(--muted);
+}
+.month-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.month-bars > i {
+  display: block;
+  height: 3px;
+  border-radius: 1px;
+  min-width: 1px;
+}
+.month-bars > .plot {
+  background: color-mix(in srgb, var(--plot) 60%, transparent);
+}
+.month-bars > .track {
+  background: var(--track);
+}
+.month-blocks {
+  color: var(--faint);
+  margin-top: auto;
+}
+
+/* ─── Excel export (wireframe screen 5) ──────────────────────────────── */
+
+.export-layout {
+  display: grid;
+  grid-template-columns: 1.35fr 0.8fr;
+  gap: var(--s-12);
+  align-items: start;
+}
+.export-layout > aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-12);
+}
+.sheet-preview {
+  margin: 0;
+}
+.mini-sheet-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+}
+/* Deliberately a spreadsheet, not the app's own table: every cell ruled, header
+   filled, monospace figures. It has to be recognisable as the artefact the
+   client already keeps. */
+.mini-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-micro);
+}
+.mini-sheet th,
+.mini-sheet td {
+  border: 1px solid var(--rule);
+  padding: 2px var(--s-6);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+.mini-sheet thead th {
+  background: var(--raised);
+  color: var(--muted);
+  font-weight: 600;
+}
+.mini-sheet tbody th {
+  background: var(--raised);
+  color: var(--muted);
+  font-weight: 400;
+}
+/* The same grammar as the Day view: hatched is a gap, dashed is an observation. */
+.mini-sheet td[data-kind="gap"] {
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 4px,
+    color-mix(in srgb, var(--rule) 70%, transparent) 4px,
+    color-mix(in srgb, var(--rule) 70%, transparent) 6px
+  );
+  color: var(--faint);
+  font-style: italic;
+}
+.mini-sheet td[data-kind="observed"] {
+  border-style: dashed;
+  color: var(--muted);
+}
+.mini-sheet td[data-kind="private"] {
+  color: var(--muted);
+}
+
+.variance {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-label);
+}
+.variance th,
+.variance td {
+  border: 1px solid var(--rule);
+  padding: var(--s-4) var(--s-8);
+  text-align: left;
+}
+.variance thead th {
+  background: var(--raised);
+  color: var(--muted);
+  font-weight: 600;
+}
+/* A moved figure gets `track` — the app's "actual" hue. Never red: a rounding
+   difference is expected, and colouring it as an error would teach the user to
+   ignore the column that exists to be trusted. */
+.variance td[data-variance="true"] {
+  color: var(--track);
+}
+
+.callout {
+  border-width: 2px;
+  margin: 0;
+}
+.callout > strong {
+  display: block;
+  margin-bottom: var(--s-4);
+}
+
+@media (max-width: 1129px) {
+  .export-layout {
+    grid-template-columns: 1fr;
+  }
+  .planner-backlog {
+    display: none;
+  }
+}

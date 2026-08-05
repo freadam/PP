@@ -6,10 +6,9 @@ Reconcile, Excel Export).
 Legend: **✅ built** · **◐ partial** · **❌ missing** · **⛔ blocked** (needs a
 component that does not exist yet, named in the row).
 
-The headline: **Day and Month Dashboard are built to the wireframe.** Planner
-and Reconcile are partial; Excel Export is untouched. Every ❌ below is blocked
-on one of exactly two remaining components — the **browser connector** and the
-**XLSX writer**. Nothing is blocked on design.
+The headline: **four of the five screens are built.** Reconcile is the one that
+is still partial. Every ❌ below is blocked on the **browser connector**, which
+is now the only missing component in the plan — and it is still unspiked.
 
 ---
 
@@ -39,15 +38,15 @@ on one of exactly two remaining components — the **browser connector** and the
 | + Add interval | ✅ | Opens the fill dialog with an adjustable range. |
 | Split / merge / repeat / multi-select editing (plan §8.1) | ❌ | Fill is the only edit. These are the next Day-view increment. |
 
-## 2. Planner — **partial**
+## 2. Planner — **built**
 
 | Wireframe | State | Note |
 |---|---|---|
 | 24-hour grid, drag/resize, drift rail, fixed blocks, repeat | ✅ | Built before this plan. |
-| Spans **3 days · 7 days · Month** | ◐ | 1/3/7 exist; **Month is missing.** 31 columns at a legible width does not fit the current grid — it needs a different layout (a month is a calendar, not 31 day columns), which is a real design decision, not a parameter change. |
-| Backlog panel beside the grid | ◐ | The backlog is in the global sidebar rather than inside the canvas. Functionally the same; visually not the wireframe. |
-| "Import calendar" button in the context bar | ❌ | The command exists (Settings → Data). It just isn't surfaced here. |
-| "+ Plan block" button | ❌ | Blocks are created by clicking the grid or pressing `S`. No button. |
+| Spans 1 day · 3 days · 7 days · **Month** | ✅ | Month is a **calendar**, not 31 hour-columns — those need ~3,400px at a legible width and no screen has it. It drops the time axis and keeps what a month horizon is for: which days are loaded, which are empty, where plan and record diverged. Clicking a day opens it at full resolution. `M` switches to it. |
+| Backlog panel beside the grid | ✅ | In the canvas now, next to the grid it gets dragged onto — "what needs a slot" and "where are the slots" are one question. Capture, then Today / This week / No date. |
+| "Import calendar" button in the context bar | ✅ | Same command as Settings → Data, surfaced where it is used. |
+| "+ Plan block" button | ✅ | Opens the ad-hoc form at 09:00 on the first visible day. |
 
 ## 3. Month Dashboard — **built**
 
@@ -79,24 +78,29 @@ sessions. The wireframe's version is a different, better shape.
 | "Apply my choice to future Twitch activity in this context" | ❌ ⛔ | Prospective rule creation. Needs the connector and a rules table. |
 | "Split interval" | ❌ | Same missing verb as the Day view's Split. |
 
-## 5. Excel Export — **missing** ⛔
+## 5. Excel Export — **built**
 
-Nothing of this screen exists. It is a whole view.
+A whole screen, because the workbook is the client's deliverable: handing it
+over on a button press with no preview asks them to trust a file they have not
+seen.
 
-| Wireframe | State |
-|---|---|
-| Full export screen with Cancel / Export .xlsx | ❌ |
-| Workbook preview (mini month sheet, gaps hatched) | ❌ |
-| Tags: Month table · Summary · Source mapping | ❌ |
-| Options: output path, include observed-only markers, include unaccounted slots, include private labels | ❌ |
-| **Reconciliation table** (Measure · App · Excel · Variance) | ❌ |
-| "7 unreconciled days — export is allowed, the workbook will mark them" | ❌ |
+| Wireframe | State | Note |
+|---|---|---|
+| Full export screen with Cancel / Export .xlsx | ✅ | Reached from Reports, not the nav rail — it acts on the month you are looking at. |
+| Workbook preview (mini month sheet, gaps hatched) | ✅ | **The preview *is* the sheet**: `preview_excel` and `write_excel` render from one matrix, so the screen cannot promise a layout the file doesn't have. |
+| Tags: Month table · Summary · Source mapping | ✅ | Three real sheets. |
+| Options: output path, observed-only markers, unaccounted slots, private labels | ✅ | Each states its own consequence. Private labels off by default — the duration is always exported, only the area is withheld, because a workbook is a file you might email. |
+| **Reconciliation table** (Measure · App · Excel · Variance) | ✅ | The app's figure, the sheet's own figure, the difference. Variance is expected to be non-zero: a half-hour grid against a to-the-second record rounds, and the caption says so. The measure is no *unexplained* variance. |
+| "n unreconciled days — export is allowed, the workbook will mark them" | ✅ | Refusing would be worse: the workbook exists to show the month as it stands, gaps included. |
 
-All blocked on the **XLSX writer**. The reconciliation table is worth calling
-out separately: it is the mechanism that makes "Excel exports reconcile to
-application totals with no unexplained variance" (success measure 7) checkable
-rather than asserted, and it is a *design* feature of the export, not a
-by-product of writing one.
+**Totals are formulas, never pasted numbers.** The Summary sheet is `COUNTIF`s
+over the month sheet, so changing a cell in Excel moves the totals — which is
+the thing the old workbook could not do, and the reason its numbers drifted
+from its own table.
+
+One new dependency: `rust_xlsxwriter`. The dependency policy asks for a reason;
+"offline XLSX generation" is a line in the plan's own stack, and hand-rolling a
+ZIP + OPC + SharedStrings writer would have been ~600 lines of worse code.
 
 ---
 
@@ -110,12 +114,16 @@ Three components gate almost everything left:
    largest risk in the plan, and it now has **four** screens waiting on it
    rather than one.
 2. ~~**`get_month`**~~ — **built.** The dashboard is done.
-3. **XLSX writer** — gates the export screen entirely.
+3. ~~**XLSX writer**~~ — **built.** The export screen is done.
 
-One item is blocked on **nothing** and is the cheapest work left:
+The connector is now the *only* missing component in the plan. Two items are
+blocked on nothing:
 
 - **Reconciling observed-only and empty hours** — M10, and both figures already
-  come out of `get_day`.
+  come out of `get_day`. This is the last piece of the Reconcile screen that
+  does not need the connector.
+- **Workbook import** (M13) — the export's inverse. Needs a reader and a mapping
+  preview, but no new capability.
 
-Recommended order from here: the connector spike (three screens still depend on
-an unproven capability), then M10 reconcile items, then the export.
+Recommended order from here: the connector spike, then M10 reconcile items,
+then workbook import.

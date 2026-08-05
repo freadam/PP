@@ -22,6 +22,7 @@ mod activity;
 mod blocks;
 mod data;
 mod day;
+mod excel;
 mod projects;
 mod reconcile;
 mod life;

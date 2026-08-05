@@ -113,6 +113,7 @@ export function useKeyboard() {
         "2": "priority-2",
         "3": app.view === "planner" ? "span-3" : "priority-3",
         "7": "span-7",
+        m: "span-month",
         Enter: "task-open",
         Backspace: app.selectedBlockId ? "block-unschedule" : "task-delete",
         ArrowLeft: "prev",

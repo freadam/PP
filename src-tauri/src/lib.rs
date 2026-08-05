@@ -332,6 +332,43 @@ fn get_month(state: State<'_, AppState>, month: String, tz: String) -> Res<Month
     with(&state, |s| s.get_month(&month, &tz))
 }
 
+/// The month table exactly as the workbook will contain it (wireframe screen 5).
+/// The preview and the file render from one matrix, so the screen cannot
+/// promise a layout the file doesn't have.
+#[tauri::command]
+fn preview_excel(
+    state: State<'_, AppState>,
+    month: String,
+    tz: String,
+    options: ExcelOptions,
+) -> Res<ExcelPreview> {
+    with(&state, |s| s.preview_excel(&month, &tz, &options))
+}
+
+#[tauri::command]
+fn export_excel(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    month: String,
+    tz: String,
+    path: PathBuf,
+    options: ExcelOptions,
+) -> Res<ExcelExportResult> {
+    let path = downloads_path(&app, path);
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    with(&state, |s| s.write_excel(&month, &tz, &path, &options))
+}
+
+/// Where the workbook will land, shown before anyone commits to writing it.
+#[tauri::command]
+fn suggest_excel_path(app: AppHandle, file_name: String) -> Res<String> {
+    Ok(downloads_path(&app, PathBuf::from(file_name))
+        .display()
+        .to_string())
+}
+
 #[tauri::command]
 fn get_life_areas(
     state: State<'_, AppState>,
@@ -505,19 +542,7 @@ fn export_data(
     path: PathBuf,
     tz: String,
 ) -> Res<ExportSummary> {
-    // A bare filename would land in the process's working directory — which on
-    // Windows is wherever the exe was launched from, and nowhere a person would
-    // look. Export is a trust feature (§6.12); "where did it go?" defeats it.
-    let path = if path.is_absolute() {
-        path
-    } else {
-        app.path()
-            .download_dir()
-            .or_else(|_| app.path().document_dir())
-            .or_else(|_| app.path().home_dir())
-            .unwrap_or_else(|_| data_dir(&app))
-            .join(&path)
-    };
+    let path = downloads_path(&app, path);
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
     }
@@ -694,6 +719,9 @@ pub fn run() {
             get_reconcile_items,
             get_day,
             get_month,
+            preview_excel,
+            export_excel,
+            suggest_excel_path,
             get_life_areas,
             create_life_area,
             update_life_area,
@@ -827,6 +855,21 @@ fn spawn_activity_loop(app: AppHandle) {
             Err(err) => log::error!("activity.record.failed code={}", err.code()),
         }
     });
+}
+
+/// A bare filename would land in the process's working directory — which on
+/// Windows is wherever the exe was launched from, and nowhere a person would
+/// look. Export is a trust feature (§6.12); "where did it go?" defeats it.
+fn downloads_path(app: &AppHandle, path: PathBuf) -> PathBuf {
+    if path.is_absolute() {
+        return path;
+    }
+    app.path()
+        .download_dir()
+        .or_else(|_| app.path().document_dir())
+        .or_else(|_| app.path().home_dir())
+        .unwrap_or_else(|_| data_dir(app))
+        .join(&path)
 }
 
 fn system_tz() -> Option<String> {

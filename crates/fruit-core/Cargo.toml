@@ -10,6 +10,7 @@ description = "Domain, storage and command layer for Fruit. Contains no UI and n
 chrono.workspace = true
 chrono-tz.workspace = true
 rusqlite.workspace = true
+rust_xlsxwriter = { version = "0.92.0", default-features = false }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

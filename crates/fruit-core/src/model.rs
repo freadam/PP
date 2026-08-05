@@ -1249,3 +1249,78 @@ pub struct MonthView {
     /// as an empty axis with no explanation.
     pub planned_entertainment_note: Option<String>,
 }
+
+// ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelOptions {
+    /// Mark slots the machine saw but nobody confirmed.
+    #[serde(default = "yes")]
+    pub include_observed: bool,
+    /// Keep blank slots as visible "Gap" cells rather than empty ones.
+    #[serde(default = "yes")]
+    pub include_unaccounted: bool,
+    /// Off by default. Private duration is always included; this only controls
+    /// whether the *area* behind it is named.
+    #[serde(default)]
+    pub include_private_labels: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// One row of the reconciliation table (wireframe screen 5).
+///
+/// The whole point of the export screen: a figure from the app beside the same
+/// figure computed from the sheet's own cells, and the difference. Success
+/// measure 7 is "exports reconcile with no unexplained variance", and this is
+/// what makes that checkable rather than asserted.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelVariance {
+    pub measure: String,
+    pub app_sec: i64,
+    pub sheet_sec: i64,
+    pub variance_sec: i64,
+}
+
+/// One cell of the month table, for the on-screen preview *and* the sheet —
+/// both render from this, so the preview cannot promise a layout the file
+/// doesn't have.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelCell {
+    pub label: String,
+    /// `work` · `life` · `entertainment` · `rest` · `observed` · `gap` · `private`
+    pub kind: String,
+    pub colour: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelPreview {
+    pub month: String,
+    pub label: String,
+    pub file_name: String,
+    /// Column headers: "1 Sat", "2 Sun", …
+    pub day_headers: Vec<String>,
+    /// Row labels: "06:00", "06:30", …
+    pub slot_labels: Vec<String>,
+    /// `rows[slot][day]`. The full month matrix, blanks included.
+    pub rows: Vec<Vec<ExcelCell>>,
+    pub variances: Vec<ExcelVariance>,
+    pub unreconciled_days: i64,
+    /// What the sheet says about itself — carried into the workbook as a note.
+    pub source_note: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelExportResult {
+    pub path: String,
+    pub sheets: Vec<String>,
+    pub rows_written: i64,
+    pub variances: Vec<ExcelVariance>,
+}

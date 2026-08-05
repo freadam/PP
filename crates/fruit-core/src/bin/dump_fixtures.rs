@@ -336,6 +336,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     out.insert("get_month".into(), json!(store.get_month(&today[..7], &tz)?));
     out.insert("get_life_areas".into(), json!(store.get_life_areas(&tz, false)?));
     out.insert(
+        "preview_excel".into(),
+        json!(store.preview_excel(
+            &today[..7],
+            &tz,
+            &ExcelOptions {
+                include_observed: true,
+                include_unaccounted: true,
+                include_private_labels: false,
+            }
+        )?),
+    );
+    out.insert("suggest_excel_path".into(), json!("~/Downloads/Tracking.xlsx"));
+    out.insert(
         "get_life_entries".into(),
         json!(store.life_entries_on(&today, &tz)?),
     );

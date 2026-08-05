@@ -48,6 +48,9 @@ import type {
   AreaKind,
   Contribution,
   DayView,
+  ExcelOptions,
+  ExcelPreview,
+  ExcelExportResult,
   LifeAreaRow,
   LifeEntryRow,
   MonthView,
@@ -317,3 +320,19 @@ export const convertSessionToLife = (id: string, lifeAreaId: string, tz: string)
 /** The month dashboard. `month` is `YYYY-MM`, or any date inside it. */
 export const getMonth = (month: string, tz: string) =>
   call<MonthView>("get_month", { month, tz });
+
+/* ─── Excel export (Plan Rev 3 §10) ────────────────────────────────────── */
+
+/** The month table exactly as the workbook will contain it. */
+export const previewExcel = (month: string, tz: string, options: ExcelOptions) =>
+  call<ExcelPreview>("preview_excel", { month, tz, options });
+
+export const exportExcel = (
+  month: string,
+  tz: string,
+  path: string,
+  options: ExcelOptions,
+) => call<ExcelExportResult>("export_excel", { month, tz, path, options });
+
+export const suggestExcelPath = (fileName: string) =>
+  call<string>("suggest_excel_path", { fileName });

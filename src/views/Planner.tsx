@@ -13,6 +13,7 @@ import * as fmt from "../lib/format";
 import type { BlockView, CollisionPolicy, DayColumn } from "../lib/types";
 import { DriftBadge, DriftRail, driftLabel } from "../components/DriftRail";
 import { Empty } from "../components/chrome";
+import { PlannerBacklog } from "../components/PlannerBacklog";
 
 const SNAP_MIN = 15;
 const FINE_SNAP_MIN = 5;
@@ -297,35 +298,71 @@ export function Planner() {
 
   return (
     <div className="planner">
-      <div className="planner-head">
+      <div className="context-bar">
+        <h1 className="display">Planner</h1>
+        <div className="segmented" role="group" aria-label="Span">
+          {([1, 3, 7, "month"] as const).map((n) => (
+            <button
+              key={String(n)}
+              className="btn"
+              aria-pressed={span === n}
+              onClick={() => setSpan(n)}
+              title={n === "month" ? "Month view (M)" : `${n}-day view (${n})`}
+            >
+              {n === "month" ? "Month" : n === 1 ? "1 day" : `${n} days`}
+            </button>
+          ))}
+        </div>
         <button className="btn" aria-label="Previous period" onClick={() => shiftPeriod(-1)}>
           ‹
+        </button>
+        <button className="btn" onClick={() => setAnchor(fmt.today())} title="Today (T)">
+          Today
         </button>
         <button className="btn" aria-label="Next period" onClick={() => shiftPeriod(1)}>
           ›
         </button>
-        <strong className="display" style={{ fontSize: "1rem" }}>
-          {rangeLabel}
-        </strong>
+        <span className="data caption">{rangeLabel}</span>
         <span className="grow" />
-        <div className="row" role="group" aria-label="Day span">
-          {([1, 3, 7] as const).map((n) => (
-            <button
-              key={n}
-              className="btn"
-              aria-pressed={span === n}
-              onClick={() => setSpan(n)}
-              title={`${n}-day view (${n})`}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        <button className="btn" onClick={() => setAnchor(fmt.today())} title="Today (T)">
-          Today
+        {/* Both actions already existed — as a Settings page and as a click on
+            empty grid. The wireframe surfaces them, which is the difference
+            between a feature that exists and one anybody finds. */}
+        <button
+          className="btn"
+          onClick={async () => {
+            const { run, toast, refresh } = useApp.getState();
+            const path = await run(() => ipc.pickIcsFile(), "Couldn't open the file picker.");
+            if (!path) return;
+            const summary = await run(
+              () => ipc.importIcs(path, fmt.tz()),
+              "Couldn't import that calendar.",
+            );
+            if (summary) {
+              toast(summary.note);
+              await refresh();
+            }
+          }}
+        >
+          Import calendar
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            const day = days.find((d) => d.isToday) ?? days[0];
+            if (day) setAdHoc({ date: day.localDate, startMin: 9 * 60 });
+          }}
+        >
+          + Plan block
         </button>
       </div>
 
+      <div className="planner-layout">
+      <PlannerBacklog />
+      <div className="planner-canvas">
+      {span === "month" ? (
+        <MonthGrid days={days} />
+      ) : (
+      <>
       <div className="planner-daynames" style={{ gridTemplateColumns: columns }}>
         {days.map((d) => (
           <div key={d.localDate} className="dayname" data-today={d.isToday}>
@@ -396,14 +433,80 @@ export function Planner() {
         </div>
       </div>
 
+      </>
+      )}
       {days.every((d) => d.blocks.length === 0) && (
         <div style={{ padding: "0 0 16px" }}>
           <p className="caption" style={{ textAlign: "center" }}>
-            Nothing plotted this week. Drag a task from the left, or press{" "}
+            Nothing plotted here. Drag a task from the backlog, press{" "}
+            <span className="kbd">S</span> to plot the selected one, or{" "}
             <span className="kbd">C</span> to capture one.
           </p>
         </div>
       )}
+      </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The month span (wireframe: `3 days · 7 days · Month`).
+ *
+ * A month is a **calendar**, not 31 hour-columns: at a legible width those
+ * columns need 3,400px and no screen has it. So the month drops the time axis
+ * and keeps what a month horizon is actually for — which days are loaded, which
+ * are empty, and where the plan and the record diverged. Clicking a day opens it
+ * at full resolution.
+ */
+function MonthGrid({ days }: { days: DayColumn[] }) {
+  const setSpan = useApp((s) => s.setSpan);
+  const setAnchor = useApp((s) => s.setAnchor);
+  if (!days.length) return <Empty>Nothing in this month.</Empty>;
+
+  // Pad to a Monday start so the columns are weekdays, as a calendar reads.
+  const lead = (new Date(`${days[0]!.localDate}T00:00:00`).getDay() + 6) % 7;
+  const max = Math.max(1, ...days.map((d) => Math.max(d.plannedSec, d.trackedSec)));
+
+  return (
+    <div className="month-grid" role="grid" aria-label="Month">
+      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+        <div key={d} className="month-head micro">
+          {d}
+        </div>
+      ))}
+      {Array.from({ length: lead }, (_, i) => (
+        <div key={`pad-${i}`} className="month-cell" data-pad="true" />
+      ))}
+      {days.map((day) => (
+        <button
+          key={day.localDate}
+          className="month-cell"
+          data-today={day.isToday || undefined}
+          data-past={day.isPast || undefined}
+          data-reconciled={day.isReconciled || undefined}
+          onClick={() => {
+            setAnchor(day.localDate);
+            setSpan(1);
+          }}
+          title={`${day.localDate} · plotted ${fmt.duration(day.plannedSec)}, tracked ${fmt.duration(
+            day.trackedSec,
+          )}`}
+        >
+          <span className="month-date data">{fmt.dayOfMonth(day.localDate)}</span>
+          {/* The same plot/track encoding as the drift rail, laid flat: the
+              month answers "where did plan and record diverge", not "when". */}
+          <span className="month-bars" aria-hidden="true">
+            <i className="plot" style={{ width: `${(day.plannedSec / max) * 100}%` }} />
+            <i className="track" style={{ width: `${(day.trackedSec / max) * 100}%` }} />
+          </span>
+          <span className="month-blocks micro">
+            {day.blocks.length > 0
+              ? `${day.blocks.length} block${day.blocks.length === 1 ? "" : "s"}`
+              : ""}
+          </span>
+        </button>
+      ))}
     </div>
   );
 }

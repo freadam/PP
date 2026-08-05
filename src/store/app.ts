@@ -33,7 +33,15 @@ import type {
 } from "../lib/types";
 
 /** Day first: it is the primary operational screen (Plan Rev 3 §8.1). */
-export type ViewName = "day" | "planner" | "tasks" | "activity" | "reports" | "settings";
+export type ViewName =
+  | "day"
+  | "planner"
+  | "tasks"
+  | "activity"
+  | "reports"
+  | "settings"
+  /** Reached from Reports, not the rail: it acts on the month you are looking at. */
+  | "export";
 
 /**
  * A task being dragged toward the planner (§4.3 — "sidebar backlog item" and
@@ -93,7 +101,8 @@ interface AppState {
   offline: boolean;
 
   // ─── planner ─────────────────────────────────────────────────────────
-  span: 1 | 3 | 7;
+  /** `month` renders the whole calendar month; the rest are day columns. */
+  span: 1 | 3 | 7 | "month";
   anchor: LocalDate;
   hourHeight: number;
   week: WeekView | null;
@@ -146,7 +155,7 @@ interface AppState {
   go: (view: ViewName) => void;
   setOverlay: (o: Overlay) => void;
   setTheme: (t: "dark" | "light" | "system") => void;
-  setSpan: (s: 1 | 3 | 7) => void;
+  setSpan: (s: 1 | 3 | 7 | "month") => void;
   setAnchor: (d: LocalDate) => void;
   shiftPeriod: (dir: -1 | 1) => void;
   setHourHeight: (h: number) => void;
@@ -259,7 +268,7 @@ export const useApp = create<AppState>((set, get) => ({
     const hourHeight = (settings["planner.hourHeight"] as number) ?? 56;
     const slotMinutes = (settings["day.slotMinutes"] as number) ?? 30;
     const reportHorizon = (settings["reports.horizon"] as "week" | "month") ?? "month";
-    const span = (settings["planner.span"] as 1 | 3 | 7) ?? 7;
+    const span = (settings["planner.span"] as 1 | 3 | 7 | "month") ?? 7;
     fmt.setHour12((settings["general.hour12"] as boolean) ?? false);
     set({ theme, hourHeight, span, slotMinutes, reportHorizon });
     applyTheme(theme);
@@ -315,7 +324,12 @@ export const useApp = create<AppState>((set, get) => ({
 
   shiftPeriod(dir) {
     const { span, anchor } = get();
-    set({ anchor: fmt.addDays(anchor, dir * span) });
+    if (span === "month") {
+      const d = new Date(Date.UTC(+anchor.slice(0, 4), +anchor.slice(5, 7) - 1 + dir, 1));
+      set({ anchor: d.toISOString().slice(0, 10) });
+    } else {
+      set({ anchor: fmt.addDays(anchor, dir * span) });
+    }
     void get().loadWeek();
   },
 
@@ -331,8 +345,23 @@ export const useApp = create<AppState>((set, get) => ({
 
   async loadWeek() {
     const { span, anchor } = get();
-    const from = span === 7 ? fmt.weekStart(anchor) : anchor;
-    const to = fmt.addDays(from, span - 1);
+    // A month is a calendar, not 31 day columns — it starts on the 1st and runs
+    // to the last, rather than from wherever the anchor happens to sit.
+    const from =
+      span === "month"
+        ? `${anchor.slice(0, 7)}-01`
+        : span === 7
+          ? fmt.weekStart(anchor)
+          : anchor;
+    const to =
+      span === "month"
+        ? fmt.addDays(
+            `${new Date(Date.UTC(+anchor.slice(0, 4), +anchor.slice(5, 7), 1))
+              .toISOString()
+              .slice(0, 10)}`,
+            -1,
+          )
+        : fmt.addDays(from, span - 1);
     /* Recurring instances are real rows, materialised to a 90-day horizon
        (§2.3, P2). Scrolling past that horizon is the one way to reach the edge,
        so the top-up runs *before* the read and is idempotent — a week already
