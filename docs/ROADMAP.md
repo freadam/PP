@@ -51,15 +51,21 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    export screen with its workbook writer.
 5. ✅ Reconciling observed-only and empty hours (M10), in the wireframe's
    three-column sheet.
-6. ⬅ **The week you are in** — weekly goals with mid-week pacing, fragmentation
-   reported rather than scored, continuous-work notices, and a weekly review
-   that sets next week's goals from what actually happened. Planned in
-   [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md). *(next)*
+6. ⬅ **The week you are in** — weekly goals with mid-week pacing,
+   **user-defined observation categories** and the uncategorised surface that
+   drives them, fragmentation reported rather than scored, focus sessions you
+   can extend in one key, notices including an off-plan nudge, and a weekly
+   review that sets next week's goals from what actually happened. Planned in
+   [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), W1–W10. *(next)*
 
    This is **not new scope**: M11's entertainment budget is a weekly goal with
    `direction = at_most`, so the general mechanism closes it as a side effect.
    It goes before workbook import because the plan's own phase order puts
    Phase 6 (reconcile, calibrate, reduce entertainment) ahead of Phase 7 (Excel).
+
+   The governing constraint comes from the source review's own verdict: the
+   biggest risk in a tool like this is that configuring it becomes the work.
+   Every item must configure itself or answer a question the user already has.
 7. **Workbook import (M13)** — the export's inverse. Unchanged in scope.
 8. The `Split` verb, on the Day view and in the reconciler.
 
@@ -92,7 +98,21 @@ Three horizons, and only two of them work.
 A month dashboard is a verdict delivered too late to act on, and a day is too
 short a window to see a habit in. The week is the horizon where a person can
 still change the outcome, and it is the one Fruit does not currently speak to.
-[`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) is the plan for closing it.
+[`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) is the plan for closing it, drawn
+from a two-year user review of Rize.
+
+Two things in that plan are worth flagging here because they change existing
+components rather than adding beside them:
+
+- **`DomainCategory` stops being a fixed enum.** The review's most valuable
+  feature was a category its user invented — *"AI Chat"* — to answer a question
+  no shipped report could have anticipated. Fruit has nowhere to put one. The
+  fixed three-way split becomes a table, with a `counts_as` roll-up so the month
+  dashboard's arithmetic never moves when a category is added.
+- **`get_week` cannot serve this.** It is the planner's week — blocks, planned
+  and tracked — with no life time, no empty hours and no entertainment. The fix
+  is to extract `get_month`'s aggregation into a shared `aggregate_range`, not
+  to write a second way of totalling a day.
 
 ## Risks currently live
 

@@ -181,19 +181,33 @@ project and week. Life-area and sleep/rest target vs actual. Planned vs
 unplanned entertainment with YouTube/Twitch trends. Work contribution
 summaries — **which never apply to personal time**.
 
-**Weekly goals** (planned — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md)): a
-target with a **direction**, so "at most 5h of entertainment" is a goal you
-succeed at by being under it rather than a bar you are failing to fill. Reported
-by **pace** rather than as a scoreboard — where you should be right now, and what
-the rest of the week has to look like. Fragmentation reported as its components —
-longest unbroken stretch, planned versus unplanned switches, time in fragments —
-and deliberately **not** synthesised into a score, because every other number in
-this app can be checked by hand. A weekly review that sets next week's goals from
-what actually happened, at the same n ≥ 5 median discipline the estimate
-calibration already uses.
+**The week horizon** (planned — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md)):
+a goal is a target with a **direction**, so "at most 5h of entertainment" is a
+goal you succeed at by being under it rather than a bar you are failing to fill.
+Reported by **pace** rather than as a scoreboard — where you should be right now,
+and what the rest of the week has to look like. Fragmentation reported as its
+components — longest unbroken stretch, planned versus unplanned switches, time in
+fragments — and deliberately **not** synthesised into a score, because every other
+number in this app can be checked by hand. A weekly review and report artifact,
+read at a fixed moment, headline first. Next week's goals pre-filled from what
+happened, at the same n ≥ 5 median discipline the estimate calibration uses.
 
-Blocking, focus scores, focus sounds and team visibility are out of scope; see
-the plan document for why each was rejected rather than deferred.
+**Observation categories become user-definable.** The fixed
+`core`/`entertainment`/`other` split becomes a table a user can extend, spanning
+**both applications and domains**, with a `counts_as` roll-up so adding a category
+never moves an existing total. This is the one place the plan changes an existing
+component rather than adding beside it, and it is there because the most valuable
+thing in the source review was a category its user invented to answer a question
+no shipped report could have anticipated.
+
+An **off-plan nudge** — "you are on youtube.com during a block you plotted for the
+auth refactor" — silenceable for the session and never fired on time nobody
+plotted. It is a notice, not a block: Fruit will not close a tab or deny a
+navigation, and the connector has no `host_permissions` with which to try.
+
+Blocking, focus scores, per-URL rules, focus sounds, billing and team visibility
+are out of scope; see the plan document for why each was rejected rather than
+deferred.
 
 ### 3.6 Settings
 
@@ -481,7 +495,10 @@ in bold; each is reversible.
 | Month dashboard | **Built** — `get_month` is `get_day` summed, so the two cannot disagree |
 | Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
 | Entertainment budgets and planned windows | **Not built** — no longer blocked. Planned as the `at_most` case of weekly goals, in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) |
-| **Weekly goals, pacing, fragmentation, weekly review** | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md). The week is the one horizon with no working surface. |
+| **The week horizon** — goals, pacing, fragmentation, weekly review and report | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W1–W10. The week is the one horizon with no working surface. |
+| **User-defined observation categories** and the uncategorised surface | **Planned** — W7/W8. Changes `DomainCategory` from a fixed enum to a table; `counts_as` keeps every existing total stable. |
+| **Focus sessions with an intended length**, extendable in one key | **Planned** — W3. The timer runs until stopped; a session that commits to 45 minutes is a different act. |
+| **Off-plan nudge** (a notice, never a block) | **Planned** — W5. |
 | Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
 | Excel **import** | **Not built** (M13) |
 | Task notes | Built as **Markdown**; the plan requires compact plain text |

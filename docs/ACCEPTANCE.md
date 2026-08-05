@@ -56,17 +56,21 @@ nothing remaining is blocked on a missing capability.
 
 Not built. Planned in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), and
 recorded here so the measures are agreed before the code exists rather than
-written to fit it afterwards. All six are testable in `fruit-core` with a fake
+written to fit it afterwards. All ten are testable in `fruit-core` with a fake
 clock and no webview.
 
 | # | Criterion | Why this one |
 |---|---|---|
 | W1 | A goal in force during a week is the goal that week's review reports, **after that goal has since been edited** | A goal edited into a new number must not retroactively rewrite how a past week went, or reviews stop meaning anything. Same argument as `activity_span.category` being stamped at write time. |
 | W2 | A goal at zero on Monday morning reports **on pace**, not behind; expected progress never counts a day that has not happened | The month dashboard's "6% accounted" bug, in a new place. An app that reports the future as a failure is one whose numbers you learn to discount. |
-| W3 | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
+| W3 | Extending a focus session shows in drift as an overrun, not as a larger plan | Extending is a plan revision. Fruit separates plan from record, so an extension has to cost something — the reading Rize cannot offer, because it has no plan to diverge from. |
 | W4 | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
-| W5 | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
-| W6 | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
+| W5 | The off-plan nudge fires only during **plotted** time, and is silenceable for the session | Both rules come from the reviewer's own false-positive caveat. Time nobody planned is time Fruit has no standing to have an opinion about. |
+| W6 | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
+| W7 | A user-defined category collects **both apps and domains**, and adding one never changes an existing month total | Claude is a website to one person and a desktop app to another; a bucket catching one of them answers the question wrongly. `counts_as` is what keeps the dashboard's arithmetic stable. |
+| W8 | The uncategorised surface ranks by time and is reachable **without opening Settings** | The governing constraint. The app names the three things worth categorising instead of presenting an empty taxonomy. |
+| W9 | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
+| W10 | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
 
 **W2 is the one that matters most**, for the reason given in its own row.
 
