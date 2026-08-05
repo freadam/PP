@@ -1173,3 +1173,79 @@ pub struct DayView {
     pub is_today: bool,
     pub now: Millis,
 }
+
+// ─── the month (Plan Rev 3 §8.5, wireframe screen 3) ───────────────────
+
+/// One day's arithmetic, for the month's per-day panels.
+///
+/// Deliberately a summary rather than a whole `DayView`: the dashboard draws
+/// 31 of these, and shipping 31 × 48 slots to render a heatmap would be a
+/// megabyte of payload for 31 numbers.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthDay {
+    pub local_date: String,
+    pub day_of_month: i64,
+    pub day_sec: i64,
+    pub confirmed_work_sec: i64,
+    pub confirmed_life_sec: i64,
+    pub sleep_sec: i64,
+    pub private_sec: i64,
+    pub observed_only_sec: i64,
+    pub idle_sec: i64,
+    pub empty_sec: i64,
+    pub entertainment_sec: i64,
+    /// Entertainment that fell inside a plotted block. Zero until entertainment
+    /// windows exist — see `MonthView::planned_entertainment_note`.
+    pub planned_entertainment_sec: i64,
+    pub is_reconciled: bool,
+    /// The day has ended. A day that has not arrived is not "unreviewed" — it
+    /// is simply not yet, and marking it as a problem is how a dashboard trains
+    /// someone to ignore its warnings.
+    pub has_happened: bool,
+    /// `0.0`–`1.0`. What the data-quality heatmap shades by.
+    pub accounted_ratio: f64,
+}
+
+/// One line of the "Monthly findings" panel: a fact, its number, and why it is
+/// on the list. Computed in Rust so the renderer never decides what counts as a
+/// finding — that judgement is the panel's whole content.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthFinding {
+    pub key: String,
+    pub label: String,
+    /// Pre-formatted, because "+38%" and "14h 20m" are different kinds of number.
+    pub value: String,
+    pub detail: Option<String>,
+    /// True when this is something to act on rather than merely notice.
+    pub is_warning: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthView {
+    /// `YYYY-MM`.
+    pub month: String,
+    pub label: String,
+    pub from: String,
+    pub to: String,
+    pub tz: String,
+    pub days: Vec<MonthDay>,
+    /// The same shape the Day view uses, summed over the month — so a figure
+    /// here and the same figure on a day can never be computed two ways.
+    pub totals: DayTotals,
+    /// Everything except unaccounted, over the days that have **happened**.
+    pub accounted_ratio: f64,
+    /// How much of the month has actually elapsed, and how much of *that* is
+    /// unaccounted for. The whole-month `totals` include days that have not
+    /// arrived, so a card reading "unaccounted 696h" beside "accounted 40%"
+    /// would be two readings of the same month. These are the pair that agree.
+    pub elapsed_sec: i64,
+    pub elapsed_empty_sec: i64,
+    pub unreconciled_days: i64,
+    pub findings: Vec<MonthFinding>,
+    /// Why the planned-entertainment series is flat. Stated rather than drawn
+    /// as an empty axis with no explanation.
+    pub planned_entertainment_note: Option<String>,
+}

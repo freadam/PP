@@ -6,10 +6,10 @@ Reconcile, Excel Export).
 Legend: **✅ built** · **◐ partial** · **❌ missing** · **⛔ blocked** (needs a
 component that does not exist yet, named in the row).
 
-The headline: **the Day screen is now built to the wireframe. The other four
-are between a third and nothing.** Every ❌ below is blocked on one of exactly
-three missing components — the **browser connector**, the **month aggregation
-query**, and the **XLSX writer**. Nothing is blocked on design.
+The headline: **Day and Month Dashboard are built to the wireframe.** Planner
+and Reconcile are partial; Excel Export is untouched. Every ❌ below is blocked
+on one of exactly two remaining components — the **browser connector** and the
+**XLSX writer**. Nothing is blocked on design.
 
 ---
 
@@ -49,21 +49,20 @@ query**, and the **XLSX writer**. Nothing is blocked on design.
 | "Import calendar" button in the context bar | ❌ | The command exists (Settings → Data). It just isn't surfaced here. |
 | "+ Plan block" button | ❌ | Blocks are created by clicking the grid or pressing `S`. No button. |
 
-## 3. Month Dashboard — **missing** ⛔
+## 3. Month Dashboard — **built**
 
-Reports today is a 28-day rolling window with three panels (calibration,
-project weeks, weekly targets). The wireframe is a **month-anchored dashboard**
-with six cards and four different panels. Almost none of it overlaps.
+Reports is now month-first. `get_month` is `get_day` summed over the month, so a
+figure here and the same figure on a day cannot disagree.
 
-| Wireframe | State | Blocked on |
+| Wireframe | State | Note |
 |---|---|---|
-| Month anchor + ‹ This month › + Day/Week/Month segmented | ❌ | month aggregation query |
-| Cards: Accounted % · Work · Life · Sleep · Entertainment · Unaccounted | ❌ | month aggregation query — `get_day` does this for one day; the month version is `get_month`, summing the same segments over 28–31 days |
-| Entertainment planned-vs-unplanned line chart | ❌ | connector + planned-entertainment windows (neither exists) |
-| Data-quality heatmap per day + "7 unreconciled days · 12h observed-only" | ❌ | month aggregation query |
-| Life-area targets vs actual bars | ◐ | `monthly_target_sec` is on `life_area` and `month_tracked_sec` is already computed per area. Only the panel is missing — **this one is not blocked.** |
-| Monthly findings list + "Review source intervals" | ❌ | connector, for the YouTube/Twitch rows |
-| "Export month to Excel" | ❌ | XLSX writer |
+| Month anchor + ‹ This month › + Day/Week/Month segmented | ✅ | Day jumps to the Day screen — it *is* the day horizon. Week keeps the calibration and project panels, which are about estimate accuracy rather than about how the month went. |
+| Cards: Accounted % · Work · Life · Sleep · Entertainment · Unaccounted | ✅ | Measured against the days that have **happened**. A fresh August on the 4th is otherwise "6% accounted", which is arithmetically true and a useless headline — the missing 27 days are the future, not a gap. |
+| Entertainment planned-vs-unplanned line chart | ◐ | Solid (unplanned) is real. Dashed (planned) is flat zero, and that is the correct reading rather than a placeholder: with no way to plan an entertainment window, every minute is unplanned by definition. The chart says so underneath. |
+| Data-quality heatmap + "n unreconciled days · Nh observed-only" | ✅ | Shade is coverage, the numeral is always present, a corner mark is "never reviewed". Future days are outlined and never marked as a problem. |
+| Life-area targets vs actual bars | ✅ | An area with a target and no time still gets a row — a zero against a target is the most actionable row there is. |
+| Monthly findings + "Review source intervals" | ✅ | Findings are computed in Rust; the button opens the worst day on the Day screen. The YouTube/Twitch split needs the connector, so the entertainment finding is currently one line rather than two. |
+| "Export month to Excel" | ◐ | Present and enabled — a disabled control cannot take keyboard focus, so it would be invisible to the users most likely to look for it. It explains why it cannot run. |
 
 ## 4. Reconcile — **partial**
 
@@ -110,16 +109,13 @@ Three components gate almost everything left:
    reconcile evidence panel and prospective rules. Still unspiked, still the
    largest risk in the plan, and it now has **four** screens waiting on it
    rather than one.
-2. **`get_month`** — one query, the same segment resolution `get_day` already
-   does, aggregated over a month. Gates the entire dashboard. Not risky; just
-   not written.
+2. ~~**`get_month`**~~ — **built.** The dashboard is done.
 3. **XLSX writer** — gates the export screen entirely.
 
-Two items are blocked on **nothing** and are the cheapest wins on this list:
+One item is blocked on **nothing** and is the cheapest work left:
 
-- **Life-area targets vs actual** — the data is already computed per area.
 - **Reconciling observed-only and empty hours** — M10, and both figures already
   come out of `get_day`.
 
-Recommended order from here: the connector spike (because four screens depend
-on an unproven capability), then `get_month` and the dashboard, then the export.
+Recommended order from here: the connector spike (three screens still depend on
+an unproven capability), then M10 reconcile items, then the export.

@@ -44,9 +44,10 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
 3. ⬅ **The browser connector spike.** Four wireframe screens now wait on an
    unproven capability — see `WIREFRAME-GAP.md`. It was a Phase 1 item and it
    is still unspiked. *(next)*
-4. `get_month`, then the month dashboard and the Planner's month span.
-5. Reconciling observed-only and empty hours (M10), and life-area targets —
-   the two items on the gap list blocked on nothing.
+4. ✅ `get_month` and the month dashboard. *(The Planner's month span remains —
+   31 columns needs a calendar layout, not a parameter.)*
+5. Reconciling observed-only and empty hours (M10) — the one item on the gap
+   list blocked on nothing.
 6. Entertainment classification, budgets and the reconcile evidence panel.
 7. Excel export, then Excel import.
 
@@ -62,7 +63,7 @@ double-counting and the month dashboard matches source totals.*
 |---|---|
 | Day | **built** — cards, five columns, now line, contribution in the classification, detail panel, filter, add-interval |
 | Planner | **partial** — no month span, no in-canvas backlog, two buttons unsurfaced |
-| Month dashboard | **missing** — needs `get_month` |
+| Month dashboard | **built** — six cards, entertainment trend, data-quality heatmap, life-area targets, findings |
 | Reconcile | **partial** — no evidence panel, no observed-only or empty items |
 | Excel export | **missing** — needs the XLSX writer |
 

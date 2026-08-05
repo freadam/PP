@@ -25,6 +25,7 @@ mod day;
 mod projects;
 mod reconcile;
 mod life;
+mod month;
 mod recurrence;
 mod reports;
 mod search;

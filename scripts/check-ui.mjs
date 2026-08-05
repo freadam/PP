@@ -111,7 +111,10 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
       ...(await page.evaluate(() => {
         const targets = [
           ...document.querySelectorAll("button, input, select, textarea, [tabindex]"),
-        ].filter((el) => el.offsetParent !== null);
+          // A disabled control cannot take focus at all, so a focus ring is not
+          // the thing to assert about it. Prefer an enabled control that
+          // explains itself; where one is genuinely disabled, skip it here.
+        ].filter((el) => el.offsetParent !== null && !el.disabled);
         const missing = [];
         for (const el of targets) {
           el.focus();

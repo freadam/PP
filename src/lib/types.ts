@@ -666,3 +666,54 @@ export interface DayView {
   isToday: boolean;
   now: Millis;
 }
+
+// ─── the month (Plan Rev 3 §8.5, wireframe screen 3) ───────────────────
+
+export interface MonthDay {
+  localDate: LocalDate;
+  dayOfMonth: number;
+  daySec: number;
+  confirmedWorkSec: number;
+  confirmedLifeSec: number;
+  sleepSec: number;
+  privateSec: number;
+  observedOnlySec: number;
+  idleSec: number;
+  emptySec: number;
+  entertainmentSec: number;
+  /** Zero until entertainment windows exist — see `plannedEntertainmentNote`. */
+  plannedEntertainmentSec: number;
+  isReconciled: boolean;
+  /** The day has ended. A future day is not "unreviewed", it just hasn't come. */
+  hasHappened: boolean;
+  /** 0–1. What the data-quality heatmap shades by. */
+  accountedRatio: number;
+}
+
+export interface MonthFinding {
+  key: string;
+  label: string;
+  /** Pre-formatted: "+38%" and "14h 20m" are different kinds of number. */
+  value: string;
+  detail: string | null;
+  isWarning: boolean;
+}
+
+export interface MonthView {
+  month: string;
+  label: string;
+  from: LocalDate;
+  to: LocalDate;
+  tz: string;
+  days: MonthDay[];
+  /** The Day view's shape, summed — so the two can never disagree. */
+  totals: DayTotals;
+  accountedRatio: number;
+  /** The pair that agree with `accountedRatio` — `totals` covers the whole
+   *  month including days that have not arrived. */
+  elapsedSec: number;
+  elapsedEmptySec: number;
+  unreconciledDays: number;
+  findings: MonthFinding[];
+  plannedEntertainmentNote: string | null;
+}

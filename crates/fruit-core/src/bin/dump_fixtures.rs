@@ -11,7 +11,7 @@
 
 use std::path::PathBuf;
 
-use chrono::Duration;
+use chrono::{Datelike, Duration};
 use fruit_core::model::*;
 use fruit_core::time::{format_date, local_date, now_ms, parse_date, week_start, zone};
 use fruit_core::Store;
@@ -209,6 +209,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter()
         .find(|a| a.name == "Wellbeing")
         .expect("seeded");
+    for (name, hours) in [("Wellbeing", 20i64), ("Family", 40), ("Personal Development", 15)] {
+        if let Some(a) = store.get_life_areas(&tz, false)?.into_iter().find(|a| a.name == name) {
+            store.update_life_area(
+                &a.id,
+                LifeAreaPatch {
+                    monthly_target_sec: Some(Some(hours * 3600)),
+                    ..Default::default()
+                },
+            )?;
+        }
+    }
+
     let today_start = fruit_core::time::day_start(today_date, &zone_);
     for (area_id, label, from_h, to_h, private) in [
         (sleep.id.clone(), Some("Sleep"), -1.0f64, 6.5, false),
@@ -225,6 +237,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             note: None,
             replace_existing: false,
         })?;
+    }
+
+    // A month's worth of sleep and a scatter of life entries, so the month
+    // dashboard has a real shape rather than one populated week against thirty
+    // empty days. Sleep every night; the rest on a rotation.
+    {
+        let month_first = today_date.with_day(1).unwrap();
+        let areas = store.get_life_areas(&tz, false)?;
+        let pick = |name: &str| areas.iter().find(|a| a.name == name).map(|a| a.id.clone()).unwrap();
+        let rota = [
+            ("Wellbeing", 18.0f64, 1.0f64),
+            ("Family", 19.0, 2.0),
+            ("Fun", 20.5, 1.5),
+            ("Personal Development", 7.5, 1.0),
+            ("Friendship", 19.5, 2.0),
+        ];
+        let mut d = month_first;
+        let mut i = 0usize;
+        while d.month() == month_first.month() && d <= today_date {
+            let midnight = fruit_core::time::day_start(d, &zone_);
+            store.add_life_entry(NewLifeEntry {
+                life_area_id: pick("Sleep/Rest"),
+                label: None,
+                started_at: midnight,
+                ended_at: midnight + (6.5 * 3_600_000.0) as i64,
+                tz: tz.clone(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })?;
+            if i % 2 == 0 {
+                let (name, from_h, len_h) = rota[(i / 2) % rota.len()];
+                store.add_life_entry(NewLifeEntry {
+                    life_area_id: pick(name),
+                    label: None,
+                    started_at: midnight + (from_h * 3_600_000.0) as i64,
+                    ended_at: midnight + ((from_h + len_h) * 3_600_000.0) as i64,
+                    tz: tz.clone(),
+                    is_private: false,
+                    note: None,
+                    replace_existing: false,
+                })?;
+            }
+            let Some(next) = d.succ_opt() else { break };
+            d = next;
+            i += 1;
+        }
     }
 
     let range = DateRange {
@@ -274,6 +333,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     out.insert("get_timer_state".into(), json!(store.timer_state()?));
     out.insert("get_day".into(), json!(store.get_day(&today, &tz, None)?));
+    out.insert("get_month".into(), json!(store.get_month(&today[..7], &tz)?));
     out.insert("get_life_areas".into(), json!(store.get_life_areas(&tz, false)?));
     out.insert(
         "get_life_entries".into(),

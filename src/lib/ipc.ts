@@ -50,6 +50,7 @@ import type {
   DayView,
   LifeAreaRow,
   LifeEntryRow,
+  MonthView,
   NewLifeEntry,
   ActivityStatus,
   BlockRow,
@@ -312,3 +313,7 @@ export const setSessionContribution = (id: string, contribution: Contribution | 
 
 export const convertSessionToLife = (id: string, lifeAreaId: string, tz: string) =>
   call<LifeEntryRow>("convert_session_to_life", { id, lifeAreaId, tz });
+
+/** The month dashboard. `month` is `YYYY-MM`, or any date inside it. */
+export const getMonth = (month: string, tz: string) =>
+  call<MonthView>("get_month", { month, tz });

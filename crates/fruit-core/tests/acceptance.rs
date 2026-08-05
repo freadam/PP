@@ -2171,3 +2171,161 @@ fn walk_keys(v: &serde_json::Value, f: &mut impl FnMut(&str)) {
         _ => {}
     }
 }
+
+/// The month is the day's arithmetic, 31 times — so a figure on the dashboard
+/// and the same figure on a day are the same number by construction (M12).
+#[test]
+fn a_month_is_the_sum_of_its_days_exactly() {
+    let (mut store, clock) = store_at(at(2025, 7, 15, 12, 0));
+    let t = task(&mut store, "Refactor auth");
+
+    life(&mut store, "Sleep/Rest", at(2025, 7, 3, 0, 0), at(2025, 7, 3, 7, 0));
+    life(&mut store, "Fun", at(2025, 7, 4, 20, 0), at(2025, 7, 4, 22, 0));
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(90 * 60_000);
+    store.stop_timer().unwrap();
+
+    let month = store.get_month("2025-07", TZ).unwrap();
+    assert_eq!(month.days.len(), 31);
+    assert_eq!(month.label, "July 2025");
+
+    let m = &month.totals;
+    assert_eq!(m.day_sec, 31 * 24 * 3600, "July has 31 whole days");
+    assert_eq!(
+        m.confirmed_work_sec + m.confirmed_life_sec + m.private_sec
+            + m.observed_only_sec + m.idle_sec + m.empty_sec,
+        m.day_sec,
+        "the month tiles exactly, like each day does"
+    );
+
+    // Each per-day figure equals what `get_day` says for that date.
+    for d in &month.days {
+        let day = store.get_day(&d.local_date, TZ, None).unwrap();
+        assert_eq!(d.empty_sec, day.totals.empty_sec, "{}", d.local_date);
+        assert_eq!(
+            d.confirmed_life_sec, day.totals.confirmed_life_sec,
+            "{}",
+            d.local_date
+        );
+    }
+
+    // …and the totals equal the sum of the days.
+    let summed: i64 = month.days.iter().map(|d| d.confirmed_life_sec).sum();
+    assert_eq!(summed, m.confirmed_life_sec);
+    assert_eq!(m.confirmed_life_sec, 9 * 3600, "seven of sleep, two of fun");
+    assert_eq!(m.entertainment_sec, 2 * 3600);
+    assert_eq!(m.confirmed_work_sec, 90 * 60);
+}
+
+/// A month containing a DST transition is not 30 × 24 hours, and the dashboard
+/// must not quietly lose or invent the hour.
+#[test]
+fn a_dst_month_is_measured_in_real_hours() {
+    let (mut store, _) = store_at(at(2025, 6, 1, 12, 0));
+
+    let march = store.get_month("2025-03", TZ).unwrap();
+    assert_eq!(
+        march.totals.day_sec,
+        31 * 24 * 3600 - 3600,
+        "March loses an hour to the spring forward"
+    );
+    let october = store.get_month("2025-10", TZ).unwrap();
+    assert_eq!(
+        october.totals.day_sec,
+        31 * 24 * 3600 + 3600,
+        "October gains one back"
+    );
+    for m in [&march, &october] {
+        let t = &m.totals;
+        assert_eq!(
+            t.confirmed_work_sec + t.confirmed_life_sec + t.private_sec
+                + t.observed_only_sec + t.idle_sec + t.empty_sec,
+            t.day_sec
+        );
+    }
+}
+
+/// §12 budget: a populated 31-day month renders in under 250ms.
+///
+/// The month deliberately runs `resolve_day` 31 times rather than writing a
+/// second, cleverer query — the guard is that the honest implementation is fast
+/// enough, not that it is the fastest possible.
+#[test]
+fn month_load_stays_inside_its_budget() {
+    let (mut store, _) = store_at(at(2025, 7, 15, 12, 0));
+    let t = task(&mut store, "Deep work");
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    // A full month: work, life and observation on every single day.
+    for day in 1..=31 {
+        life(&mut store, "Sleep/Rest", at(2025, 7, day, 0, 0), at(2025, 7, day, 7, 0));
+        store
+            .add_session(ManualSession {
+                task_id: t.id.clone(),
+                block_id: None,
+                started_at: at(2025, 7, day, 9, 0),
+                ended_at: at(2025, 7, day, 17, 0),
+                note: None,
+            })
+            .unwrap();
+        for minute in (0..120).step_by(5) {
+            store
+                .record_activity(ActivitySample {
+                    app_id: "code.exe".into(),
+                    window_title: None,
+                    at: at(2025, 7, day, 19, 0) + minute * 60_000,
+                })
+                .unwrap();
+        }
+    }
+
+    let start = std::time::Instant::now();
+    let month = store.get_month("2025-07", TZ).unwrap();
+    let elapsed = start.elapsed();
+    assert_eq!(month.days.len(), 31);
+    assert!(
+        elapsed.as_millis() < 250,
+        "month load took {elapsed:?}, budget is 250ms"
+    );
+}
+
+/// "Accounted" measures days that have happened, not the whole month.
+///
+/// A fresh August on the 4th is 6% of its month recorded — arithmetically true
+/// and a useless headline, because the missing 27 days are the future rather
+/// than a gap in the record. The same applies to the unreconciled count: nobody
+/// was ever going to review tomorrow.
+#[test]
+fn a_month_in_progress_is_measured_against_the_days_that_happened() {
+    // Noon on the 4th: three whole days behind, half of today, 27 ahead.
+    let (mut store, _) = store_at(at(2025, 7, 4, 12, 0));
+    for day in 1..=4 {
+        life(&mut store, "Sleep/Rest", at(2025, 7, day, 0, 0), at(2025, 7, day, 6, 0));
+    }
+
+    let month = store.get_month("2025-07", TZ).unwrap();
+
+    // 3 × 24h + 12h elapsed = 84h; 4 × 6h recorded = 24h.
+    let elapsed = 84.0 * 3600.0;
+    let expected = (elapsed - (elapsed - 24.0 * 3600.0)) / elapsed;
+    assert!(
+        (month.accounted_ratio - expected).abs() < 0.01,
+        "accounted {:.3}, expected about {expected:.3}",
+        month.accounted_ratio
+    );
+    assert!(
+        month.accounted_ratio > 0.25,
+        "measuring against all 31 days would have given about 0.03"
+    );
+
+    assert_eq!(
+        month.unreconciled_days, 3,
+        "the three finished days, not today and not the 27 to come"
+    );
+
+    // The whole-month totals are still whole-month — only the *ratio* is
+    // elapsed-relative, because a total is a fact and a ratio is a judgement.
+    assert_eq!(month.totals.day_sec, 31 * 24 * 3600);
+}

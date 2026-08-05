@@ -20,6 +20,7 @@ import type {
   DayView,
   LifeAreaRow,
   LifeEntryRow,
+  MonthView,
   BacklogView,
   LocalDate,
   ProjectRow,
@@ -108,6 +109,11 @@ interface AppState {
   /** The day's life entries, for the detail panel's notes and labels. */
   dayEntries: LifeEntryRow[];
 
+  // ─── the month (Plan Rev 3 §8.5) — the default reporting horizon ─────
+  month: MonthView | null;
+  monthKey: string;
+  reportHorizon: "week" | "month";
+
   // ─── activity (§3.5, P2) ─────────────────────────────────────────────
   activityStatus: ActivityStatus | null;
   activityDay: ActivityDay | null;
@@ -153,6 +159,9 @@ interface AppState {
   loadDay: () => Promise<void>;
   setDayDate: (d: LocalDate) => void;
   setSlotMinutes: (m: number) => void;
+  loadMonth: () => Promise<void>;
+  setMonthKey: (m: string) => void;
+  setReportHorizon: (h: "week" | "month") => void;
   loadActivity: () => Promise<void>;
   setActivityDate: (d: LocalDate) => void;
   putActivitySetting: (key: string, value: unknown) => Promise<void>;
@@ -207,6 +216,10 @@ export const useApp = create<AppState>((set, get) => ({
   lifeAreas: [],
   dayEntries: [],
 
+  month: null,
+  monthKey: fmt.today().slice(0, 7),
+  reportHorizon: "month",
+
   activityStatus: null,
   activityDay: null,
   activityDate: fmt.today(),
@@ -245,9 +258,10 @@ export const useApp = create<AppState>((set, get) => ({
     const theme = (settings["general.theme"] as "dark" | "light" | "system") ?? "dark";
     const hourHeight = (settings["planner.hourHeight"] as number) ?? 56;
     const slotMinutes = (settings["day.slotMinutes"] as number) ?? 30;
+    const reportHorizon = (settings["reports.horizon"] as "week" | "month") ?? "month";
     const span = (settings["planner.span"] as 1 | 3 | 7) ?? 7;
     fmt.setHour12((settings["general.hour12"] as boolean) ?? false);
-    set({ theme, hourHeight, span, slotMinutes });
+    set({ theme, hourHeight, span, slotMinutes, reportHorizon });
     applyTheme(theme);
 
     await Promise.all([
@@ -272,7 +286,7 @@ export const useApp = create<AppState>((set, get) => ({
   go(view) {
     void get().flushNote();
     set({ view, overlay: null });
-    if (view === "reports" && !get().reports) void get().loadReports();
+    if (view === "reports") void get().loadMonth();
     if (view === "activity") void get().loadActivity();
     if (view === "day") void get().loadDay();
   },
@@ -391,6 +405,26 @@ export const useApp = create<AppState>((set, get) => ({
     }
     const day = await get().run(() => ipc.getActivityDay(get().activityDate, fmt.tz()));
     if (day) set({ activityDay: day });
+  },
+
+  /**
+   * `get_month` is `get_day` summed over the month, so nothing here is a second
+   * implementation of the precedence rules — see `store/month.rs`.
+   */
+  async loadMonth() {
+    const month = await get().run(() => ipc.getMonth(get().monthKey, fmt.tz()));
+    if (month) set({ month });
+  },
+
+  setMonthKey(monthKey) {
+    set({ monthKey });
+    void get().loadMonth();
+  },
+
+  setReportHorizon(reportHorizon) {
+    set({ reportHorizon });
+    void ipc.setSetting("reports.horizon", reportHorizon).catch(() => {});
+    if (reportHorizon === "month") void get().loadMonth();
   },
 
   setActivityDate(activityDate) {
@@ -570,7 +604,7 @@ export const useApp = create<AppState>((set, get) => ({
       const fresh = await ipc.getTaskDetail(detail.task.id).catch(() => null);
       if (fresh) set({ detail: fresh });
     }
-    if (view === "reports") await get().loadReports();
+    if (view === "reports") await get().loadMonth();
     if (view === "activity") await get().loadActivity();
     // The Day view reads sessions and blocks, so any mutation can change it.
     if (view === "day") await get().loadDay();

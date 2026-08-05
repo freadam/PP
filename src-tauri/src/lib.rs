@@ -325,6 +325,13 @@ fn get_day(
     with(&state, |s| s.get_day(&date, &tz, slot_minutes))
 }
 
+/// The month dashboard (wireframe screen 3). Month is the plan's default
+/// reporting horizon, so this is what Reports opens to.
+#[tauri::command]
+fn get_month(state: State<'_, AppState>, month: String, tz: String) -> Res<MonthView> {
+    with(&state, |s| s.get_month(&month, &tz))
+}
+
 #[tauri::command]
 fn get_life_areas(
     state: State<'_, AppState>,
@@ -686,6 +693,7 @@ pub fn run() {
             get_reports,
             get_reconcile_items,
             get_day,
+            get_month,
             get_life_areas,
             create_life_area,
             update_life_area,

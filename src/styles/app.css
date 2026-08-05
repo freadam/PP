@@ -1730,3 +1730,169 @@ textarea::placeholder {
   .day-detail { display: none; }
   .cards { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ─── Month dashboard (wireframe screen 3) ───────────────────────────── */
+
+/* Four panels, two up. The wireframe's proportions: the trend chart and the
+   targets get the wider column because both are read left-to-right. */
+.dashboard {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--s-12);
+  align-items: start;
+}
+.dashboard .panel {
+  margin: 0;
+}
+.panel h3 {
+  margin: 0 0 var(--s-8);
+  font-size: var(--t-label);
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.linechart {
+  height: 165px;
+  border-left: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: var(--s-12) var(--s-8) var(--s-4) var(--s-8);
+}
+.linechart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* One cell per day. Shade carries the ratio, but the numeral is always there
+   and a corner mark carries "never reviewed" — so nothing is colour-only. */
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--s-4);
+}
+.heat {
+  position: relative;
+  aspect-ratio: 1.6;
+  border: 1px solid var(--line);
+  border-radius: 1px;
+  padding: 2px 4px;
+  color: var(--muted);
+  overflow: hidden;
+}
+.heat[data-level="1"] { background: color-mix(in srgb, var(--plot) 12%, transparent); }
+.heat[data-level="2"] { background: color-mix(in srgb, var(--plot) 26%, transparent); }
+.heat[data-level="3"] { background: color-mix(in srgb, var(--plot) 42%, transparent); color: var(--paper); }
+/* A day that has not arrived: outlined only, and never marked as a problem. */
+.heat[data-future="true"] {
+  border-style: dashed;
+  color: var(--faint);
+  background: none;
+}
+/* A day nobody reviewed, whatever its coverage. Corner mark, not a hue. */
+.heat[data-unreconciled="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  border-width: 0 7px 7px 0;
+  border-style: solid;
+  border-color: transparent var(--track) transparent transparent;
+}
+
+.bars .bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr 44px auto;
+  align-items: center;
+  gap: var(--s-8);
+  margin: var(--s-6) 0;
+}
+.bar-row > .micro:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bar {
+  display: block;
+  height: 14px;
+  border: 1px solid var(--line);
+  border-radius: 1px;
+  background: var(--rule);
+  overflow: hidden;
+}
+.bar > i {
+  display: block;
+  height: 100%;
+}
+
+.warning-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-8);
+  padding: var(--s-6) 0;
+  border-top: 1px solid var(--rule);
+}
+.warning-list > div:first-child {
+  border-top: 0;
+}
+/* A finding worth acting on gets a rule in `track`, the app's "actual" hue —
+   never red, which stays reserved for destructive actions (§9.4). */
+.warning-list > div[data-warning="true"] {
+  box-shadow: inset 2px 0 0 var(--track);
+  padding-left: var(--s-8);
+}
+
+/* ─── Wireframe language, shared ─────────────────────────────────────────
+   The wireframes distinguish the four layers by *border*, not by fill:
+   solid = confirmed, dotted = planned, dashed = observed, hatched = empty.
+   That survives greyscale and a printed export, which is where a colour-only
+   scheme fails first (M16). Applied here so every screen speaks it. */
+
+.day-chip[data-plan="true"] > i {
+  /* The plan is drawn, not filled — a dotted mark against the record's solid. */
+  background-image: linear-gradient(
+    to bottom,
+    currentColor 0 2px,
+    transparent 2px 4px
+  );
+  opacity: 0.9;
+}
+.day-chip[data-owner="observed"] > i,
+.day-chip[data-owner="idle"] > i {
+  background: transparent !important;
+  border-left: 3px dashed var(--muted);
+  width: 0;
+}
+
+/* The classification cell is a boxed status, as in the wireframe: a word in a
+   rule reads as a state, the same word bare reads as a caption. */
+.day-state .micro {
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  padding: 0 var(--s-6);
+  display: inline-block;
+  max-width: 100%;
+}
+.day-row[data-state="empty"] .day-state .micro {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+/* Vertical rules between columns. The wireframe is a grid, not a list — the
+   columns are four different kinds of claim and the rule is what says so. */
+.day-table th,
+.day-table td {
+  border-right: 1px solid var(--rule);
+}
+.day-table th:last-child,
+.day-table td:last-child {
+  border-right: 0;
+}
+
+@media (max-width: 1129px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+}
