@@ -13,8 +13,8 @@ what is missing.
 | **2. Core foundation** | Weeks 3–4 | **done** | Tauri shell, Rust core with no UI dependency, SQLite schema with forward-only migrations, timer state machine, crash recovery, sleep segmentation, plan/record separation, `VACUUM INTO` backups. Time invariants and restart recovery pass automated tests. | — |
 | **3. Activity capture** | Weeks 5–6 | **partial** | Foreground application observation, idle segmentation, exclusions applied before storage, retention with automatic purge, pause that survives restart, delete-all. Privacy contract enforced below the IPC boundary. **The browser connector**: MV3 extension, native-messaging host, spool hand-off, domain rules and write-time classification, with its own switch and its own exclusion list. | Seven days of real capture on the client's PC, which is what the 90%-capture and 95%-YouTube/Twitch measures are actually measured over. |
 | **4. Day, Planner and dashboard** | Weeks 6–7 | **in progress** | The life-time model and precedence engine; the **Day view** at 5/15/30/60-minute resolution with empty hours, four distinguishable layers, a per-gap fill action and a day ledger. Planner at 1/3/7-day spans with drift, collisions, recurrence. | The month dashboard and the Planner's month span. Day-view editing beyond fill: split, merge, repeat, multi-select. Filters. |
-| **5. Projects, tasks and life tracking** | Week 8 | **partial** | Backlog with six groups, estimates on a fixed ladder, timers, manual session correction, subtasks to three levels. Life areas and entries, and work contribution modes, both landed early in Phase 4. | Target-vs-actual reporting for life areas, life-area management UI, and the reduction of task notes from Markdown to compact plain text. |
-| **6. Reconcile, calibrate, reduce entertainment** | Week 9 | **partial** | Daily reconcile in the wireframe's three-column shape: queue, numbered choices with a stated recommendation, and an evidence panel for machine claims. Covers overruns, unstarted plans, unplanned work, **observed-only time and empty hours** (M10). Drift per block. Trailing 30-day calibration. | Entertainment budgets, planned entertainment windows, threshold notifications, planned-vs-unplanned reporting. The connector they were blocked on now exists, so these are ordinary work rather than a dependency. |
+| **5. Projects, tasks and life tracking** | Week 8 | **partial** | Backlog with six groups, estimates on a fixed ladder, timers, manual session correction, subtasks to three levels. Life areas and entries, and work contribution modes, both landed early in Phase 4. Target-vs-actual bars for life areas on the month dashboard. | Life-area management UI, and the reduction of task notes from Markdown to compact plain text. |
+| **6. Reconcile, calibrate, reduce entertainment** | Week 9 | **partial — next** | Daily reconcile in the wireframe's three-column shape: queue, numbered choices with a stated recommendation, and an evidence panel for machine claims. Covers overruns, unstarted plans, unplanned work, **observed-only time and empty hours** (M10). Drift per block. Trailing 30-day calibration. | Entertainment budgets, planned entertainment windows, threshold notifications, planned-vs-unplanned reporting. The connector they were blocked on now exists, so these are ordinary work rather than a dependency — and all of them fall out of the weekly-goal mechanism planned in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md). |
 | **7. Excel migration and export** | Week 10 | **partial** | The `.xlsx` month export: three sheets, a preview that is the sheet, options, and a reconciliation table putting the app's figures beside the sheet's own. Totals are formulas over the month sheet, not pasted numbers. JSON round-trips exactly; CSV exists. | Workbook **import** with mapping and variance preview (M13). |
 | **8. Private beta and hardening** | Week 11 | **not started** | UI checks run headless at five viewport sizes on every view. | Seven consecutive days on the client's PC. Performance profiling on a packaged build. |
 | **9. Release candidate** | Week 12 | **not started** | — | Installer, user guide, release notes, acceptance sign-off. |
@@ -51,11 +51,16 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    export screen with its workbook writer.
 5. ✅ Reconciling observed-only and empty hours (M10), in the wireframe's
    three-column sheet.
-6. ⬅ **Workbook import (M13)** — the export's inverse, and now the only
-   substantial item left that is blocked on nothing. *(next)*
-7. Entertainment budgets, planned entertainment windows and threshold
-   notifications — the reduction half of the outcome, now that the measurement
-   half exists.
+6. ⬅ **The week you are in** — weekly goals with mid-week pacing, fragmentation
+   reported rather than scored, continuous-work notices, and a weekly review
+   that sets next week's goals from what actually happened. Planned in
+   [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md). *(next)*
+
+   This is **not new scope**: M11's entertainment budget is a weekly goal with
+   `direction = at_most`, so the general mechanism closes it as a side effect.
+   It goes before workbook import because the plan's own phase order puts
+   Phase 6 (reconcile, calibrate, reduce entertainment) ahead of Phase 7 (Excel).
+7. **Workbook import (M13)** — the export's inverse. Unchanged in scope.
 8. The `Split` verb, on the Day view and in the reconciler.
 
 Items 1–3 close the plan's Phase 4 exit gate: *a full day reconciles without
@@ -73,6 +78,21 @@ double-counting and the month dashboard matches source totals.*
 | Month dashboard | **built** — six cards, entertainment trend, data-quality heatmap, life-area targets, findings |
 | Reconcile | **built** — three columns, evidence panel, numbered choices, observed-only and empty items (M10), and the prospective-rule checkbox |
 | Excel export | **built** — preview, options, reconciliation table, three-sheet workbook with real formulas |
+
+## The week horizon
+
+Three horizons, and only two of them work.
+
+| Horizon | State |
+|---|---|
+| **Day** | The primary screen, with a ritual — reconcile, ninety seconds, every evening. |
+| **Month** | The dashboard: six cards, findings, targets versus actual. |
+| **Week** | A planner span and a calibration panel. **Nothing tells you on Wednesday whether the week is going the way you meant it to.** |
+
+A month dashboard is a verdict delivered too late to act on, and a day is too
+short a window to see a habit in. The week is the horizon where a person can
+still change the outcome, and it is the one Fruit does not currently speak to.
+[`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) is the plan for closing it.
 
 ## Risks currently live
 

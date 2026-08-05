@@ -5,8 +5,8 @@ Windows, without a full URL ever leaving the browser — and without opening a
 listening port?
 
 **Answer.** Yes. The design is settled and the risky parts are built and tested.
-Two things remain unproven, both named below, and both need a Windows machine
-with Chrome on it rather than more code.
+Three things remain unproven, all named below, and all three need a Windows
+machine with Chrome on it rather than more code.
 
 This spike closes the last **Phase 1** item in `ROADMAP.md`, which the plan
 scheduled for week 2 and which four wireframe screens have been waiting on.

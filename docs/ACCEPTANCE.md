@@ -28,21 +28,47 @@ To be demonstrated on the client's Windows PC.
 | M4 | Projects and tasks support estimates, timers, sessions, subtasks and **one compact plain-text note each**; no Markdown or Obsidian workflow | Estimates/timers/sessions/subtasks all covered by F1/F4. **The note is still a Markdown renderer — not yet reduced.** | ❌ partial |
 | M5 | Contribution modes apply to **Work only** and clear when a record becomes life time | `contribution_is_work_only_and_clears_on_conversion` | ✅ |
 | M6 | Foreground app and idle capture when enabled, with pause, exclusions, retention and delete enforced | `activity_respects_the_privacy_contract`, `activity_purges_at_the_retention_limit` | ✅ |
-| M7 | YouTube and Twitch classify as Entertainment automatically; user exceptions work prospectively | **Not built** — needs the browser connector | ❌ |
+| M7 | YouTube and Twitch classify as Entertainment automatically; user exceptions work prospectively | `defaults_classify_the_domains_the_plan_names`; `a_rule_made_while_reconciling_classifies_forwards_and_never_backwards` proves the *prospectively* half — a rule made today cannot rewrite a month already closed | ✅ |
 | M8 | A task timer overlapping PC activity **enriches** the interval instead of adding duplicate duration | `observation_enriches_a_confirmed_session_without_adding_time` | ✅ |
 | M9 | Manual life entries fill gaps, repeat, replace an interval with confirmation, and are editable later | `life_entries_fill_gaps_and_replace_with_confirmation`; repeat is **not built** | ❌ partial |
-| M10 | Daily reconciliation covers overruns, unstarted plans, unplanned work, **observed-only activity and empty hours** | First three covered by `f3_…` and the reconcile suite. Observed-only and empty hours are **not built**. | ❌ partial |
-| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Not built** | ❌ |
-| M12 | Reports open to a month summary by default; a month exports to `.xlsx` in the approved format with accurate totals | **Not built** | ❌ |
+| M10 | Daily reconciliation covers overruns, unstarted plans, unplanned work, **observed-only activity and empty hours** | First three by `f3_…` and the reconcile suite; the last two by `reconcile_covers_observed_only_and_empty_hours`, sourced from `resolve_day`'s own segments so the sheet and the Day view cannot disagree about what is left to decide | ✅ |
+| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Not built.** Planned as the `at_most` case of weekly goals — see [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) and W1/W2 below. Unplanned totals are already real; planned entertainment is flat zero because no window can be planned yet, and the dashboard says so rather than drawing an empty axis. | ❌ |
+| M12 | Reports open to a month summary by default; a month exports to `.xlsx` in the approved format with accurate totals | Reports is month-first; `get_month` is `get_day` summed, so a figure here and on a day cannot be computed two ways. Export writes three sheets whose totals are `COUNTIF` formulas rather than pasted numbers, from the same matrix the preview renders. | ✅ / format needs client sign-off |
 | M13 | A historical workbook month imports through a preview with no silent loss and a variance report | **Not built** | ❌ |
 | M14 | Backup/restore succeeds on a clean profile; the product stays usable offline with no unexpected outbound connection | `d5_restore_from_snapshot`, `d6_export_import_round_trips_exactly`; I7 asserts zero external requests | ✅ |
 | M15 | Timers and activity segmentation recover safely after restart, sleep/wake or forced close | `u7_recovery_trims_to_the_last_heartbeat`, `d10_sleep_is_not_counted_by_default`, `sleep_splits_the_session_instead_of_spanning_it` | ✅ |
 | M16 | Primary actions reachable by keyboard; important states never colour-only | One `COMMANDS` registry (structural); `check-ui.mjs` U10 and I3 | ✅ |
 
-**7 of 16 fully covered, 3 partial, 6 not started.** The six untouched are
-entertainment (M7, M11), Excel (M12, M13), and the two halves of reconciling
-what the observer saw (M10). Every one of them is downstream of a component
-that does not exist yet — the browser connector or the XLSX writer.
+**12 of 16 fully covered, 2 partial, 2 not started.** Both components that used
+to gate the rest — the browser connector and the XLSX writer — now exist, so
+nothing remaining is blocked on a missing capability.
+
+| | |
+|---|---|
+| **M4**, **M9** — partial | The task note is still a Markdown renderer, and life entries do not repeat. |
+| **M11** — not started | Entertainment budgets. Planned below as the `at_most` case of weekly goals. |
+| **M13** — not started | Workbook import. |
+| **M12** — built, unsigned | The export exists and its totals are formulas; the *format* needs the client's reference month before it can be signed off. |
+
+---
+
+## Weekly goals (W) — proposed
+
+Not built. Planned in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), and
+recorded here so the measures are agreed before the code exists rather than
+written to fit it afterwards. All six are testable in `fruit-core` with a fake
+clock and no webview.
+
+| # | Criterion | Why this one |
+|---|---|---|
+| W1 | A goal in force during a week is the goal that week's review reports, **after that goal has since been edited** | A goal edited into a new number must not retroactively rewrite how a past week went, or reviews stop meaning anything. Same argument as `activity_span.category` being stamped at write time. |
+| W2 | A goal at zero on Monday morning reports **on pace**, not behind; expected progress never counts a day that has not happened | The month dashboard's "6% accounted" bug, in a new place. An app that reports the future as a failure is one whose numbers you learn to discount. |
+| W3 | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
+| W4 | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
+| W5 | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
+| W6 | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
+
+**W2 is the one that matters most**, for the reason given in its own row.
 
 ---
 

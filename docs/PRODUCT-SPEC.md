@@ -181,6 +181,20 @@ project and week. Life-area and sleep/rest target vs actual. Planned vs
 unplanned entertainment with YouTube/Twitch trends. Work contribution
 summaries — **which never apply to personal time**.
 
+**Weekly goals** (planned — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md)): a
+target with a **direction**, so "at most 5h of entertainment" is a goal you
+succeed at by being under it rather than a bar you are failing to fill. Reported
+by **pace** rather than as a scoreboard — where you should be right now, and what
+the rest of the week has to look like. Fragmentation reported as its components —
+longest unbroken stretch, planned versus unplanned switches, time in fragments —
+and deliberately **not** synthesised into a score, because every other number in
+this app can be checked by hand. A weekly review that sets next week's goals from
+what actually happened, at the same n ≥ 5 median discipline the estimate
+calibration already uses.
+
+Blocking, focus scores, focus sounds and team visibility are out of scope; see
+the plan document for why each was rejected rather than deferred.
+
 ### 3.6 Settings
 
 General · Planner/month · Timer · Pomodoro · Activity privacy · Entertainment
@@ -466,7 +480,8 @@ in bold; each is reversible.
 | Day view | **Built** — the primary screen, at 5/15/30/60-minute resolution |
 | Month dashboard | **Built** — `get_month` is `get_day` summed, so the two cannot disagree |
 | Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
-| Entertainment budgets and planned windows | **Not built** — no longer blocked |
+| Entertainment budgets and planned windows | **Not built** — no longer blocked. Planned as the `at_most` case of weekly goals, in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) |
+| **Weekly goals, pacing, fragmentation, weekly review** | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md). The week is the one horizon with no working surface. |
 | Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
 | Excel **import** | **Not built** (M13) |
 | Task notes | Built as **Markdown**; the plan requires compact plain text |
