@@ -421,3 +421,283 @@ mod tests {
         assert!(s.merge_life_entries(&[d, e, f]).is_err());
     }
 }
+
+// ─── split, merge's inverse ────────────────────────────────────────────
+//
+// One record becoming two, at a moment inside it. The other half of the pair
+// the wireframe asks for on the Day view, and the same verb the reconciler
+// already offers for a block that overran.
+//
+// **The two halves account for exactly what the one did.** No second is lost at
+// the seam and none is invented: the first ends where the second begins. That
+// is the counting invariant applied to an edit, and it is what the tests below
+// assert rather than the ids or the ordering.
+
+impl Store {
+    /// Splits a life entry at `at`, which must fall strictly inside it.
+    ///
+    /// Returns `(earlier, later)`. The original row survives as the earlier
+    /// half, so anything already pointing at it still points at something.
+    pub fn split_life_entry(&mut self, id: &str, at: Millis) -> Result<(LifeEntryRow, LifeEntryRow)> {
+        validate_id(id, "life entry")?;
+        let row = self.life_entry_row(id)?;
+        check_inside(row.started_at, row.ended_at, at)?;
+
+        let zone_ = zone(&row.tz)?;
+        let now = self.now();
+        let new = crate::ids::new_id();
+        let tx = self.conn.transaction()?;
+        // The later half is written **first**, while the original still knows
+        // where it ended. Shortening it first and then selecting `ended_at`
+        // reads back the split point, and produces a zero-length row the CHECK
+        // constraint refuses — which is the schema catching a real mistake.
+        //
+        // It inherits everything descriptive: area, label, privacy, note, the
+        // series it belongs to, the import it came from. A split is one thing
+        // becoming two of the same thing, not two of a new thing.
+        tx.execute(
+            "INSERT INTO life_entry
+               (id, life_area_id, label, started_at, ended_at, local_date, tz,
+                is_private, note, series_id, import_batch_id, device_id, created_at, updated_at)
+             SELECT ?2, life_area_id, label, ?3, ended_at, ?4, tz, is_private, note,
+                    series_id, import_batch_id, ?5, ?6, ?6
+               FROM life_entry WHERE id = ?1",
+            params![id, new, at, local_date(at, &zone_), self.device_id, now],
+        )?;
+        tx.execute(
+            "UPDATE life_entry SET ended_at = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, at, now],
+        )?;
+        tx.commit()?;
+
+        Ok((self.life_entry_row(id)?, self.life_entry_row(&new)?))
+    }
+
+    /// Splits a closed session at `at`. Returns `(earlier, later)`.
+    ///
+    /// Both halves set `elapsed_sec` to their own span, for the reason merge
+    /// does: a row whose two durations disagree puts a different number in the
+    /// Day view than in the drift rail.
+    pub fn split_session(&mut self, id: &str, at: Millis) -> Result<(SessionRow, SessionRow)> {
+        validate_id(id, "session")?;
+        let row = self.session_row(id)?;
+        let Some(ended_at) = row.ended_at else {
+            return Err(AppError::invalid(
+                "That session is still running. Stop the timer before splitting it.",
+            ));
+        };
+        if self.timer.session_id.as_deref() == Some(id) {
+            return Err(AppError::invalid(
+                "That session is the running one. Stop the timer before splitting it.",
+            ));
+        }
+        check_inside(row.started_at, ended_at, at)?;
+
+        let now = self.now();
+        let new = crate::ids::new_id();
+        let tx = self.conn.transaction()?;
+        // Written first, while the original still knows where it ended — see
+        // `split_life_entry`. The later half keeps the block attribution:
+        // splitting a session is not a decision about which plan it belongs to,
+        // and quietly detaching half of it would move tracked time out of a
+        // drift figure nobody touched.
+        tx.execute(
+            "INSERT INTO time_session
+               (id, task_id, block_id, started_at, ended_at, elapsed_sec, heartbeat_at,
+                source, is_confirmed, note, import_batch_id, device_id, created_at, updated_at)
+             SELECT ?2, task_id, block_id, ?3, ended_at, ?4, NULL,
+                    source, is_confirmed, note, import_batch_id, ?5, ?6, ?6
+               FROM time_session WHERE id = ?1",
+            params![id, new, at, (ended_at - at) / 1000, self.device_id, now],
+        )?;
+        tx.execute(
+            "UPDATE time_session SET ended_at = ?2, elapsed_sec = ?3, updated_at = ?4
+              WHERE id = ?1",
+            params![id, at, (at - row.started_at) / 1000, now],
+        )?;
+        db::rebuild_tracked_caches(&tx)?;
+        tx.commit()?;
+
+        Ok((self.session_row(id)?, self.session_row(&new)?))
+    }
+}
+
+/// A split point has to be *inside*, and leave something on both sides.
+///
+/// A minute is the floor rather than zero, because a split producing a
+/// four-second sliver is never what anyone meant and is impossible to click on
+/// afterwards.
+fn check_inside(from: Millis, to: Millis, at: Millis) -> Result<()> {
+    const MIN_HALF_MS: i64 = 60_000;
+    if at - from < MIN_HALF_MS || to - at < MIN_HALF_MS {
+        return Err(AppError::invalid(
+            "Pick a time inside it, at least a minute from either end.",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod split_tests {
+    use super::*;
+    use crate::clock::TestClock;
+    use std::sync::Arc;
+
+    const MONDAY: i64 = 1_785_747_600_000;
+    const TZ: &str = "UTC";
+
+    fn store() -> Store {
+        Store::in_memory_with_clock(Arc::new(TestClock::new(MONDAY))).unwrap()
+    }
+
+    /// The whole point, stated as arithmetic: the two halves account for
+    /// exactly what the one did. No second lost at the seam, none invented.
+    #[test]
+    fn the_halves_account_for_what_the_whole_did() {
+        let mut s = store();
+        let area = s
+            .get_life_areas(TZ, false)
+            .unwrap()
+            .into_iter()
+            .find(|a| a.name == "Wellbeing")
+            .unwrap()
+            .id;
+        let entry = s
+            .add_life_entry(NewLifeEntry {
+                life_area_id: area,
+                label: Some("Out".into()),
+                started_at: MONDAY,
+                ended_at: MONDAY + 2 * 3_600_000,
+                tz: TZ.into(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })
+            .unwrap();
+
+        let before = s.get_day("2026-08-03", TZ, None).unwrap().totals;
+        let (a, b) = s.split_life_entry(&entry.id, MONDAY + 90 * 60_000).unwrap();
+        let after = s.get_day("2026-08-03", TZ, None).unwrap().totals;
+
+        assert_eq!(a.ended_at, b.started_at, "no gap and no overlap at the seam");
+        assert_eq!(
+            (a.ended_at - a.started_at) + (b.ended_at - b.started_at),
+            2 * 3_600_000
+        );
+        assert_eq!(after.confirmed_life_sec, before.confirmed_life_sec);
+        // Descriptive fields travel: one thing became two of the same thing.
+        assert_eq!(b.label.as_deref(), Some("Out"));
+        assert_eq!(b.life_area_id, a.life_area_id);
+    }
+
+    #[test]
+    fn a_split_session_keeps_its_block_and_its_arithmetic() {
+        let mut s = store();
+        let task = s
+            .create_task(NewTask {
+                title: "Work".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        let block = s
+            .schedule_block(NewBlock {
+                task_id: Some(task.id.clone()),
+                label: None,
+                starts_at: MONDAY,
+                duration_sec: 2 * 3600,
+                tz: TZ.into(),
+                is_fixed: false,
+                rrule: None,
+                intent: None,
+            })
+            .unwrap();
+        let session = s
+            .add_session(ManualSession {
+                task_id: task.id.clone(),
+                block_id: Some(block.id.clone()),
+                started_at: MONDAY,
+                ended_at: MONDAY + 2 * 3_600_000,
+                note: None,
+            })
+            .unwrap();
+
+        let (a, b) = s.split_session(&session.id, MONDAY + 45 * 60_000).unwrap();
+        assert_eq!(a.ended_at, Some(b.started_at));
+        assert_eq!(a.elapsed_sec + b.elapsed_sec, 2 * 3600);
+        // Span and elapsed agree on both halves, or the Day view and the drift
+        // rail would disagree about the same interval.
+        assert_eq!(a.elapsed_sec, (a.ended_at.unwrap() - a.started_at) / 1000);
+        assert_eq!(b.elapsed_sec, (b.ended_at.unwrap() - b.started_at) / 1000);
+        // Splitting is not a decision about which plan the time belongs to.
+        assert_eq!(b.block_id.as_deref(), Some(block.id.as_str()));
+
+        let day = s.get_day("2026-08-03", TZ, None).unwrap();
+        assert_eq!(day.totals.confirmed_work_sec, 2 * 3600);
+    }
+
+    /// Outside, or too close to an end to leave anything usable behind.
+    #[test]
+    fn a_split_point_has_to_leave_something_on_both_sides() {
+        let mut s = store();
+        let area = s
+            .get_life_areas(TZ, false)
+            .unwrap()
+            .into_iter()
+            .find(|a| a.name == "Wellbeing")
+            .unwrap()
+            .id;
+        let entry = s
+            .add_life_entry(NewLifeEntry {
+                life_area_id: area,
+                label: None,
+                started_at: MONDAY,
+                ended_at: MONDAY + 3_600_000,
+                tz: TZ.into(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })
+            .unwrap();
+
+        for at in [MONDAY - 60_000, MONDAY, MONDAY + 30_000, MONDAY + 3_600_000] {
+            assert!(
+                s.split_life_entry(&entry.id, at).is_err(),
+                "{at} should have been refused"
+            );
+        }
+        // And nothing moved.
+        assert_eq!(s.life_entries_on("2026-08-03", TZ).unwrap().len(), 1);
+    }
+
+    /// Split then merge is a round trip. It is the pair the Day view offers,
+    /// so an afternoon divided by mistake costs one more click, not an evening.
+    #[test]
+    fn splitting_and_merging_again_restores_the_interval() {
+        let mut s = store();
+        let area = s
+            .get_life_areas(TZ, false)
+            .unwrap()
+            .into_iter()
+            .find(|a| a.name == "Wellbeing")
+            .unwrap()
+            .id;
+        let entry = s
+            .add_life_entry(NewLifeEntry {
+                life_area_id: area,
+                label: None,
+                started_at: MONDAY,
+                ended_at: MONDAY + 2 * 3_600_000,
+                tz: TZ.into(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })
+            .unwrap();
+
+        let (a, b) = s.split_life_entry(&entry.id, MONDAY + 3_600_000).unwrap();
+        let merged = s.merge_life_entries(&[a.id.clone(), b.id]).unwrap();
+        assert_eq!(merged.seconds, 2 * 3600);
+        assert_eq!(merged.absorbed_sec, 0, "the halves touched");
+        assert_eq!(merged.id, entry.id, "and the original id survived both");
+    }
+}

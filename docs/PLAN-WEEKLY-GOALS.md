@@ -899,12 +899,18 @@ time it can.
 
 ### Still not done
 
-- **The weekly report as an artifact** — a file waiting on Monday morning,
-  headline first. The review panel exists; the thing you open at a fixed moment
-  does not.
-- **W3 focus sessions**, **W4 notices**, **W5 the off-plan nudge**.
-- **Workbook import (M13)**.
-- **Planned entertainment windows**, the other half of M11.
+*(This list was written partway through the build. Everything on it has since
+landed; it is kept rather than deleted because a plan that quietly erases what
+it once said was missing is a plan you cannot audit.)*
+
+- ~~**The weekly report as an artifact**~~ — built. A two-sheet `.xlsx` whose
+  shares are formulas, and a card that appears once a week has finished and
+  waits until it has been read.
+- ~~**W3 focus sessions**, **W4 notices**, **W5 the off-plan nudge**~~ — built.
+- ~~**Workbook import (M13)**~~ — built, and unproven against the client's own
+  workbook, which is open question 6.
+- ~~**Planned entertainment windows**~~ — built, migration 0009. The
+  planned-versus-unplanned split now reconciles to the intervals underneath it.
 
 ---
 

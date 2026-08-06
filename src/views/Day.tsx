@@ -793,6 +793,10 @@ function IntervalDetail({
         </>
       )}
 
+      {(owner.kind === "work" || owner.kind === "life") && (
+        <SplitControl segment={segment} onDone={reload} />
+      )}
+
       {owner.kind === "life" && (
         <>
           <div className="field">
@@ -848,6 +852,100 @@ function IntervalDetail({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Split — one record becoming two, at a moment inside it (wireframe, Day).
+ *
+ * Merge's inverse, and the pair matters: an afternoon divided by mistake costs
+ * one more click rather than an evening. The core guarantees the halves account
+ * for exactly what the whole did, so this control's only job is choosing where.
+ *
+ * It opens at the midpoint and steps in quarter hours. A time input would be
+ * more precise and worse: the point of a split is almost never a minute you
+ * could name, it is "somewhere around there", and two buttons get you there
+ * without a keyboard.
+ */
+function SplitControl({ segment, onDone }: { segment: DaySegment; onDone: () => Promise<void> }) {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const [at, setAt] = useState<number | null>(null);
+
+  const length = segment.to - segment.from;
+  // Under two minutes there is no inside to pick — the core refuses anything
+  // that would leave less than a minute on either side, and offering a control
+  // that can only fail is worse than not offering one.
+  if (length < 2 * 60_000) return null;
+  const point = at ?? segment.from + Math.round(length / 2);
+
+  const shift = (minutes: number) =>
+    setAt(
+      Math.min(
+        segment.to - 60_000,
+        Math.max(segment.from + 60_000, point + minutes * 60_000),
+      ),
+    );
+
+  return (
+    <div className="field">
+      <label>Split</label>
+      {at === null ? (
+        <button className="btn" onClick={() => setAt(point)}>
+          Split this in two
+        </button>
+      ) : (
+        <>
+          <div className="row">
+            <button className="btn" onClick={() => shift(-15)}>
+              −15m
+            </button>
+            <span className="grow data" style={{ textAlign: "center" }}>
+              {fmt.clock(point)}
+            </span>
+            <button className="btn" onClick={() => shift(15)}>
+              +15m
+            </button>
+          </div>
+          <div className="row">
+            <button
+              className="btn btn-primary"
+              onClick={async () => {
+                const owner = segment.owner;
+                const done = await run<unknown>(
+                  () =>
+                    owner.kind === "life"
+                      ? ipc.splitLifeEntry(owner.entryId, point)
+                      : owner.kind === "work"
+                        ? ipc.splitSession(owner.sessionId, point)
+                        : Promise.reject(new Error("Only records can be split.")),
+                  "Couldn't split that.",
+                );
+                setAt(null);
+                if (done) {
+                  toast(
+                    `Split at ${fmt.clock(point)} — ${fmt.duration(
+                      (point - segment.from) / 1000,
+                    )} then ${fmt.duration((segment.to - point) / 1000)}.`,
+                  );
+                  await onDone();
+                }
+              }}
+            >
+              Split at {fmt.clock(point)}
+            </button>
+            <button className="btn" onClick={() => setAt(null)}>
+              Cancel
+            </button>
+          </div>
+          <span className="caption">
+            {fmt.duration((point - segment.from) / 1000)} then{" "}
+            {fmt.duration((segment.to - point) / 1000)}. Nothing is added or lost — the two halves
+            account for exactly what the one did.
+          </span>
+        </>
+      )}
+    </div>
   );
 }
 

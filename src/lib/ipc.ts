@@ -290,6 +290,14 @@ export const mergeLifeEntries = (ids: string[]) =>
 
 export const mergeSessions = (ids: string[]) => call<MergeResult>("merge_sessions", { ids });
 
+/** One record becoming two, at a moment inside it. Returns `[earlier, later]`;
+ *  the original id survives as the earlier half. */
+export const splitLifeEntry = (id: string, at: Millis) =>
+  call<[LifeEntryRow, LifeEntryRow]>("split_life_entry", { id, at });
+
+export const splitSession = (id: string, at: Millis) =>
+  call<[SessionRow, SessionRow]>("split_session", { id, at });
+
 /** Makes a life entry repeat. Sleep is the case this exists for. */
 export const repeatLifeEntry = (id: string, rrule: string) =>
   call<LifeEntryRow[]>("repeat_life_entry", { id, rrule });

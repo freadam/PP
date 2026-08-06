@@ -258,6 +258,22 @@ fn merge_sessions(state: State<'_, AppState>, ids: Vec<String>) -> Res<MergeResu
     with(&state, |s| s.merge_sessions(&ids))
 }
 
+/// One record becoming two, at a moment inside it — merge's inverse, and the
+/// verb the wireframe asks for on the Day view's detail panel.
+#[tauri::command]
+fn split_life_entry(
+    state: State<'_, AppState>,
+    id: String,
+    at: i64,
+) -> Res<(LifeEntryRow, LifeEntryRow)> {
+    with(&state, |s| s.split_life_entry(&id, at))
+}
+
+#[tauri::command]
+fn split_session(state: State<'_, AppState>, id: String, at: i64) -> Res<(SessionRow, SessionRow)> {
+    with(&state, |s| s.split_session(&id, at))
+}
+
 /// Makes an existing life entry repeat. Sleep is the case this exists for.
 #[tauri::command]
 fn repeat_life_entry(
@@ -1202,6 +1218,8 @@ pub fn run() {
             extend_series_to,
             repeat_life_entry,
             merge_life_entries,
+            split_life_entry,
+            split_session,
             merge_sessions,
             delete_life_series,
             repeat_block,

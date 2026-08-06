@@ -35,10 +35,10 @@ remains is ordinary work.
 | "Observed Entertainment" | ✅ | The observed row names the **site**, not `chrome.exe`, which was the entire point of the connector. |
 | Empty rows visible and labelled | ✅ | Hatched and labelled "Unaccounted", per plan §17.4. |
 | NOW line | ✅ | A rule across the row plus a NOW tag in the gutter. |
-| Right detail panel: time, tags, project/task, **contribution dropdown**, PC evidence, note, Split / Edit | ◐ | Everything except **Split**. Contribution is settable, reclassifying work → life is there (it clears the contribution by construction), and an observed segment shows its domain rather than its browser. |
-| Filter | ◐ | Five presets (Everything · Unaccounted · Needs a decision · Work · Life). It filters **rows only** and says so — the totals stay the whole day, because a filter that changed the arithmetic would make the counting invariant unverifiable by eye. Per-project and per-area filters not yet. |
+| Right detail panel: time, tags, project/task, **contribution dropdown**, PC evidence, note, Split / Edit | ✅ | Contribution is settable, reclassifying work → life is there (it clears the contribution by construction), an observed segment shows its domain rather than its browser, and **Split** opens at the midpoint and steps in quarter hours. The two halves account for exactly what the one did — no second lost at the seam, none invented. |
+| Filter | ✅ | Five state presets, plus **per-project and per-area** groups built from the day's own segments — a filter offering thirty projects, twenty-eight of which have no time today, is a menu of dead ends. It filters **rows only** and says so: the totals stay the whole day, because a filter that changed the arithmetic would make the counting invariant unverifiable by eye. |
 | + Add interval | ✅ | Opens the fill dialog with an adjustable range. |
-| Split / merge / repeat / multi-select editing (plan §8.1) | ❌ | Fill is the only edit. These are the next Day-view increment. |
+| Split / merge / repeat / multi-select editing (plan §8.1) | ✅ | All four. **Split** on the detail panel; **merge** from a range selection, bounded at five minutes of gap and reporting every second it absorbs; **repeat** on life entries (migration 0012 — sleep is the case); **multi-select** as a range on the time column, because the fill button opens a modal and a modal covers the table you would be shift-clicking into. |
 
 ## 2. Planner — **built**
 
@@ -59,11 +59,11 @@ figure here and the same figure on a day cannot disagree.
 |---|---|---|
 | Month anchor + ‹ This month › + Day/Week/Month segmented | ✅ | Day jumps to the Day screen — it *is* the day horizon. Week keeps the calibration and project panels, which are about estimate accuracy rather than about how the month went. |
 | Cards: Accounted % · Work · Life · Sleep · Entertainment · Unaccounted | ✅ | Measured against the days that have **happened**. A fresh August on the 4th is otherwise "6% accounted", which is arithmetically true and a useless headline — the missing 27 days are the future, not a gap. |
-| Entertainment planned-vs-unplanned line chart | ◐ | Solid (unplanned) is real, and now has a real source — observed domains classified at write time. Dashed (planned) is still flat zero, and that remains the correct reading rather than a placeholder: with no way to plan an entertainment window, every minute is unplanned by definition. Planned windows are the next increment here, and they are no longer blocked. |
+| Entertainment planned-vs-unplanned line chart | ✅ | Both lines are real. Solid is entertainment outside any window you plotted; dashed is the windows themselves (migration 0009). The split is arithmetic rather than assertion — `entertainment_sec` divides by interval intersection into the part inside a window and the part outside, so the two lines and the day's total cannot disagree. |
 | Data-quality heatmap + "n unreconciled days · Nh observed-only" | ✅ | Shade is coverage, the numeral is always present, a corner mark is "never reviewed". Future days are outlined and never marked as a problem. |
 | Life-area targets vs actual bars | ✅ | An area with a target and no time still gets a row — a zero against a target is the most actionable row there is. |
 | Monthly findings + "Review source intervals" | ✅ | Findings are computed in Rust; the button opens the worst day on the Day screen. The YouTube/Twitch split now has a source — `domain_totals` — and splitting the entertainment finding into per-domain lines is a reporting change rather than a capability. |
-| "Export month to Excel" | ◐ | Present and enabled — a disabled control cannot take keyboard focus, so it would be invisible to the users most likely to look for it. It explains why it cannot run. |
+| "Export month to Excel" | ✅ | Three sheets whose totals are formulas over the month sheet, from the same matrix the preview renders. Beside it, **"Import a workbook"** — the inverse (M13). In browser preview both are present and enabled rather than greyed: a disabled control cannot take keyboard focus, so it would be invisible to exactly the users most likely to look for it, and each says plainly why it cannot run without the desktop app. |
 
 ## 4. Reconcile — **built**
 
@@ -80,7 +80,7 @@ and nine unexplained hours is not reconciled, and the sheet had no way to say so
 | **Numbered** choices with a recommended default | ✅ | `1`–`4` pick, `Enter` takes the recommendation. The recommendation is a heavier border rather than a fill: the other choices are equally legitimate and must not read as discouraged. Each carries its own consequence line. |
 | Item kinds: planned-not-started, **observed-only**, **empty**, overrun, unplanned | ✅ | Observed-only and empty come from `resolve_day`'s segments, not a query of their own — the reconciler asks about exactly the intervals the Day view shows, or the two screens disagree about what is left to decide. |
 | "Apply my choice to future activity in this context" | ✅ | A real checkbox now, shown only for a claim with a **domain** behind it — an application name is not durable enough to key a rule on, and a control that is inert half the time teaches people to ignore it. Unticked by default, and it states that it applies forwards only: `activity_span.category` is stamped at write time, so a rule made today cannot rewrite a month already signed off. There is an acceptance test for exactly that, because no screen can show it. |
-| "Split interval" | ❌ | Still the missing verb, here and on the Day view. |
+| "Split interval" | ✅ | `ReconcileVerb::Split` — the original shrinks to what was planned and the overrun gets its own block right after the tracked time ended. The Day view has its own split control now too. |
 
 ## 5. Excel Export — **built**
 
