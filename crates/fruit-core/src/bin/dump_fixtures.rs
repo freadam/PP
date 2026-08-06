@@ -176,11 +176,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (from_min, minutes, app_id, title) in [
         (0i64, 22i64, "code.exe", "auth.rs — fruit"),
         (22, 18, "slack.exe", "#eng-planning"),
+        // Both observers run at once in life, and the window title is the only
+        // thing that can say *which* video: the connector sends a domain and
+        // deliberately never a page title. These two overlap the YouTube
+        // stretches below so the preview shows a stretch you can tell apart.
+        (35, 22, "chrome.exe", "Rust lifetimes explained — YouTube"),
         (40, 25, "code.exe", "auth.rs — fruit"),
         (65, 10, "chrome.exe", "OAuth 2.1 draft"),
         (120, 55, "code.exe", "activity.rs — fruit"),
         (185, 30, "slack.exe", "#design-review"),
         (240, 70, "code.exe", "Activity.tsx — fruit"),
+        (300, 35, "chrome.exe", "Lo-fi beats to relax to — YouTube"),
         (330, 25, "chrome.exe", "RFC 5545 — RRULE"),
     ] {
         // One sample every 20 seconds, exactly as the shell's loop does: each

@@ -469,10 +469,46 @@ pub fn dedupe_browser_overlap(spans: Vec<ObservedSpan>) -> Vec<ObservedSpan> {
         return spans;
     }
 
+    // The window title lives on the *sampler's* span, never on the connector's:
+    // the extension sends a domain and nothing else, by design. So a
+    // domain-bearing span knows it was youtube.com and not which video, while
+    // the app span being subtracted underneath it holds "Video Name - YouTube -
+    // Google Chrome" — the one detail that tells two stretches apart.
+    //
+    // Carry it across. It is the same application at the same instant, so this
+    // is not an inference; it is the same fact recorded by the other of two
+    // observers. Titles remain opt-in, so this is empty unless the user asked
+    // for them.
+    let mut titles: Vec<(Millis, Millis, &str, &str)> = spans
+        .iter()
+        .filter(|s| s.domain.is_none() && !s.is_idle)
+        .filter_map(|s| {
+            s.window_title
+                .as_deref()
+                .map(|t| (s.started_at, s.ended_at, s.app_id.as_str(), t))
+        })
+        .collect();
+    titles.sort();
+
     let mut out = Vec::with_capacity(spans.len());
     for span in &spans {
         if span.domain.is_some() || span.is_idle {
-            out.push(span.clone());
+            let mut span = span.clone();
+            if span.window_title.is_none() {
+                // The title that covered the most of this interval, so a stretch
+                // spanning a title change is named after the larger part rather
+                // than after whatever happened to start first.
+                span.window_title = titles
+                    .iter()
+                    .filter(|(_, _, app, _)| *app == span.app_id)
+                    .filter_map(|(a, b, _, t)| {
+                        let overlap = (*b).min(span.ended_at) - (*a).max(span.started_at);
+                        (overlap > 0).then_some((overlap, *t))
+                    })
+                    .max_by_key(|(overlap, _)| *overlap)
+                    .map(|(_, t)| t.to_string());
+            }
+            out.push(span);
             continue;
         }
         let Some(ranges) = covered.get(span.app_id.as_str()) else {

@@ -651,10 +651,42 @@ reported nothing. It now looks for the most recent span *describing the same
 thing*. This was latent from the moment the connector landed and only became
 visible when something depended on span length.
 
+### Each stretch, not just the total
+
+The first cut of the unlabelled list showed one row per app or site — *"chrome ·
+8 stretches"* — with a single set of label buttons. That answers "what should
+this always be" and refuses the more common question: *which of those eight was
+the lecture?*
+
+Each row now carries its stretches, longest first, with times and per-stretch
+label buttons. Two verbs on one screen, and the panel says which is which:
+
+- the buttons on the **row** write a rule, and apply from now on;
+- the buttons on a **stretch** label that visit only, and touch no rule.
+
+### Which video it was
+
+The connector sends a registrable domain and nothing else — no URL, no page
+title. That is the privacy design and it does not change. But Chrome puts the
+video's name in its **window title**, and window titles are an existing,
+separate, off-by-default switch the user has already been asked about.
+
+So the detail is available, through a channel that was already consented to.
+One bug was in the way: `dedupe_browser_overlap` subtracts the app-only span —
+the one carrying the title — in favour of the domain span, which has none. It
+now carries the title across, choosing the one that covered the most of the
+interval. That is not an inference: it is the same application at the same
+instant, recorded by the other of two observers.
+
+With titles off, a stretch says which *site* and not which video, and the panel
+explains that rather than showing a blank column.
+
 ### Not done
 
 - The Day view's detail panel does not yet offer relabelling; the Activity
-  timeline does. Same command either way.
+  timeline and the unlabelled list both do. Same command either way.
+- A row shows its 12 longest stretches. Past that the aggregate is the useful
+  object, and a scrolling list of forty is not — that is a day for a rule.
 - `counts_as` is fixed after creation. Changing it would move totals on months
   already exported, so correcting a mistake means deleting the category and
   making a new one — which is visible.

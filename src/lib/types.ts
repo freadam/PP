@@ -170,6 +170,24 @@ export interface ActivityRule {
   isBuiltin: boolean;
 }
 
+/**
+ * One continuous stretch of observation, as a thing you can point at.
+ *
+ * The aggregate answers "what should this *always* be"; this answers "what was
+ * *that*". Different verbs — a rule and a relabel.
+ */
+export interface ObservedInterval {
+  id: number;
+  startedAt: Millis;
+  endedAt: Millis;
+  seconds: number;
+  appId: string;
+  domain: string | null;
+  /** The video, the document, the ticket. Only when window titles are on. */
+  windowTitle: string | null;
+  categoryId: string | null;
+}
+
 /** Something observed that no rule covers, ranked by how much time it took. */
 export interface UnlabelledRow {
   matchKind: MatchKind;
@@ -177,6 +195,8 @@ export interface UnlabelledRow {
   seconds: number;
   /** One 4-hour stretch and forty 6-minute ones are different problems. */
   occurrences: number;
+  /** Longest first, so each can be labelled without committing to a rule. */
+  stretches: ObservedInterval[];
 }
 
 export interface DomainTotal {

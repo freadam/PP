@@ -61,6 +61,13 @@ const UNDELETABLE: [&str; 2] = [category::WORK, category::OTHER];
 ///
 /// Cycled by how many categories already exist, so the first few additions are
 /// visibly different from each other and from the built-ins.
+/// How many individual stretches ride along with each unlabelled row.
+///
+/// Enough to cover a normal day's visits to one site; past that the aggregate is
+/// the useful object and a scrolling list of forty rows is not. A day that
+/// genuinely has more is a day for a rule, which is the row's own action.
+const MAX_STRETCHES: usize = 12;
+
 const NEW_CATEGORY_COLOURS: [&str; 6] = [
     "#8B7FD4", "#4FA374", "#C98A2E", "#5B8FC4", "#56C2D6", "#C2609B",
 ];
@@ -425,14 +432,15 @@ impl Store {
     /// utilities ahead of the thing that actually ate the afternoon.
     pub fn get_unlabelled(&self, from: &str, to: &str, tz: &str, limit: u32) -> Result<Vec<UnlabelledRow>> {
         use std::collections::HashMap;
-        let mut totals: HashMap<(MatchKind, String), (i64, i64)> = HashMap::new();
+        let mut totals: HashMap<(MatchKind, String), (i64, i64, Vec<ObservedInterval>)> =
+            HashMap::new();
 
         for date in crate::time::date_series(from, to)? {
             for span in self.labelled_spans(&date, tz)? {
                 if span.category_id.is_some() || span.is_idle {
                     continue;
                 }
-                let seconds = (span.ended_at - span.started_at) / 1000;
+                let seconds = span.seconds();
                 // A browser with an unlabelled tab is a question about the
                 // *site*, never about the browser. Attributing it to chrome.exe
                 // would put one row at the top of this list forever and hide
@@ -441,20 +449,42 @@ impl Store {
                     Some(d) => (MatchKind::Domain, d.clone()),
                     None => (MatchKind::App, span.app_id.to_lowercase()),
                 };
-                let entry = totals.entry(key).or_insert((0, 0));
+                let entry = totals.entry(key).or_insert((0, 0, Vec::new()));
                 entry.0 += seconds;
                 entry.1 += 1;
+                entry.2.push(ObservedInterval {
+                    id: span.id,
+                    started_at: span.started_at,
+                    ended_at: span.ended_at,
+                    seconds,
+                    app_id: span.app_id.clone(),
+                    domain: span.domain.clone(),
+                    window_title: span.window_title.clone(),
+                    category_id: span.category_id.clone(),
+                });
             }
         }
 
         let mut out: Vec<UnlabelledRow> = totals
             .into_iter()
-            .map(|((match_kind, match_value), (seconds, occurrences))| UnlabelledRow {
-                match_kind,
-                match_value,
-                seconds,
-                occurrences,
-            })
+            .map(
+                |((match_kind, match_value), (seconds, occurrences, mut stretches))| {
+                    // Longest first here too: the stretch worth naming is the
+                    // one that took the afternoon, not the one that happened
+                    // earliest.
+                    stretches.sort_by(|a, b| {
+                        b.seconds.cmp(&a.seconds).then_with(|| a.started_at.cmp(&b.started_at))
+                    });
+                    stretches.truncate(MAX_STRETCHES);
+                    UnlabelledRow {
+                        match_kind,
+                        match_value,
+                        seconds,
+                        occurrences,
+                        stretches,
+                    }
+                },
+            )
             .collect();
         // Longest first, ties broken by name — the same reason `ranked()` does
         // it in activity.rs: without a tie-break the order comes from a hash
@@ -696,6 +726,74 @@ mod tests {
                 (MatchKind::Domain, "wiki.example", 12 * 60),
             ],
             "a browser with an unlabelled tab is a question about the site"
+        );
+    }
+
+    /// The list is not only a total: each stretch comes with it, so a visit can
+    /// be labelled on its own without first committing to a rule about the site.
+    #[test]
+    fn every_stretch_comes_with_the_row_so_each_can_be_labelled_alone() {
+        let (mut s, clock) = store();
+        observe(&mut s, &clock, "chrome.exe", Some("news.example"), 30);
+        clock.advance(20 * 60_000);
+        observe(&mut s, &clock, "chrome.exe", Some("news.example"), 12);
+        clock.advance(20 * 60_000);
+        observe(&mut s, &clock, "chrome.exe", Some("news.example"), 45);
+
+        let rows = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        assert_eq!(rows.len(), 1, "one row for the site");
+        assert_eq!(rows[0].occurrences, 3);
+        // Longest first — the stretch worth naming is the one that took the
+        // afternoon, not the one that happened earliest.
+        assert_eq!(
+            rows[0].stretches.iter().map(|x| x.seconds).collect::<Vec<_>>(),
+            [45 * 60, 30 * 60, 12 * 60]
+        );
+
+        // And each carries the id `set_span_category` needs.
+        let one = &rows[0].stretches[1];
+        s.set_span_category(one.id, Some(&named(&s, "Study"))).unwrap();
+        assert_eq!(totals(&s), [("Study".to_string(), 30 * 60)]);
+        // The other two are untouched and still on the list.
+        let rows = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        assert_eq!(rows[0].occurrences, 2);
+    }
+
+    /// The detail that tells two stretches of the same site apart.
+    ///
+    /// The connector sends a domain and never a page title — that is the privacy
+    /// design. The *window* title is a different, already-opt-in channel, and
+    /// Chrome puts the video's name in it. Subtracting the app span underneath
+    /// the domain span must not throw that away.
+    #[test]
+    fn a_stretch_keeps_the_window_title_that_says_which_video_it_was() {
+        let (mut s, clock) = store();
+        s.set_activity_setting("activity.titlesEnabled", json!(true))
+            .unwrap();
+        let start = clock.now();
+
+        // The sampler, which sees the window title.
+        for _ in 0..90 {
+            s.record_activity(ActivitySample {
+                app_id: "chrome.exe".into(),
+                window_title: Some("Rust lifetimes explained - YouTube".into()),
+                domain: None,
+                at: clock.now(),
+            })
+            .unwrap();
+            clock.advance(SAMPLE_INTERVAL_MS);
+        }
+        // The connector, which sees the site and deliberately not the title.
+        clock.set(start);
+        observe(&mut s, &clock, "chrome.exe", Some("youtube.com"), 30);
+
+        let spans = s.labelled_spans(DATE, "UTC").unwrap();
+        assert_eq!(spans.len(), 1);
+        assert_eq!(spans[0].domain.as_deref(), Some("youtube.com"));
+        assert_eq!(
+            spans[0].window_title.as_deref(),
+            Some("Rust lifetimes explained - YouTube"),
+            "the one detail that distinguishes a lecture from a music video"
         );
     }
 

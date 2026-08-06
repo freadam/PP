@@ -829,6 +829,29 @@ pub struct ActivityRuleRow {
     pub is_builtin: bool,
 }
 
+/// One continuous stretch of observation, as a thing a person can point at.
+///
+/// The aggregate below answers "what should this *always* be"; this answers
+/// "what was *that*". They need different verbs — a rule and a relabel — and
+/// conflating them is how someone turns one YouTube lecture into a standing
+/// declaration that YouTube is study.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservedInterval {
+    pub id: i64,
+    pub started_at: Millis,
+    pub ended_at: Millis,
+    pub seconds: i64,
+    pub app_id: String,
+    /// The site, where the connector saw one.
+    pub domain: Option<String>,
+    /// What the window was called — the video, the document, the ticket. Only
+    /// present when window titles are switched on, and it is the field that
+    /// tells two stretches of the same site apart.
+    pub window_title: Option<String>,
+    pub category_id: Option<String>,
+}
+
 /// Something observed that no rule covers, ranked by how much of your time it
 /// took. The list the labelling UI is built on: the app names the few things
 /// worth naming instead of presenting an empty taxonomy.
@@ -841,6 +864,9 @@ pub struct UnlabelledRow {
     /// How many separate stretches. One 4-hour stretch and forty 6-minute ones
     /// are different problems wearing the same total.
     pub occurrences: i64,
+    /// The stretches themselves, longest first, so each can be labelled on its
+    /// own without first committing to a rule about the whole site.
+    pub stretches: Vec<ObservedInterval>,
 }
 
 #[derive(Debug, Clone, Serialize)]

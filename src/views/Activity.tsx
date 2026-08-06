@@ -135,7 +135,12 @@ export function Activity() {
       ) : (
         <>
           <ByCategory cats={cats} />
-          <Unlabelled rows={unlabelled} cats={cats} onDone={reload} />
+          <Unlabelled
+            rows={unlabelled}
+            cats={cats}
+            titlesOn={status.settings.titlesEnabled}
+            onDone={reload}
+          />
           <Correlations day={day} />
           <ByApp totals={day.byApp} trackedSec={day.trackedSec} />
           <DayTimeline day={day} hourHeight={hourHeight} cats={cats} onDone={reload} />
@@ -319,15 +324,18 @@ function DayTimeline({
                     height,
                     background: cat ? cat.colour : appColour(s.appId),
                   }}
-                  title={`${name}${cat ? ` · ${cat.name}` : " · no label yet"} · ${fmt.clock(
-                    s.startedAt,
-                  )}–${fmt.clock(s.endedAt)} — click to label`}
+                  title={`${name}${s.windowTitle ? ` — ${s.windowTitle}` : ""}${
+                    cat ? ` · ${cat.name}` : " · no label yet"
+                  } · ${fmt.clock(s.startedAt)}–${fmt.clock(s.endedAt)} — click to label`}
                   onClick={() => setPicking(s)}
                 >
                   {height >= 14 && (
                     <span className="micro">
                       {name}
-                      {cat && height >= 28 && <> — {cat.name}</>}
+                      {/* The window title before the label: which video it was
+                          is the thing you need in order to decide. */}
+                      {s.windowTitle && height >= 28 && <> — {s.windowTitle}</>}
+                      {cat && height >= 42 && <> · {cat.name}</>}
                     </span>
                   )}
                 </button>
@@ -390,15 +398,27 @@ function ByCategory({ cats }: { cats: ObservationCategory[] }) {
 function Unlabelled({
   rows,
   cats,
+  titlesOn,
   onDone,
 }: {
   rows: UnlabelledRow[];
   cats: ObservationCategory[];
+  titlesOn: boolean;
   onDone: () => void;
 }) {
   const run = useApp((s) => s.run);
   const toast = useApp((s) => s.toast);
+  const [open, setOpen] = useState<string | null>(null);
   if (rows.length === 0) return null;
+
+  /** One interval, no rule — the YouTube-lecture case. */
+  const labelOne = async (spanId: number, categoryId: string) => {
+    const ok = await run(
+      () => ipc.setSpanCategory(spanId, categoryId),
+      "Couldn't label that interval.",
+    );
+    if (ok !== null) onDone();
+  };
 
   const label = async (row: UnlabelledRow, categoryId: string) => {
     const ok = await run(
@@ -420,24 +440,86 @@ function Unlabelled({
         from now on — today&rsquo;s record keeps what it was given.
       </p>
       <div className="stack" style={{ gap: 8 }}>
-        {rows.map((row) => (
-          <div key={`${row.matchKind}:${row.matchValue}`} className="row">
-            <span className="tag micro">{row.matchKind === "domain" ? "site" : "app"}</span>
-            <span className="grow">
-              {row.matchValue}{" "}
-              <span className="caption">
-                {/* One 4-hour stretch and forty 6-minute ones are different
-                    problems wearing the same total. */}
-                {row.occurrences === 1 ? "one stretch" : `${row.occurrences} stretches`}
-              </span>
-            </span>
-            <span className="data caption" style={{ width: 64, textAlign: "right" }}>
-              {fmt.duration(row.seconds)}
-            </span>
-            <CategoryPicker cats={cats} onPick={(id) => void label(row, id)} />
-          </div>
-        ))}
+        {rows.map((row) => {
+          const key = `${row.matchKind}:${row.matchValue}`;
+          const isOpen = open === key || row.occurrences === 1;
+          return (
+            <div key={key} className="stack" style={{ gap: 4 }}>
+              <div className="row">
+                <span className="tag micro">{row.matchKind === "domain" ? "site" : "app"}</span>
+                <span className="grow">
+                  {row.matchValue}{" "}
+                  {row.occurrences > 1 && (
+                    <button
+                      className="btn micro"
+                      aria-expanded={isOpen}
+                      onClick={() => setOpen(isOpen ? null : key)}
+                    >
+                      {/* One 4-hour stretch and forty 6-minute ones are
+                          different problems wearing the same total, so the
+                          count is a control rather than a caption. */}
+                      {isOpen ? "▾" : "▸"} {row.occurrences} stretches
+                    </button>
+                  )}
+                </span>
+                <span className="data caption" style={{ width: 64, textAlign: "right" }}>
+                  {fmt.duration(row.seconds)}
+                </span>
+                <CategoryPicker cats={cats} onPick={(id) => void label(row, id)} />
+              </div>
+
+              {isOpen && (
+                <div className="stack" style={{ gap: 4, paddingLeft: 24 }}>
+                  {row.occurrences > 1 && (
+                    <p className="caption">
+                      The buttons above make a <b>rule</b> for every future visit. The ones
+                      below label <b>that visit only</b>.
+                    </p>
+                  )}
+                  {row.stretches.map((st) => (
+                    <div key={st.id} className="row">
+                      <span className="data micro" style={{ width: 92 }}>
+                        {fmt.clock(st.startedAt)}–{fmt.clock(st.endedAt)}
+                      </span>
+                      <span className="grow micro">
+                        {/* The window title is what tells a lecture from a music
+                            video. It arrives only when titles are switched on,
+                            so its absence gets an explanation rather than a
+                            blank. */}
+                        {st.windowTitle ?? (
+                          <span className="caption">no window title recorded</span>
+                        )}
+                      </span>
+                      <span className="data caption" style={{ width: 56, textAlign: "right" }}>
+                        {fmt.duration(st.seconds)}
+                      </span>
+                      <CategoryPicker
+                        cats={cats}
+                        current={st.categoryId}
+                        onPick={(id) => void labelOne(st.id, id)}
+                      />
+                    </div>
+                  ))}
+                  {row.stretches.length < row.occurrences && (
+                    <p className="caption">
+                      Showing the {row.stretches.length} longest of {row.occurrences}. Past
+                      that, a rule is the better tool.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+      {!titlesOn && (
+        <p className="caption">
+          Window titles are off, so a stretch cannot say <i>which</i> video or document it
+          was — only which site. Settings → Activity → <b>Track window titles</b> turns them
+          on. It is a separate switch because a title is the document name, the customer,
+          the ticket.
+        </p>
+      )}
     </section>
   );
 }
@@ -514,6 +596,7 @@ function SpanLabeller({
         <span className="data caption">
           {fmt.clock(span.startedAt)}–{fmt.clock(span.endedAt)}
         </span>
+        {span.windowTitle && <span className="caption"> — {span.windowTitle}</span>}
       </strong>
       <CategoryPicker cats={cats} current={span.categoryId} onPick={(id) => void apply(id)} />
       <button className="btn micro" onClick={() => void apply(null)}>
