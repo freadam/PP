@@ -137,7 +137,7 @@ impl Store {
         let now = self.now();
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.task_id, t.title, t.project_id, p.colour, s.contribution,
-                    s.started_at, COALESCE(s.ended_at, ?3)
+                    s.started_at, COALESCE(s.ended_at, ?3), p.name
                FROM time_session s
                JOIN task t         ON t.id = s.task_id
                LEFT JOIN project p ON p.id = t.project_id
@@ -153,6 +153,7 @@ impl Store {
                     task_id: r.get(1)?,
                     task_title: r.get(2)?,
                     project_id: r.get(3)?,
+                    project_name: r.get(8)?,
                     project_colour: r.get(4)?,
                     contribution: contribution.as_deref().and_then(Contribution::parse),
                 },
@@ -959,6 +960,7 @@ mod tests {
                 task_id: "t".into(),
                 task_title: "Refactor".into(),
                 project_id: None,
+                project_name: None,
                 project_colour: None,
                 contribution: None,
             },
@@ -1008,6 +1010,7 @@ mod tests {
                 task_id: task.into(),
                 task_title: task.into(),
                 project_id: None,
+                project_name: None,
                 project_colour: None,
                 contribution: None,
             },

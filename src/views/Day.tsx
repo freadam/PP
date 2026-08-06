@@ -70,6 +70,47 @@ const FILTERS: { key: string; label: string; match: (s: DaySlot) => boolean }[] 
   { key: "life", label: "Life", match: (s) => s.state === "confirmedLife" },
 ];
 
+/**
+ * The per-project and per-area filters (wireframe, Day).
+ *
+ * Built from **the day's own segments**, not from every project in the
+ * database. A filter that offers thirty projects, twenty-eight of which have no
+ * time today, is a menu of dead ends — and the two that do have time are the
+ * ones you came to isolate.
+ *
+ * The key carries its kind (`project:…`, `area:…`) so one `<select>` can hold
+ * three groups without a second piece of state deciding which one is live.
+ */
+function subjectFilters(day: DayView | null): { key: string; label: string; match: (s: DaySlot) => boolean }[] {
+  if (!day) return [];
+  const projects = new Map<string, string>();
+  const areas = new Map<string, string>();
+  for (const seg of day.segments) {
+    if (seg.owner.kind === "work") {
+      // A session with no project still needs a row, or "no project" becomes
+      // the one thing the filter cannot show you.
+      projects.set(seg.owner.projectId ?? "", seg.owner.projectName ?? "No project");
+    } else if (seg.owner.kind === "life" && !seg.owner.isPrivate) {
+      areas.set(seg.owner.areaId, seg.owner.areaName);
+    }
+  }
+  const byName = (a: [string, string], b: [string, string]) => a[1].localeCompare(b[1]);
+  return [
+    ...[...projects].sort(byName).map(([id, label]) => ({
+      key: `project:${id}`,
+      label,
+      match: (s: DaySlot) =>
+        s.segments.some((g) => g.owner.kind === "work" && (g.owner.projectId ?? "") === id),
+    })),
+    ...[...areas].sort(byName).map(([id, label]) => ({
+      key: `area:${id}`,
+      label,
+      match: (s: DaySlot) =>
+        s.segments.some((g) => g.owner.kind === "life" && g.owner.areaId === id),
+    })),
+  ];
+}
+
 function appName(id: string): string {
   return id.replace(/\.(exe|app)$/i, "");
 }
@@ -135,6 +176,20 @@ export function Day() {
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState<DaySegment | null>(null);
   const [fill, setFill] = useState<{ from: number; to: number } | null>(null);
+  /**
+   * Multi-select, on the time column (wireframe, Day).
+   *
+   * A *range*, not a scattered set. The rows are contiguous minutes and "that
+   * whole afternoon was the school run" is the sentence people actually have;
+   * a set of disconnected slots filled with one label would write four records
+   * that read as one.
+   *
+   * It lives on the time cell rather than on the fill button because the fill
+   * button opens a modal, and a modal covers the table you would be
+   * shift-clicking into. Click a time to anchor, shift-click another to reach
+   * — the same gesture as a spreadsheet, on the column that looks like one.
+   */
+  const [range, setRange] = useState<{ anchor: number; head: number } | null>(null);
 
   useEffect(() => {
     void load();
@@ -147,7 +202,32 @@ export function Day() {
     return day.segments.find((s) => s.from === selected.from && s.to === selected.to) ?? null;
   }, [selected, day]);
 
-  const rule = FILTERS.find((f) => f.key === filter) ?? FILTERS[0]!;
+  const fillFrom = (slot: DaySlot, _extend: boolean) => {
+    setFill({ from: slot.startsAt, to: slot.endsAt });
+  };
+
+  const markRange = (slot: DaySlot, extend: boolean) => {
+    setRange((r) =>
+      extend && r ? { ...r, head: slot.index } : { anchor: slot.index, head: slot.index },
+    );
+  };
+
+  /** The selected span, in real times — `null` when it is a single row, which
+   *  is a click that has not become a selection yet. */
+  const span = useMemo(() => {
+    if (!day || !range) return null;
+    const lo = Math.min(range.anchor, range.head);
+    const hi = Math.max(range.anchor, range.head);
+    if (lo === hi) return null;
+    const first = day.slots.find((s) => s.index === lo);
+    const last = day.slots.find((s) => s.index === hi);
+    if (!first || !last) return null;
+    return { from: first.startsAt, to: last.endsAt, rows: hi - lo + 1 };
+  }, [day, range]);
+
+  const subjects = useMemo(() => subjectFilters(day), [day]);
+  const rule =
+    [...FILTERS, ...subjects].find((f) => f.key === filter) ?? FILTERS[0]!;
   const rows = day ? day.slots.filter(rule.match) : [];
 
   if (!day) return <Empty>Loading the day…</Empty>;
@@ -195,6 +275,29 @@ export function Day() {
                 {f.label}
               </option>
             ))}
+            {/* Only what this day actually contains — see `subjectFilters`. */}
+            {subjects.some((f) => f.key.startsWith("project:")) && (
+              <optgroup label="Project">
+                {subjects
+                  .filter((f) => f.key.startsWith("project:"))
+                  .map((f) => (
+                    <option key={f.key} value={f.key}>
+                      {f.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+            {subjects.some((f) => f.key.startsWith("area:")) && (
+              <optgroup label="Life area">
+                {subjects
+                  .filter((f) => f.key.startsWith("area:"))
+                  .map((f) => (
+                    <option key={f.key} value={f.key}>
+                      {f.label}
+                    </option>
+                  ))}
+              </optgroup>
+            )}
           </select>
         </label>
         <button
@@ -212,9 +315,32 @@ export function Day() {
            difference between a filter and a screen that appears to have lost
            twenty hours. */
         <p className="caption">
-          Showing {rows.length} of {day.slots.length} rows. The totals above are always the whole
+          Showing {rows.length} of {day.slots.length} rows
+          {filter.includes(":") && <> for {rule.label}</>}. The totals above are always the whole
           day.
         </p>
+      )}
+
+      {span && (
+        /* Nothing happens until it is asked for: a selection that acted on
+           its own would be a four-hour edit made by a stray shift-click. */
+        <div className="row selection-bar" role="status">
+          <span className="grow">
+            <span className="data">
+              {fmt.clock(span.from)}–{fmt.clock(span.to)}
+            </span>{" "}
+            selected · {span.rows} rows · {fmt.duration((span.to - span.from) / 1000)}
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={() => setFill({ from: span.from, to: span.to })}
+          >
+            Record all of it
+          </button>
+          <button className="btn" onClick={() => setRange(null)}>
+            Clear
+          </button>
+        </div>
       )}
 
       <div className="day-body">
@@ -241,7 +367,13 @@ export function Day() {
                   day={day}
                   selected={liveSelection}
                   onSelect={setSelected}
-                  onFill={() => setFill({ from: slot.startsAt, to: slot.endsAt })}
+                  onFill={(shift) => fillFrom(slot, shift)}
+                  onMark={(extend) => markRange(slot, extend)}
+                  inRange={
+                    range != null &&
+                    slot.index >= Math.min(range.anchor, range.head) &&
+                    slot.index <= Math.max(range.anchor, range.head)
+                  }
                 />
               ))}
             </tbody>
@@ -347,12 +479,16 @@ function SlotRow({
   selected,
   onSelect,
   onFill,
+  onMark,
+  inRange,
 }: {
   slot: DaySlot;
   day: DayView;
   selected: DaySegment | null;
   onSelect: (s: DaySegment) => void;
-  onFill: () => void;
+  onFill: (extend: boolean) => void;
+  onMark: (extend: boolean) => void;
+  inRange: boolean;
 }) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const isNow = day.isToday && day.now >= slot.startsAt && day.now < slot.endsAt;
@@ -377,6 +513,7 @@ function SlotRow({
       data-state={slot.state}
       data-now={isNow || undefined}
       data-hour={slot.index % rowsPerHour === 0 || undefined}
+      data-in-range={inRange || undefined}
       data-selected={
         selected && actual.some((s) => s.from === selected.from && s.to === selected.to)
           ? true
@@ -384,9 +521,18 @@ function SlotRow({
       }
     >
       <th scope="row" className="data day-time">
-        {/* Only the hour is labelled; the half-hours between are rhythm, not
-            information, and repeating ":30" 24 times is noise. */}
-        {slot.index % rowsPerHour === 0 ? fmt.clock(slot.startsAt) : ""}
+        {/* The whole cell is the selection handle, labelled or not — a
+            half-hour row you cannot click is a half-hour you cannot include. */}
+        <button
+          className="day-time-mark"
+          onClick={(e) => onMark(e.shiftKey)}
+          aria-label={`Select from ${fmt.clock(slot.startsAt)}`}
+          title="Click to start a selection · shift-click to extend it"
+        >
+          {/* Only the hour is labelled; the half-hours between are rhythm, not
+              information, and repeating ":30" 24 times is noise. */}
+          {slot.index % rowsPerHour === 0 ? fmt.clock(slot.startsAt) : ""}
+        </button>
       </th>
 
       <td className="day-planned">
@@ -435,7 +581,7 @@ function SlotRow({
         {/* Empty time is offered as an action, not shown as a blank. This is the
             button the ninety-second reconciliation target is actually spent on. */}
         {hasGap && (
-          <button className="day-fill" onClick={onFill}>
+          <button className="day-fill" onClick={() => onFill(false)}>
             {actual.length === 0 ? "Unaccounted — fill" : "+ fill the gap"}
           </button>
         )}

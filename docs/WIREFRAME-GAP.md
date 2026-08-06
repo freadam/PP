@@ -135,8 +135,16 @@ What remains is work:
   with weekly goals (migration 0008); windows are migration 0009, and the
   planned-versus-unplanned split now reconciles to the intervals underneath it.
 - ~~**`Ctrl K` button in the topbar**~~ — **built.**
-- **Per-project and per-area Day filters**, and Day-view editing beyond fill:
-  merge, multi-select. (Repeat landed with M9, on life entries.)
+- ~~**Per-project and per-area Day filters**~~ — **built.** The options are
+  built from the day's own segments, not from every project in the database: a
+  filter offering thirty projects, twenty-eight of which have no time today, is
+  a menu of dead ends.
+- ~~**Day-view multi-select**~~ — **built**, on the time column. A *range*, not
+  a scattered set: the rows are contiguous minutes and "that whole afternoon was
+  the school run" is the sentence people actually have. It lives on the time
+  cell rather than the fill button because the fill button opens a modal, and a
+  modal covers the table you would be shift-clicking into.
+- **Merge** — two adjacent records of the same thing becoming one. Still open,
+  and the smallest thing left on this page.
 
-That leaves the Day-view filters and multi-select, which is the only item on
-this page that is neither built nor waiting on the client.
+Everything else here is either built or waiting on the client's workbook.

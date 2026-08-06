@@ -1737,6 +1737,11 @@ pub enum SlotOwner {
         task_id: String,
         task_title: String,
         project_id: Option<String>,
+        /// Resolved for display, beside the colour that is already here. The
+        /// renderer never looks a project up — the Day view's per-project
+        /// filter reads this, and a filter that had to join against a separate
+        /// list would show the wrong name for an archived project.
+        project_name: Option<String>,
         project_colour: Option<String>,
         contribution: Option<Contribution>,
     },

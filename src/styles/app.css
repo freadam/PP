@@ -1591,6 +1591,27 @@ textarea::placeholder {
   text-align: right;
   white-space: nowrap;
 }
+/* The whole time cell is the selection handle, including the unlabelled
+   half-hours — a row you cannot click is a half-hour you cannot include. */
+.day-time-mark {
+  display: block;
+  width: 100%;
+  min-height: 16px;
+  text-align: right;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* The selection says what it covers and waits. Nothing happens until it is
+   asked for: a selection that acted on its own would be a four-hour edit made
+   by a stray shift-click. */
+.selection-bar {
+  margin: var(--s-8) 0;
+  padding: var(--s-8) var(--s-12);
+  border: 1px solid var(--plot);
+  border-radius: var(--r-plate);
+  background: var(--raised);
+}
 
 /* Unaccounted time is hatched and labelled, never blank: blank is
    indistinguishable from "not loaded yet", and this is the state the user is
@@ -1610,6 +1631,17 @@ textarea::placeholder {
 .day-row[data-state="observedOnly"] > * {
   background: color-mix(in srgb, var(--track) 6%, transparent);
 }
+/* Placed after the state backgrounds so a selected row reads as selected
+   whatever it contains. The solid left edge is the part that does not depend on
+   colour at all (M16) — the bar above the table says the same thing in words. */
+.day-row[data-in-range="true"] > * {
+  background: color-mix(in srgb, var(--plot) 18%, var(--raised));
+}
+.day-row[data-in-range="true"] .day-time {
+  color: var(--paper);
+  box-shadow: inset 2px 0 0 var(--plot);
+}
+
 .day-row[data-state="private"] .day-actual {
   color: var(--muted);
 }

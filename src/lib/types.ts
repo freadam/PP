@@ -880,6 +880,8 @@ export type SlotOwner =
       taskId: string;
       taskTitle: string;
       projectId: string | null;
+      /** Resolved for display — the renderer never looks a project up. */
+      projectName: string | null;
       projectColour: string | null;
       contribution: Contribution | null;
     }
