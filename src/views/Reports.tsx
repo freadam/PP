@@ -146,21 +146,29 @@ function MonthDashboard({ month }: { month: MonthView | null }) {
 /**
  * Entertainment per day across the month.
  *
- * The wireframe wants solid = unplanned against dashed = planned. Planned is
- * flat zero and will stay there until entertainment windows exist — which is
- * not a placeholder, it is the correct reading: with no way to plan
- * entertainment, every minute of it is unplanned by definition. The note under
- * the chart says exactly that rather than leaving a mystery line at the axis.
+ * Solid is entertainment nobody plotted a window for; dashed is the windows
+ * themselves. The two reconcile against the day's total by construction —
+ * `entertainmentSec` splits into the part inside a window and the part outside
+ * it, and the solid line is the second of those. So the distance between the
+ * lines is a real quantity and not a mood: it is how much of the month went to
+ * entertainment that was never the plan.
  */
 function EntertainmentTrend({ month }: { month: MonthView }) {
-  const { path, plannedPath, max } = useMemo(() => {
+  const { path, plannedPath, max, unplannedSec } = useMemo(() => {
     const days = month.days;
-    const max = Math.max(3600, ...days.map((d) => d.entertainmentSec));
+    const unplanned = (d: MonthDay) =>
+      Math.max(0, d.entertainmentSec - d.entertainmentInWindowSec);
+    const max = Math.max(
+      3600,
+      ...days.map((d) => Math.max(unplanned(d), d.plannedEntertainmentSec)),
+    );
     const x = (i: number) => (i / Math.max(1, days.length - 1)) * 500;
     const y = (sec: number) => 150 - (sec / max) * 140;
     return {
       max,
-      path: days.map((d, i) => `${x(i)},${y(d.entertainmentSec)}`).join(" "),
+      unplannedSec:
+        month.totals.entertainmentSec - month.totals.entertainmentInWindowSec,
+      path: days.map((d, i) => `${x(i)},${y(unplanned(d))}`).join(" "),
       plannedPath: days.map((d, i) => `${x(i)},${y(d.plannedEntertainmentSec)}`).join(" "),
     };
   }, [month]);
@@ -175,9 +183,9 @@ function EntertainmentTrend({ month }: { month: MonthView }) {
       <h3>Entertainment · planned vs unplanned</h3>
       <div className="linechart">
         <svg viewBox="0 0 500 160" preserveAspectRatio="none" role="img"
-          aria-label={`Entertainment per day across ${month.label}. Total ${fmt.duration(
-            month.totals.entertainmentSec,
-          )}, peak ${fmt.duration(worst?.entertainmentSec ?? 0)}.`}>
+          aria-label={`Unplanned entertainment per day across ${month.label}. ${fmt.duration(
+            unplannedSec,
+          )} unplanned in total, peak day ${fmt.duration(worst?.entertainmentSec ?? 0)}.`}>
           <polyline points={path} fill="none" stroke="var(--over)" strokeWidth="2.5" />
           <polyline
             points={plannedPath}
@@ -189,11 +197,16 @@ function EntertainmentTrend({ month }: { month: MonthView }) {
         </svg>
       </div>
       <p className="caption">
-        Solid: unplanned · dashed: planned. Peak {fmt.duration(max)} in a day.
+        Solid: unplanned · dashed: planned windows. Peak {fmt.duration(max)} in a day.
       </p>
-      {month.plannedEntertainmentNote && (
-        <p className="caption">{month.plannedEntertainmentNote}</p>
-      )}
+      <p className="caption">
+        {fmt.duration(month.totals.entertainmentSec)} of entertainment this month:{" "}
+        {fmt.duration(month.totals.entertainmentInWindowSec)} inside a window you
+        plotted, {fmt.duration(unplannedSec)} outside one.
+        {month.totals.plannedEntertainmentSec === 0 &&
+          " No windows plotted yet — plot one from the Planner and the dashed line" +
+            " becomes the evening you meant to have."}
+      </p>
     </section>
   );
 }

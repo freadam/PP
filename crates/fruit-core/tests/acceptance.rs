@@ -52,6 +52,7 @@ fn block(store: &mut Store, task_id: &str, starts_at: i64, minutes: i64) -> Bloc
             tz: TZ.into(),
             is_fixed: false,
             rrule: None,
+            intent: None,
         })
         .unwrap()
 }
@@ -582,6 +583,7 @@ fn d1_d7_d11_fuzz_leaves_the_database_consistent() {
                     tz: TZ.into(),
                     is_fixed: false,
                     rrule: None,
+                    intent: None,
                 }) {
                     blocks.push(b.id);
                 }
@@ -837,6 +839,7 @@ fn d8_dst_and_timezone_correctness() {
         tz: TZ.into(),
         is_fixed: false,
         rrule: None,
+        intent: None,
     });
     assert!(matches!(crosses, Err(AppError::CrossesMidnight)));
 
@@ -953,6 +956,7 @@ fn boot_repairs_a_disagreeing_local_date() {
                 tz: TZ.into(),
                 is_fixed: false,
                 rrule: None,
+                intent: None,
             })
             .unwrap();
         block_id = b.id.clone();
@@ -2017,7 +2021,7 @@ fn private_time_is_accounted_for_but_not_categorised() {
 #[test]
 fn the_counting_invariant_holds_across_a_dst_transition() {
     for (date, hours) in [("2025-03-30", 23), ("2025-10-26", 25)] {
-        let (mut store, _) = store_at(at(2025, 6, 1, 12, 0));
+        let (store, _) = store_at(at(2025, 6, 1, 12, 0));
         let day = store.get_day(date, TZ, None).unwrap();
         let d = &day.totals;
         assert_eq!(d.day_sec, hours * 3600, "{date} is {hours} hours long");
@@ -2249,7 +2253,7 @@ fn a_month_is_the_sum_of_its_days_exactly() {
 /// must not quietly lose or invent the hour.
 #[test]
 fn a_dst_month_is_measured_in_real_hours() {
-    let (mut store, _) = store_at(at(2025, 6, 1, 12, 0));
+    let (store, _) = store_at(at(2025, 6, 1, 12, 0));
 
     let march = store.get_month("2025-03", TZ).unwrap();
     assert_eq!(

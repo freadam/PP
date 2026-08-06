@@ -642,6 +642,29 @@ textarea::placeholder {
 .plate[data-warn="true"] {
   background: color-mix(in srgb, var(--over) 12%, var(--raised));
 }
+/* An evening plotted for a film is a plan, and it has to read as one — a plate
+   that looks like work makes "planned two hours of television" and "two hours
+   of missing work" the same picture. Tinted plus a word in the title, never
+   colour alone (M16). */
+.plate[data-intent="entertainment"] {
+  background: color-mix(in srgb, var(--over) 10%, var(--raised));
+  border-style: dashed;
+}
+.plate[data-intent="life"] {
+  background: color-mix(in srgb, var(--track) 8%, var(--raised));
+  border-style: dashed;
+}
+.plate .intent-mark,
+.day-chip .intent-mark {
+  color: var(--muted);
+  margin-right: 4px;
+}
+.day-chip[data-intent="entertainment"] {
+  border-style: dashed;
+}
+.day-chip[data-intent="life"] {
+  border-style: dashed;
+}
 .plate .plate-title {
   display: block;
   white-space: nowrap;

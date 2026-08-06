@@ -394,9 +394,23 @@ function SlotRow({
             key={p.blockId}
             className="day-chip"
             data-plan="true"
-            title={`Plotted ${fmt.duration(p.durationSec)} · tracked ${fmt.duration(p.trackedSec)}`}
+            data-intent={p.intent}
+            title={`Plotted ${fmt.duration(p.durationSec)} · tracked ${fmt.duration(p.trackedSec)}${
+              p.intent === "entertainment"
+                ? " · an entertainment window, not work"
+                : p.intent === "life"
+                  ? " · life, not work"
+                  : ""
+            }`}
           >
             <i style={{ background: p.projectColour ?? "var(--plot)" }} aria-hidden="true" />
+            {/* An entertainment window sitting in the plan column has to say
+                so, or the row reads as an hour of work nobody did. */}
+            {p.intent !== "work" && (
+              <span className="intent-mark micro">
+                {p.intent === "entertainment" ? "Window" : "Life"} ·
+              </span>
+            )}
             {p.title}
           </span>
         ))}

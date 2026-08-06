@@ -68,6 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tz: tz.clone(),
             is_fixed: i == 4,
             rrule: None,
+            intent: None,
         })?;
 
         // Every drift state from §5.6 gets a representative on screen.
@@ -126,6 +127,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tz: tz.clone(),
         is_fixed: true,
         rrule: None,
+        intent: None,
     })?;
     let firefight = store.create_task(NewTask {
         title: "Production firefight".into(),
@@ -151,6 +153,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tz: tz.clone(),
             is_fixed: true,
             rrule: None,
+            intent: None,
         },
         "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
     )?;
@@ -333,6 +336,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })?;
             if i % 2 == 0 {
                 let (name, from_h, len_h) = rota[(i / 2) % rota.len()];
+                // An evening plotted for a film — the second half of M11, and
+                // the reason the dashboard's dashed line is no longer flat.
+                //
+                // Deliberately only *some* of the entertainment evenings get a
+                // window, and the window is longer than the evening that fills
+                // it. That produces all three readings the chart has to be able
+                // to draw: an evening you planned and took, an evening you
+                // planned and did not use, and an evening that just happened.
+                if name == "Fun" && i % 4 == 0 {
+                    store.schedule_block(NewBlock {
+                        task_id: None,
+                        label: Some("Film".into()),
+                        starts_at: midnight + (20.0 * 3_600_000.0) as i64,
+                        duration_sec: 2 * 3600,
+                        tz: tz.clone(),
+                        is_fixed: false,
+                        rrule: None,
+                        intent: Some(BlockIntent::Entertainment),
+                    })?;
+                }
                 store.add_life_entry(NewLifeEntry {
                     life_area_id: pick(name),
                     label: None,

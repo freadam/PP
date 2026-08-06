@@ -579,6 +579,7 @@ function DayColumnView({
             data-warn={b.lanes > 1}
             data-done={b.taskStatus === "done"}
             data-series={b.block.seriesId != null}
+            data-intent={b.block.intent}
             style={{
               top,
               height,
@@ -597,7 +598,13 @@ function DayColumnView({
                 driftSec: b.driftSec,
                 state: b.driftState,
               },
-            )}${b.block.seriesId ? ", repeats" : ""}`}
+            )}${b.block.seriesId ? ", repeats" : ""}${
+              b.block.intent === "entertainment"
+                ? ", entertainment window"
+                : b.block.intent === "life"
+                  ? ", life"
+                  : ""
+            }`}
             onPointerDown={(e) => onDragStart(e, b, "move")}
             onClick={() => selectBlock(b.block.id)}
             onDoubleClick={() => b.block.taskId && void openDetail(b.block.taskId)}
@@ -627,6 +634,14 @@ function DayColumnView({
                 {b.block.seriesId && (
                   <span className="repeat-mark" aria-hidden="true" title="Repeats">
                     ↻
+                  </span>
+                )}
+                {/* The tint says "not work"; this says which kind, because a
+                    reader who cannot separate the two tints still has to be
+                    able to tell a film night from dinner (M16). */}
+                {b.block.intent !== "work" && (
+                  <span className="intent-mark micro">
+                    {b.block.intent === "entertainment" ? "Window" : "Life"} ·
                   </span>
                 )}
                 {b.title}

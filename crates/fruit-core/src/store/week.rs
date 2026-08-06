@@ -25,7 +25,8 @@ impl Store {
         let placeholders = vec!["?"; dates.len()].join(",");
         let sql = format!(
             "SELECT b.id, b.task_id, b.label, b.starts_at, b.duration_sec, b.local_date, b.tz,
-                    b.is_fixed, b.series_id, b.rrule, b.external_uid, b.created_at, b.updated_at,
+                    b.is_fixed, b.series_id, b.rrule, b.external_uid, b.intent,
+                    b.created_at, b.updated_at,
                     t.title, t.status, t.project_id, p.colour,
                     COALESCE(c.tracked_sec, 0),
                     EXISTS(SELECT 1 FROM time_session s
@@ -40,21 +41,21 @@ impl Store {
         let mut stmt = self.conn.prepare(&sql)?;
         let rows = stmt.query_map(rusqlite::params_from_iter(dates.iter()), |r| {
             let block = Self::map_block(r)?;
-            let title: Option<String> = r.get(13)?;
-            let status: Option<String> = r.get(14)?;
+            let title: Option<String> = r.get(14)?;
+            let status: Option<String> = r.get(15)?;
             Ok((
                 BlockView {
                     title: title
                         .or_else(|| block.label.clone())
                         .unwrap_or_else(|| "Untitled".into()),
-                    project_id: r.get(15)?,
-                    project_colour: r.get(16)?,
+                    project_id: r.get(16)?,
+                    project_colour: r.get(17)?,
                     task_status: status.as_deref().and_then(Status::parse),
                     planned_sec: block.duration_sec,
-                    tracked_sec: r.get(17)?,
+                    tracked_sec: r.get(18)?,
                     drift_sec: 0,
                     drift_state: DriftState::NotStarted,
-                    is_running: r.get::<_, i64>(18)? == 1,
+                    is_running: r.get::<_, i64>(19)? == 1,
                     lane: 0,
                     lanes: 1,
                     block,

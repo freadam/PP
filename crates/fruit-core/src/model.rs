@@ -242,6 +242,8 @@ pub struct BlockRow {
     pub rrule: Option<String>,
     /// The VEVENT UID when this block came from a `.ics` file.
     pub external_uid: Option<String>,
+    /// What the interval was plotted *for* (migration 0009).
+    pub intent: BlockIntent,
     pub created_at: Millis,
     pub updated_at: Millis,
 }
@@ -259,6 +261,43 @@ pub struct NewBlock {
     /// An RFC 5545 subset (§2.3, P2). Present means "make this a series".
     #[serde(default)]
     pub rrule: Option<String>,
+    /// What the interval was plotted *for*. Defaults to work, because every
+    /// block that existed before this column was one.
+    #[serde(default)]
+    pub intent: Option<BlockIntent>,
+}
+
+/// What a plotted interval was for (migration 0009).
+///
+/// An evening plotted for a film is a plan for an interval, which is exactly
+/// what a block is — so this is a column rather than a second table the Planner,
+/// the Day view and the reconciler would each have to learn about separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BlockIntent {
+    #[default]
+    Work,
+    /// The half of M11 that was missing: entertainment you *meant* to have.
+    Entertainment,
+    Life,
+}
+
+impl BlockIntent {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "work" => Self::Work,
+            "entertainment" => Self::Entertainment,
+            "life" => Self::Life,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Work => "work",
+            Self::Entertainment => "entertainment",
+            Self::Life => "life",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1551,6 +1590,11 @@ pub struct DayPlan {
     pub drift_state: DriftState,
     pub is_fixed: bool,
     pub series_id: Option<String>,
+    /// What the interval was plotted *for* (migration 0009). An evening blocked
+    /// out for a film is a plan, and the Day view draws it like one — tinted
+    /// differently, so a plan-versus-record comparison does not read a planned
+    /// two hours of television as two hours of missing work.
+    pub intent: BlockIntent,
 }
 
 /// One row of the Day table. The slot grid is a lens for the eye; the segments
@@ -1618,6 +1662,11 @@ pub struct ProjectTotal {
 pub struct DayTotals {
     pub day_sec: i64,
     pub planned_sec: i64,
+    /// The part of `planned_sec` that was plotted as entertainment — an evening
+    /// you *meant* to spend on a film. A subset, not an extra bucket: it does
+    /// not participate in the counting invariant, because plans are an overlay
+    /// on the timeline rather than part of it.
+    pub planned_entertainment_sec: i64,
     pub confirmed_work_sec: i64,
     pub confirmed_life_sec: i64,
     /// Confirmed life time in a `rest` area. A subset of `confirmed_life_sec`,
@@ -1631,6 +1680,10 @@ pub struct DayTotals {
     /// Confirmed life time in an `entertainment` area, plus observed-only time
     /// the classifier called entertainment.
     pub entertainment_sec: i64,
+    /// The part of `entertainment_sec` that fell inside a plotted entertainment
+    /// window. `entertainment_sec` minus this is the unplanned part — the two
+    /// reconcile by construction, which is what M11 asks for.
+    pub entertainment_in_window_sec: i64,
     /// Every second the machine was observed in front of someone, whether or
     /// not it also belongs to a confirmed record. **Overlaps the totals above
     /// on purpose** — it answers "how much of this day was at the PC", which is
@@ -1713,8 +1766,13 @@ pub struct MonthDay {
     pub idle_sec: i64,
     pub empty_sec: i64,
     pub entertainment_sec: i64,
-    /// Entertainment that fell inside a plotted block. Zero until entertainment
-    /// windows exist — see `MonthView::planned_entertainment_note`.
+    /// The part of `entertainment_sec` that happened inside a plotted window.
+    /// The rest is unplanned — the solid line on the dashboard.
+    pub entertainment_in_window_sec: i64,
+    /// Time plotted as an entertainment window (a block with
+    /// `intent = entertainment`, migration 0009) — entertainment you *meant*
+    /// to have. Compare it with `entertainment_sec`, which is what actually
+    /// happened; the gap between the two is the point of the dashboard.
     pub planned_entertainment_sec: i64,
     pub is_reconciled: bool,
     /// The day has ended. A day that has not arrived is not "unreviewed" — it
@@ -1763,9 +1821,6 @@ pub struct MonthView {
     pub elapsed_empty_sec: i64,
     pub unreconciled_days: i64,
     pub findings: Vec<MonthFinding>,
-    /// Why the planned-entertainment series is flat. Stated rather than drawn
-    /// as an empty axis with no explanation.
-    pub planned_entertainment_note: Option<String>,
 }
 
 // ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────

@@ -242,7 +242,7 @@ impl Store {
         let mut stmt = self.conn.prepare(
             "SELECT b.id, COALESCE(t.title, b.label, 'Untitled'), p.colour,
                     b.starts_at, b.duration_sec, COALESCE(c.tracked_sec, 0),
-                    b.is_fixed, b.series_id
+                    b.is_fixed, b.series_id, b.intent
                FROM scheduled_block b
                LEFT JOIN task t    ON t.id = b.task_id
                LEFT JOIN project p ON p.id = t.project_id
@@ -264,6 +264,7 @@ impl Store {
                 drift_state: drift_state(tracked_sec, duration_sec, is_past),
                 is_fixed: r.get::<_, i64>(6)? == 1,
                 series_id: r.get(7)?,
+                intent: BlockIntent::parse(&r.get::<_, String>(8)?).unwrap_or_default(),
             })
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
@@ -281,6 +282,11 @@ impl Store {
         let mut t = DayTotals {
             day_sec: (to - from) / 1000,
             planned_sec: plans.iter().map(|p| p.duration_sec).sum(),
+            planned_entertainment_sec: plans
+                .iter()
+                .filter(|p| p.intent == BlockIntent::Entertainment)
+                .map(|p| p.duration_sec)
+                .sum(),
             confirmed_work_sec: 0,
             confirmed_life_sec: 0,
             sleep_sec: 0,
@@ -289,6 +295,7 @@ impl Store {
             idle_sec: 0,
             empty_sec: 0,
             entertainment_sec: 0,
+            entertainment_in_window_sec: 0,
             // Deliberately overlaps the layers above: "how much of this day was
             // at the PC" is a different question from "how was it spent".
             pc_sec: merged_seconds(spans.iter().filter(|s| !s.is_idle).map(|s| (s.started_at, s.ended_at))),
@@ -299,6 +306,9 @@ impl Store {
 
         let mut areas: HashMap<String, (String, String, AreaKind, i64)> = HashMap::new();
         let mut projects: HashMap<Option<String>, (String, Option<String>, i64)> = HashMap::new();
+        // Where entertainment actually happened, so it can be checked against
+        // where it was *meant* to happen.
+        let mut ent_intervals: Vec<(Millis, Millis)> = Vec::new();
 
         for seg in segments {
             let sec = (seg.to - seg.from) / 1000;
@@ -321,6 +331,7 @@ impl Store {
                     }
                     if *area_kind == AreaKind::Entertainment {
                         t.entertainment_sec += sec;
+                        ent_intervals.push((seg.from, seg.to));
                     }
                     let e = areas.entry(area_id.clone()).or_insert((
                         area_name.clone(),
@@ -352,12 +363,22 @@ impl Store {
                     t.observed_only_sec += sec;
                     if category.as_deref() == Some("entertainment") {
                         t.entertainment_sec += sec;
+                        ent_intervals.push((seg.from, seg.to));
                     }
                 }
                 SlotOwner::Idle => t.idle_sec += sec,
                 SlotOwner::Empty => t.empty_sec += sec,
             }
         }
+
+        // M11's reconciliation. `entertainment_sec` splits cleanly in two:
+        // the part that fell inside a window you plotted, and the rest.
+        let windows: Vec<(Millis, Millis)> = plans
+            .iter()
+            .filter(|p| p.intent == BlockIntent::Entertainment)
+            .map(|p| (p.starts_at, p.starts_at + p.duration_sec * 1000))
+            .collect();
+        t.entertainment_in_window_sec = intersect_seconds(&ent_intervals, &windows);
 
         t.by_area = areas
             .into_iter()
@@ -814,6 +835,26 @@ fn merged_seconds(intervals: impl Iterator<Item = (Millis, Millis)>) -> i64 {
     total / 1000
 }
 
+/// Seconds where `a` and `b` overlap, counting any instant once however many
+/// intervals cover it.
+///
+/// This is what makes M11's reconciliation checkable rather than asserted:
+/// entertainment that happened inside a window you plotted, plus entertainment
+/// that did not, is all the entertainment there was.
+fn intersect_seconds(a: &[(Millis, Millis)], b: &[(Millis, Millis)]) -> i64 {
+    let mut pieces: Vec<(Millis, Millis)> = Vec::new();
+    for &(a0, a1) in a {
+        for &(b0, b1) in b {
+            let lo = a0.max(b0);
+            let hi = a1.min(b1);
+            if hi > lo {
+                pieces.push((lo, hi));
+            }
+        }
+    }
+    merged_seconds(pieces.into_iter())
+}
+
 /// Projects segments onto the display grid. The grid never changes the
 /// arithmetic — a slot simply lists whatever segments touch it.
 fn build_slots(
@@ -985,6 +1026,7 @@ mod tests {
             drift_state: DriftState::OnEstimate,
             is_fixed: false,
             series_id: None,
+            intent: BlockIntent::Work,
         }
     }
 

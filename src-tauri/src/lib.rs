@@ -725,6 +725,12 @@ fn set_block_fixed(state: State<'_, AppState>, id: String, is_fixed: bool) -> Re
     with(&state, |s| s.set_block_fixed(&id, is_fixed))
 }
 
+/// Reclassify a plotted interval — work, an entertainment window, or life.
+#[tauri::command]
+fn set_block_intent(state: State<'_, AppState>, id: String, intent: BlockIntent) -> Res<BlockRow> {
+    with(&state, |s| s.set_block_intent(&id, intent))
+}
+
 #[tauri::command]
 fn start_timer(
     app: AppHandle,
@@ -1070,6 +1076,7 @@ pub fn run() {
             unschedule_block,
             duplicate_block,
             set_block_fixed,
+            set_block_intent,
             start_timer,
             stop_timer,
             resolve_idle,

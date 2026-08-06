@@ -774,7 +774,7 @@ mod tests {
     /// review sums `get_day`'s own totals rather than running a second query.
     #[test]
     fn the_week_totals_what_the_days_total() {
-        let (mut s, _) = store_on(2, 12);
+        let (s, _) = store_on(2, 12);
         let today = local_date(s.now(), &zone(TZ).unwrap());
         let review = s.get_week_review(&today, TZ).unwrap();
 

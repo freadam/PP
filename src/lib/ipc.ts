@@ -69,6 +69,7 @@ import type {
   NewLifeEntry,
   ActivityStatus,
   BlockRow,
+  BlockIntent,
   IcsImportSummary,
   NewBlock,
   RrulePreset,
@@ -198,6 +199,14 @@ export const duplicateBlock = (id: string) => call<BlockRow>("duplicate_block", 
 
 export const setBlockFixed = (id: string, isFixed: boolean) =>
   call<BlockRow>("set_block_fixed", { id, isFixed });
+
+/**
+ * Reclassify a plotted interval. Changing this changes what the month
+ * dashboard counts as *planned* entertainment; it touches nothing already
+ * recorded against the block.
+ */
+export const setBlockIntent = (id: string, intent: BlockIntent) =>
+  call<BlockRow>("set_block_intent", { id, intent });
 
 export const startTimer = (taskId: string, blockId?: string | null) =>
   call<TimerState>("start_timer", { taskId, blockId: blockId ?? null });

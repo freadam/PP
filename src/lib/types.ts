@@ -78,9 +78,20 @@ export interface BlockRow {
   rrule: string | null;
   /** The VEVENT UID when this block came from a `.ics` file. */
   externalUid: string | null;
+  /** What the interval was plotted *for* (migration 0009). */
+  intent: BlockIntent;
   createdAt: Millis;
   updatedAt: Millis;
 }
+
+/**
+ * What a plotted interval was for.
+ *
+ * An evening blocked out for a film is a plan for an interval, which is what a
+ * block already is — so this is a property of the block rather than a second
+ * kind of thing the planner has to draw.
+ */
+export type BlockIntent = "work" | "entertainment" | "life";
 
 /** Which occurrences an edit to a series applies to. */
 export type SeriesScope = "instance" | "future" | "all";
@@ -892,6 +903,9 @@ export interface DayPlan {
   driftState: DriftState;
   isFixed: boolean;
   seriesId: string | null;
+  /** Work, an entertainment window, or life — so a planned two hours of
+   *  television does not read as two hours of missing work. */
+  intent: BlockIntent;
 }
 
 export type SlotState =
@@ -931,6 +945,9 @@ export interface DayProjectTotal {
 export interface DayTotals {
   daySec: number;
   plannedSec: number;
+  /** The part of `plannedSec` plotted as an entertainment window — an evening
+   *  you *meant* to spend on a film. A subset, not an extra bucket. */
+  plannedEntertainmentSec: number;
   confirmedWorkSec: number;
   confirmedLifeSec: number;
   /** A subset of `confirmedLifeSec` — the workbook reports sleep on its own line. */
@@ -940,6 +957,10 @@ export interface DayTotals {
   idleSec: number;
   emptySec: number;
   entertainmentSec: number;
+  /** The part of `entertainmentSec` that fell inside a plotted entertainment
+   *  window. `entertainmentSec` minus this is the unplanned part; the two
+   *  reconcile by construction. */
+  entertainmentInWindowSec: number;
   /** Overlaps the layers above on purpose — a different question. */
   pcSec: number;
   byArea: AreaTotal[];
@@ -976,7 +997,11 @@ export interface MonthDay {
   idleSec: number;
   emptySec: number;
   entertainmentSec: number;
-  /** Zero until entertainment windows exist — see `plannedEntertainmentNote`. */
+  /** The part of `entertainmentSec` that happened inside a plotted window.
+   *  The rest is unplanned. */
+  entertainmentInWindowSec: number;
+  /** Time plotted as an entertainment window. Compare with
+   *  `entertainmentSec`, which is what actually happened. */
   plannedEntertainmentSec: number;
   isReconciled: boolean;
   /** The day has ended. A future day is not "unreviewed", it just hasn't come. */
@@ -1010,7 +1035,6 @@ export interface MonthView {
   elapsedEmptySec: number;
   unreconciledDays: number;
   findings: MonthFinding[];
-  plannedEntertainmentNote: string | null;
 }
 
 // ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────

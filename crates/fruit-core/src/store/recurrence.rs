@@ -130,8 +130,8 @@ impl Store {
             tx.execute(
                 "INSERT INTO scheduled_block
                    (id, task_id, label, starts_at, duration_sec, local_date, tz, is_fixed,
-                    series_id, device_id, created_at, updated_at)
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11)",
+                    series_id, intent, device_id, created_at, updated_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12)",
                 params![
                     id,
                     seed.task_id,
@@ -142,6 +142,9 @@ impl Store {
                     seed.tz,
                     seed.is_fixed as i64,
                     series_id,
+                    // A standing Friday film night is entertainment on every
+                    // instance, not just the seed.
+                    seed.intent.as_str(),
                     self.device_id,
                     now
                 ],
@@ -339,6 +342,11 @@ impl Store {
                 tz: tz.to_string(),
                 is_fixed: true,
                 rrule: None,
+                // A `.ics` file carries no notion of intent. Calling an
+                // imported meeting work is a guess, but it is the guess that
+                // matches every calendar anyone imports; the block can be
+                // reclassified afterwards.
+                intent: None,
             })?;
             self.conn.execute(
                 "UPDATE scheduled_block SET external_uid = ?2 WHERE id = ?1",

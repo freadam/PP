@@ -18,6 +18,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0006_domain_rules.sql"),
     include_str!("../migrations/0007_observation_categories.sql"),
     include_str!("../migrations/0008_goals.sql"),
+    include_str!("../migrations/0009_block_intent.sql"),
 ];
 
 pub fn schema_version() -> i64 {

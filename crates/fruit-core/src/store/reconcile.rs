@@ -585,6 +585,9 @@ impl Store {
                         tz: tz.to_string(),
                         is_fixed: false,
                         rrule: None,
+                        // The remainder of an evening you meant to spend on a
+                        // film is still that evening.
+                        intent: Some(block.intent),
                     })?;
                 }
 
@@ -624,6 +627,7 @@ impl Store {
                         tz: tz.to_string(),
                         is_fixed: false,
                         rrule: None,
+                        intent: Some(block.intent),
                     })?;
                 }
 
@@ -664,6 +668,8 @@ impl Store {
                         tz: tz.to_string(),
                         is_fixed: false,
                         rrule: None,
+                        // A retro block exists to hold a work session.
+                        intent: Some(BlockIntent::Work),
                     })?;
                     let tx = self.conn.transaction()?;
                     tx.execute(

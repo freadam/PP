@@ -32,21 +32,20 @@ To be demonstrated on the client's Windows PC.
 | M8 | A task timer overlapping PC activity **enriches** the interval instead of adding duplicate duration | `observation_enriches_a_confirmed_session_without_adding_time` | ✅ |
 | M9 | Manual life entries fill gaps, repeat, replace an interval with confirmation, and are editable later | `life_entries_fill_gaps_and_replace_with_confirmation`; repeat is **not built** | ❌ partial |
 | M10 | Daily reconciliation covers overruns, unstarted plans, unplanned work, **observed-only activity and empty hours** | First three by `f3_…` and the reconcile suite; the last two by `reconcile_covers_observed_only_and_empty_hours`, sourced from `resolve_day`'s own segments so the sheet and the Day view cannot disagree about what is left to decide | ✅ |
-| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Budgets built** (migration 0008): a budget is a goal with `direction = atMost` on `metric:entertainment`, and its figure comes from `aggregate_range` — the same `get_day` totals the Day view renders, so a budget and a day cannot disagree. `an_at_most_goal_reports_budget_left_rather_than_progress_made`. Planned entertainment is still flat zero because no window can be planned yet, and the dashboard says so rather than drawing an empty axis. | ◐ |
+| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Budgets** (migration 0008): a budget is a goal with `direction = atMost` on `metric:entertainment`, and its figure comes from `aggregate_range` — the same `get_day` totals the Day view renders, so a budget and a day cannot disagree (`an_at_most_goal_reports_budget_left_rather_than_progress_made`). **Windows** (migration 0009): a block carries an `intent`, so an evening plotted for a film is a plan rather than an untracked absence. The split is arithmetic, not assertion — `entertainment_sec` divides into the part that fell inside a window and the part that did not, by interval intersection over `resolve_day`'s own segments (`entertainment_reconciles_to_planned_and_unplanned`, `overlapping_windows_do_not_double_count`). | ✅ |
 | M12 | Reports open to a month summary by default; a month exports to `.xlsx` in the approved format with accurate totals | Reports is month-first; `get_month` is `get_day` summed, so a figure here and on a day cannot be computed two ways. Export writes three sheets whose totals are `COUNTIF` formulas rather than pasted numbers, from the same matrix the preview renders. | ✅ / format needs client sign-off |
 | M13 | A historical workbook month imports through a preview with no silent loss and a variance report | **Not built** | ❌ |
 | M14 | Backup/restore succeeds on a clean profile; the product stays usable offline with no unexpected outbound connection | `d5_restore_from_snapshot`, `d6_export_import_round_trips_exactly`; I7 asserts zero external requests | ✅ |
 | M15 | Timers and activity segmentation recover safely after restart, sleep/wake or forced close | `u7_recovery_trims_to_the_last_heartbeat`, `d10_sleep_is_not_counted_by_default`, `sleep_splits_the_session_instead_of_spanning_it` | ✅ |
 | M16 | Primary actions reachable by keyboard; important states never colour-only | One `COMMANDS` registry (structural); `check-ui.mjs` U10 and I3 | ✅ |
 
-**12 of 16 fully covered, 3 partial, 1 not started.** Both components that used
+**13 of 16 fully covered, 2 partial, 1 not started.** Both components that used
 to gate the rest — the browser connector and the XLSX writer — now exist, so
 nothing remaining is blocked on a missing capability.
 
 | | |
 |---|---|
 | **M4**, **M9** — partial | The task note is still a Markdown renderer, and life entries do not repeat. |
-| **M11** — partial | Budgets are built (weekly goals, `atMost`). Planned entertainment windows are not, so the planned-vs-unplanned split is still one line. |
 | **M13** — not started | Workbook import. |
 | **M12** — built, unsigned | The export exists and its totals are formulas; the *format* needs the client's reference month before it can be signed off. |
 

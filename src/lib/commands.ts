@@ -146,6 +146,31 @@ export const COMMANDS: Command[] = [
       app().setBlockDialog({ kind: "repeat", blockId: block.block.id, title: block.title });
     },
   },
+  /* An evening plotted for a film is a plan, and the app has to be able to
+     say so — otherwise every planned hour reads as work, and the month
+     dashboard's "unplanned entertainment" figure counts the film night you
+     deliberately scheduled (M11). Three commands rather than one cycling
+     toggle: the palette lists what each one does, and a cycle would hide two
+     of the three answers behind repetition. */
+  ...(["work", "entertainment", "life"] as const).map((intent) => ({
+    id: `block-intent-${intent}`,
+    title:
+      intent === "work"
+        ? "Mark block as work"
+        : intent === "entertainment"
+          ? "Mark block as an entertainment window"
+          : "Mark block as life",
+    group: "Planner" as const,
+    when: hasBlock,
+    run: async () => {
+      const id = app().selectedBlockId!;
+      await app().run(
+        () => ipc.setBlockIntent(id, intent),
+        "Couldn't change what that block is for.",
+      );
+      await app().refresh();
+    },
+  })),
   {
     id: "block-unschedule",
     title: "Unschedule block",

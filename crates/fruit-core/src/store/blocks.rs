@@ -26,14 +26,18 @@ impl Store {
             series_id: row.get(8)?,
             rrule: row.get(9)?,
             external_uid: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
+            // A row written before 0009 reads back as `work`, which is what it
+            // was; an unrecognised string can only mean a newer schema, and the
+            // migrator has already refused that, so `work` is the safe floor.
+            intent: BlockIntent::parse(&row.get::<_, String>(11)?).unwrap_or_default(),
+            created_at: row.get(12)?,
+            updated_at: row.get(13)?,
         })
     }
 
     pub(crate) const BLOCK_COLS: &'static str =
         "id, task_id, label, starts_at, duration_sec, local_date, tz, is_fixed,
-         series_id, rrule, external_uid, created_at, updated_at";
+         series_id, rrule, external_uid, intent, created_at, updated_at";
 
     pub fn schedule_block(&mut self, input: NewBlock) -> Result<BlockRow> {
         // A rule on the input means a series; `schedule_recurring` validates the
@@ -74,8 +78,8 @@ impl Store {
         self.conn.execute(
             "INSERT INTO scheduled_block
                (id, task_id, label, starts_at, duration_sec, local_date, tz, is_fixed,
-                device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
+                intent, device_id, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?11)",
             params![
                 id,
                 input.task_id,
@@ -85,6 +89,7 @@ impl Store {
                 local_date,
                 input.tz,
                 input.is_fixed as i64,
+                input.intent.unwrap_or_default().as_str(),
                 self.device_id,
                 now
             ],
@@ -290,7 +295,25 @@ impl Store {
             tz: b.tz,
             is_fixed: false,
             rrule: None,
+            intent: Some(b.intent),
         })
+    }
+
+    /// Reclassify a plotted interval — the evening you blocked out for work and
+    /// then decided to spend on a film. Changing this changes what the month
+    /// dashboard counts as *planned* entertainment from that moment on; it does
+    /// not touch anything already recorded against the block.
+    pub fn set_block_intent(&mut self, id: &str, intent: BlockIntent) -> Result<BlockRow> {
+        validate_id(id, "block")?;
+        let n = self.conn.execute(
+            "UPDATE scheduled_block SET intent = ?2, updated_at = ?3
+              WHERE id = ?1 AND deleted_at IS NULL",
+            params![id, intent.as_str(), self.now()],
+        )?;
+        if n == 0 {
+            return Err(AppError::NotFound("block"));
+        }
+        self.block_row(id)
     }
 
     /// Free seconds between `from` and the next block that starts after it.
@@ -346,5 +369,270 @@ impl Store {
             return Ok(Some(cursor));
         }
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clock::TestClock;
+    use crate::time::local_date;
+    use std::sync::Arc;
+
+    /// Monday 2026-08-03, 09:00 UTC — the same anchor the goals tests use, so a
+    /// failure here and a failure there are talking about the same week.
+    const MONDAY: i64 = 1_785_747_600_000;
+    const TZ: &str = "UTC";
+
+    fn store() -> Store {
+        Store::in_memory_with_clock(Arc::new(TestClock::new(MONDAY))).unwrap()
+    }
+
+    fn plot(s: &mut Store, hour: i64, hours: i64, intent: Option<BlockIntent>) -> BlockRow {
+        s.schedule_block(NewBlock {
+            task_id: None,
+            label: Some("Something".into()),
+            starts_at: MONDAY + (hour - 9) * 3_600_000,
+            duration_sec: hours * 3600,
+            tz: TZ.into(),
+            is_fixed: false,
+            rrule: None,
+            intent,
+        })
+        .unwrap()
+    }
+
+    /// The reason the column defaults rather than being required: every block
+    /// plotted before 0009 existed was work, and reading one back must not
+    /// reclassify it.
+    #[test]
+    fn a_block_plotted_without_an_intent_is_work() {
+        let mut s = store();
+        let b = plot(&mut s, 10, 1, None);
+        assert_eq!(b.intent, BlockIntent::Work);
+        assert_eq!(s.block_row(&b.id).unwrap().intent, BlockIntent::Work);
+    }
+
+    #[test]
+    fn an_entertainment_window_survives_the_round_trip() {
+        let mut s = store();
+        let b = plot(&mut s, 20, 2, Some(BlockIntent::Entertainment));
+        assert_eq!(s.block_row(&b.id).unwrap().intent, BlockIntent::Entertainment);
+        // And through the Day view's plan overlay, which reads its own
+        // column list rather than `BLOCK_COLS`.
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let day = s.get_day(&today, TZ, None).unwrap();
+        let plan = day
+            .slots
+            .iter()
+            .flat_map(|slot| slot.plans.iter())
+            .find(|p| p.block_id == b.id)
+            .expect("the window is on the day");
+        assert_eq!(plan.intent, BlockIntent::Entertainment);
+
+        // And through the week query, whose column list is written by hand.
+        let week = s
+            .get_week(&DateRange { from: today.clone(), to: today.clone() }, TZ)
+            .unwrap();
+        let view = week
+            .days
+            .iter()
+            .flat_map(|d| d.blocks.iter())
+            .find(|v| v.block.id == b.id)
+            .expect("the window is in the week");
+        assert_eq!(view.block.intent, BlockIntent::Entertainment);
+    }
+
+    /// M11's arithmetic: an evening you *meant* to spend on a film is planned
+    /// entertainment, and a morning of work is not — even though both are
+    /// planned time.
+    #[test]
+    fn planned_entertainment_counts_only_entertainment_windows() {
+        let mut s = store();
+        plot(&mut s, 9, 3, None); // work
+        plot(&mut s, 20, 2, Some(BlockIntent::Entertainment));
+        plot(&mut s, 18, 1, Some(BlockIntent::Life)); // dinner: planned, not entertainment
+
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let t = s.get_day(&today, TZ, None).unwrap().totals;
+        assert_eq!(t.planned_sec, 6 * 3600);
+        assert_eq!(t.planned_entertainment_sec, 2 * 3600);
+
+        // And the month is the same arithmetic, summed.
+        let month = s.get_month(&today, TZ).unwrap();
+        assert_eq!(month.totals.planned_entertainment_sec, 2 * 3600);
+        let day = month
+            .days
+            .iter()
+            .find(|d| d.local_date == today)
+            .expect("today is in this month");
+        assert_eq!(day.planned_entertainment_sec, 2 * 3600);
+    }
+
+    /// Planned time is an overlay, not a layer of the timeline — so adding an
+    /// entertainment window must not move a single second of the day's
+    /// accounting. This is the counting invariant, guarded from the one
+    /// direction 0009 could have broken it.
+    #[test]
+    fn planning_a_window_does_not_touch_what_the_day_counts() {
+        let mut s = store();
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let before = s.get_day(&today, TZ, None).unwrap().totals;
+
+        plot(&mut s, 20, 2, Some(BlockIntent::Entertainment));
+        let after = s.get_day(&today, TZ, None).unwrap().totals;
+
+        assert_eq!(after.entertainment_sec, before.entertainment_sec);
+        assert_eq!(after.empty_sec, before.empty_sec);
+        assert_eq!(after.day_sec, before.day_sec);
+        // Only the overlay moved.
+        assert_eq!(after.planned_entertainment_sec, 2 * 3600);
+    }
+
+    #[test]
+    fn a_window_can_be_reclassified_after_the_fact() {
+        let mut s = store();
+        let b = plot(&mut s, 20, 2, None);
+        let changed = s.set_block_intent(&b.id, BlockIntent::Entertainment).unwrap();
+        assert_eq!(changed.intent, BlockIntent::Entertainment);
+
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let t = s.get_day(&today, TZ, None).unwrap().totals;
+        assert_eq!(t.planned_entertainment_sec, 2 * 3600);
+
+        // A well-formed id that names nothing is not found, rather than
+        // silently succeeding against zero rows.
+        assert!(matches!(
+            s.set_block_intent(&new_id(), BlockIntent::Work),
+            Err(AppError::NotFound("block"))
+        ));
+
+        // And a soft-deleted block is gone for this purpose too.
+        s.unschedule_block(&b.id).unwrap();
+        assert!(matches!(
+            s.set_block_intent(&b.id, BlockIntent::Work),
+            Err(AppError::NotFound("block"))
+        ));
+    }
+
+    /// M11, stated as arithmetic: entertainment that happened inside a window
+    /// you plotted, plus entertainment that did not, is all the entertainment
+    /// there was. The dashboard's two lines are that split, so they cannot
+    /// drift from the total they came from.
+    #[test]
+    fn entertainment_reconciles_to_planned_and_unplanned() {
+        let mut s = store();
+        let tv = s
+            .create_life_area(NewLifeArea {
+                name: "Television".into(),
+                colour: Some("#8b5cf6".into()),
+                kind: Some("entertainment".into()),
+                monthly_target_sec: None,
+            })
+            .unwrap();
+
+        // A two-hour window plotted for the evening…
+        plot(&mut s, 20, 2, Some(BlockIntent::Entertainment));
+        // …an hour of which was used, plus an unplanned hour at lunchtime.
+        let mut watch = |hour: i64, hours: i64| {
+            s.add_life_entry(NewLifeEntry {
+                life_area_id: tv.id.clone(),
+                label: Some("Watching".into()),
+                started_at: MONDAY + (hour - 9) * 3_600_000,
+                ended_at: MONDAY + (hour - 9 + hours) * 3_600_000,
+                tz: TZ.into(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })
+            .unwrap();
+        };
+        watch(20, 1);
+        watch(13, 1);
+
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let t = s.get_day(&today, TZ, None).unwrap().totals;
+
+        assert_eq!(t.entertainment_sec, 2 * 3600);
+        assert_eq!(t.entertainment_in_window_sec, 3600, "one hour was inside the window");
+        assert_eq!(
+            t.entertainment_sec - t.entertainment_in_window_sec,
+            3600,
+            "and one hour was not"
+        );
+        // The window was two hours; only one of them was used. Planned time is
+        // an intention, not a record, and the two are never merged.
+        assert_eq!(t.planned_entertainment_sec, 2 * 3600);
+    }
+
+    /// The split is a partition, never an overcount: an hour of entertainment
+    /// under two overlapping windows is still one hour.
+    #[test]
+    fn overlapping_windows_do_not_double_count() {
+        let mut s = store();
+        let tv = s
+            .create_life_area(NewLifeArea {
+                name: "Television".into(),
+                colour: Some("#8b5cf6".into()),
+                kind: Some("entertainment".into()),
+                monthly_target_sec: None,
+            })
+            .unwrap();
+        plot(&mut s, 20, 2, Some(BlockIntent::Entertainment));
+        plot(&mut s, 21, 2, Some(BlockIntent::Entertainment));
+        s.add_life_entry(NewLifeEntry {
+            life_area_id: tv.id.clone(),
+            label: Some("Watching".into()),
+            started_at: MONDAY + 11 * 3_600_000, // 20:00
+            ended_at: MONDAY + 14 * 3_600_000,   // 23:00
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+        let today = local_date(s.now(), &crate::time::zone(TZ).unwrap());
+        let t = s.get_day(&today, TZ, None).unwrap().totals;
+        assert_eq!(t.entertainment_sec, 3 * 3600);
+        // 20:00–23:00 watched; windows cover 20:00–23:00 between them.
+        assert_eq!(t.entertainment_in_window_sec, 3 * 3600);
+    }
+
+    /// A standing Friday film night is entertainment every Friday, not just the
+    /// first one.
+    #[test]
+    fn every_instance_of_a_series_inherits_the_seeds_intent() {
+        let mut s = store();
+        let created = s
+            .schedule_recurring(
+                NewBlock {
+                    task_id: None,
+                    label: Some("Film night".into()),
+                    starts_at: MONDAY + 11 * 3_600_000, // 20:00
+                    duration_sec: 2 * 3600,
+                    tz: TZ.into(),
+                    is_fixed: false,
+                    rrule: None,
+                    intent: Some(BlockIntent::Entertainment),
+                },
+                "FREQ=WEEKLY;BYDAY=MO;COUNT=4",
+            )
+            .unwrap();
+        assert_eq!(created.len(), 4);
+        assert!(created.iter().all(|b| b.intent == BlockIntent::Entertainment));
+    }
+
+    /// The database refuses a value the enum cannot name, so a bad write is a
+    /// failed write rather than a row nobody can classify.
+    #[test]
+    fn the_column_refuses_an_intent_that_is_not_one() {
+        let mut s = store();
+        let b = plot(&mut s, 10, 1, None);
+        let bad = s.conn.execute(
+            "UPDATE scheduled_block SET intent = 'leisure' WHERE id = ?1",
+            [&b.id],
+        );
+        assert!(bad.is_err(), "the CHECK constraint should have refused this");
     }
 }

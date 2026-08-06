@@ -63,6 +63,7 @@ impl Store {
         let mut totals = DayTotals {
             day_sec: 0,
             planned_sec: 0,
+            planned_entertainment_sec: 0,
             confirmed_work_sec: 0,
             confirmed_life_sec: 0,
             sleep_sec: 0,
@@ -71,6 +72,7 @@ impl Store {
             idle_sec: 0,
             empty_sec: 0,
             entertainment_sec: 0,
+            entertainment_in_window_sec: 0,
             pc_sec: 0,
             by_area: Vec::new(),
             by_project: Vec::new(),
@@ -97,6 +99,7 @@ impl Store {
 
             totals.day_sec += d.day_sec;
             totals.planned_sec += d.planned_sec;
+            totals.planned_entertainment_sec += d.planned_entertainment_sec;
             totals.confirmed_work_sec += d.confirmed_work_sec;
             totals.confirmed_life_sec += d.confirmed_life_sec;
             totals.sleep_sec += d.sleep_sec;
@@ -105,6 +108,7 @@ impl Store {
             totals.idle_sec += d.idle_sec;
             totals.empty_sec += d.empty_sec;
             totals.entertainment_sec += d.entertainment_sec;
+            totals.entertainment_in_window_sec += d.entertainment_in_window_sec;
             totals.pc_sec += d.pc_sec;
 
             for a in &d.by_area {
@@ -160,9 +164,12 @@ impl Store {
                 idle_sec: d.idle_sec,
                 empty_sec: d.empty_sec,
                 entertainment_sec: d.entertainment_sec,
-                // Entertainment you meant to have. Nothing can produce this yet
-                // — see `planned_entertainment_note` below.
-                planned_entertainment_sec: 0,
+                entertainment_in_window_sec: d.entertainment_in_window_sec,
+                // Entertainment you *meant* to have: blocks plotted with
+                // `intent = entertainment` (migration 0009). The dashed line
+                // on the dashboard reads this, and the distance between it and
+                // the solid one is the number the whole app is about.
+                planned_entertainment_sec: d.planned_entertainment_sec,
                 is_reconciled: day.is_reconciled,
                 has_happened: day.ends_at <= now,
                 accounted_ratio: if d.day_sec > 0 {
@@ -268,12 +275,6 @@ impl Store {
             to: last_local,
             tz: tz.to_string(),
             findings: self.month_findings(&totals, unreconciled, &days, elapsed_empty_sec)?,
-            planned_entertainment_note: Some(
-                "Planned entertainment is always zero: there is no way to plan an \
-                 entertainment window yet, so every minute of it is unplanned by \
-                 definition. The dashed line becomes real when windows land."
-                    .into(),
-            ),
             totals,
             accounted_ratio,
             elapsed_sec,
