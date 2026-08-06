@@ -238,6 +238,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Confirmed work on *today*, deliberately.
+    //
+    // Every other session here is seeded relative to Monday, so unless the
+    // preview happened to be recorded on a Monday the Day view opened with no
+    // confirmed work at all — and "Work + distraction", the finding this whole
+    // product exists to surface, had nothing to fire against. It covers the
+    // 09:35 YouTube stretch below, so the row is demonstrated rather than
+    // asserted.
+    store.add_session(ManualSession {
+        task_id: firefight.id.clone(),
+        block_id: None,
+        started_at: activity_base,
+        ended_at: activity_base + 75 * 60_000,
+        note: None,
+    })?;
+
     // Confirmed non-work time, so the Day view's primary screen has all four
     // record types on it: a night's sleep that starts the previous evening, a
     // lunch, and an evening the user marked private.
@@ -409,7 +425,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "settings": store.activity_settings()?,
         }),
     );
-    out.insert("get_domain_rules".into(), json!(store.list_domain_rules()?));
+    out.insert("get_activity_rules".into(), json!(store.get_activity_rules()?));
+    out.insert(
+        "get_categories".into(),
+        json!(store.get_categories(Some((&today, &today)), &tz)?),
+    );
+    out.insert(
+        "get_unlabelled".into(),
+        json!(store.get_unlabelled(&today, &today, &tz, 12)?),
+    );
     out.insert(
         "get_domain_totals".into(),
         json!(store.domain_totals(&today, &tz)?),

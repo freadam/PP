@@ -192,7 +192,7 @@ number in this app can be checked by hand. A weekly review and report artifact,
 read at a fixed moment, headline first. Next week's goals pre-filled from what
 happened, at the same n ≥ 5 median discipline the estimate calibration uses.
 
-**Observation categories become user-definable.** The fixed
+**Observation categories are user-definable** (built, migration 0007). The fixed
 `core`/`entertainment`/`other` split becomes a table a user can extend, spanning
 **both applications and domains**, with a `counts_as` roll-up so adding a category
 never moves an existing total. This is the one place the plan changes an existing
@@ -496,7 +496,7 @@ in bold; each is reversible.
 | Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
 | Entertainment budgets and planned windows | **Not built** — no longer blocked. Planned as the `at_most` case of weekly goals, in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) |
 | **The week horizon** — goals, pacing, fragmentation, weekly review and report | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W1–W10. The week is the one horizon with no working surface. |
-| **User-defined observation categories** and the uncategorised surface | **Planned** — W7/W8. Changes `DomainCategory` from a fixed enum to a table; `counts_as` keeps every existing total stable. |
+| **User-defined observation categories** and the uncategorised surface | **Built** — migration 0007. Work · Study · Distraction · Life, extensible, per app **and** per site. `counts_as` keeps every existing total stable. |
 | **Focus sessions with an intended length**, extendable in one key | **Planned** — W3. The timer runs until stopped; a session that commits to 45 minutes is a different act. |
 | **Off-plan nudge** (a notice, never a block) | **Planned** — W5. |
 | Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |

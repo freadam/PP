@@ -109,6 +109,7 @@ fn f1_full_loop_through_the_command_layer() {
                 estimate_sec: None,
                 life_area_id: None,
                 rule_for_domain: None,
+                rule_category_id: None,
             }],
             TZ,
         )
@@ -184,6 +185,7 @@ fn f3_unplanned_session_becomes_a_retroactive_block() {
                 estimate_sec: None,
                 life_area_id: None,
                 rule_for_domain: None,
+                rule_category_id: None,
             }],
             TZ,
         )
@@ -1569,6 +1571,11 @@ fn ics_recurring_events_expand() {
 #[test]
 fn activity_respects_the_privacy_contract() {
     let (mut store, _) = store_at(at(2025, 7, 30, 9, 0));
+    // This test is about which fields may be written, not about how long an
+    // observation has to last to be reported. The floor has its own tests.
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_MIN_SPAN_SEC, 0.into())
+        .unwrap();
     let sample = |app: &str, title: &str, at: i64| ActivitySample {
         app_id: app.into(),
         window_title: Some(title.into()),
@@ -1660,14 +1667,18 @@ fn activity_samples_coalesce_into_spans() {
             })
             .unwrap();
     }
-    store
-        .record_activity(ActivitySample {
-            app_id: "mail.exe".into(),
-            window_title: None,
-            domain: None,
-            at: at(2025, 7, 30, 9, 10),
-        })
-        .unwrap();
+    // Five minutes of a second app, not one tick: a single 20-second sample is
+    // below the short-span floor and is deliberately not reported.
+    for tick in 0..15 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "mail.exe".into(),
+                window_title: None,
+                domain: None,
+                at: at(2025, 7, 30, 9, 10) + tick * fruit_core::store::SAMPLE_INTERVAL_MS,
+            })
+            .unwrap();
+    }
 
     let day = store.get_activity_day("2025-07-30", TZ).unwrap();
     assert_eq!(day.spans.len(), 2, "ten samples of one app are one span");
@@ -2120,14 +2131,19 @@ fn wire_shape_is_camel_case() {
     store.start_timer(&t.id, None).unwrap();
     clock.advance(30 * 60_000);
     store.stop_timer().unwrap();
-    store
-        .record_activity(ActivitySample {
-            app_id: "code.exe".into(),
-            window_title: None,
-            domain: None,
-            at: at(2025, 7, 30, 14, 0),
-        })
-        .unwrap();
+    // Ten minutes, not one sample: observation below the short-span floor is
+    // not reported, and a fixture built from a single 20-second tick would
+    // silently stop producing an `observed` segment at all.
+    for tick in 0..30 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                domain: None,
+                at: at(2025, 7, 30, 14, 0) + tick * fruit_core::store::SAMPLE_INTERVAL_MS,
+            })
+            .unwrap();
+    }
 
     let day = store.get_day("2025-07-30", TZ, None).unwrap();
     let json = serde_json::to_value(&day).unwrap();
@@ -2553,6 +2569,7 @@ fn a_rule_made_while_reconciling_classifies_forwards_and_never_backwards() {
                 estimate_sec: None,
                 life_area_id: Some(area),
                 rule_for_domain: evidence.domain.clone(),
+                rule_category_id: None,
             }],
             TZ,
         )
@@ -2560,27 +2577,32 @@ fn a_rule_made_while_reconciling_classifies_forwards_and_never_backwards() {
 
     // Forwards: tomorrow's visit is classified without being asked about again.
     assert_eq!(
-        store.classify_domain("news.example.com").unwrap(),
+        store
+            .classify("chrome.exe", Some("news.example.com"))
+            .unwrap()
+            .map(|(_, counts)| counts),
         Some(DomainCategory::Entertainment)
     );
     clock.advance(24 * 3600 * 1000);
-    store
-        .record_activity(ActivitySample {
-            app_id: "chrome.exe".into(),
-            window_title: None,
-            domain: Some("news.example.com".into()),
-            at: at(2025, 7, 31, 11, 0),
-        })
-        .unwrap();
+    for tick in 0..30 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "chrome.exe".into(),
+                window_title: None,
+                domain: Some("news.example.com".into()),
+                at: at(2025, 7, 31, 11, 0) + tick * fruit_core::store::SAMPLE_INTERVAL_MS,
+            })
+            .unwrap();
+    }
     let tomorrow = store.domain_totals("2025-07-31", TZ).unwrap();
-    assert_eq!(tomorrow[0].category, Some(DomainCategory::Entertainment));
+    assert_eq!(tomorrow[0].category_name.as_deref(), Some("Distraction"));
 
     // Backwards: yesterday is exactly as it was left. The hour was reconciled
     // as life time by hand, and the observation underneath it still carries the
     // verdict it was written with — which was none.
     let yesterday = store.domain_totals("2025-07-30", TZ).unwrap();
     assert_eq!(
-        yesterday[0].category, None,
+        yesterday[0].category_name, None,
         "the rule reached backwards and reclassified a day already closed"
     );
 }
@@ -2685,6 +2707,7 @@ fn reconciling_an_empty_hour_fills_it() {
                 estimate_sec: None,
                 life_area_id: Some(family),
                 rule_for_domain: None,
+                rule_category_id: None,
             }],
             TZ,
         )
@@ -2713,6 +2736,7 @@ fn reconciling_an_empty_hour_fills_it() {
                 estimate_sec: None,
                 life_area_id: None,
                 rule_for_domain: None,
+                rule_category_id: None,
             }],
             TZ,
         )

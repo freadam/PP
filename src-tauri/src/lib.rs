@@ -310,24 +310,94 @@ fn set_activity_setting(
 
 /* ─── browser connector (Plan Rev 3 §5.4) ──────────────────────────────── */
 
-#[tauri::command]
-fn get_domain_rules(state: State<'_, AppState>) -> Res<Vec<DomainRuleRow>> {
-    with(&state, |s| s.list_domain_rules())
-}
+/* ─── labelling observed time (migration 0007) ─────────────────────────── */
 
 #[tauri::command]
-fn set_domain_rule(
+fn get_categories(
     state: State<'_, AppState>,
-    domain: String,
-    category: DomainCategory,
-    life_area_id: Option<String>,
-) -> Res<DomainRuleRow> {
-    with(&state, |s| s.set_domain_rule(&domain, category, life_area_id))
+    from: Option<String>,
+    to: Option<String>,
+    tz: String,
+) -> Res<Vec<ObservationCategory>> {
+    with(&state, |s| {
+        let range = from.as_deref().zip(to.as_deref());
+        s.get_categories(range, &tz)
+    })
 }
 
 #[tauri::command]
-fn delete_domain_rule(state: State<'_, AppState>, id: String) -> Res<()> {
-    with(&state, |s| s.delete_domain_rule(&id))
+fn create_category(
+    state: State<'_, AppState>,
+    name: String,
+    colour: Option<String>,
+    counts_as: DomainCategory,
+) -> Res<ObservationCategory> {
+    with(&state, |s| {
+        s.create_category(&name, colour.as_deref(), counts_as)
+    })
+}
+
+#[tauri::command]
+fn update_category(
+    state: State<'_, AppState>,
+    id: String,
+    name: Option<String>,
+    colour: Option<String>,
+) -> Res<ObservationCategory> {
+    with(&state, |s| {
+        s.update_category(&id, name.as_deref(), colour.as_deref())
+    })
+}
+
+#[tauri::command]
+fn delete_category(state: State<'_, AppState>, id: String) -> Res<()> {
+    with(&state, |s| s.delete_category(&id))
+}
+
+#[tauri::command]
+fn get_activity_rules(state: State<'_, AppState>) -> Res<Vec<ActivityRuleRow>> {
+    with(&state, |s| s.get_activity_rules())
+}
+
+#[tauri::command]
+fn set_activity_rule(
+    state: State<'_, AppState>,
+    match_kind: MatchKind,
+    match_value: String,
+    category_id: String,
+) -> Res<ActivityRuleRow> {
+    with(&state, |s| {
+        s.set_activity_rule(match_kind, &match_value, &category_id)
+    })
+}
+
+#[tauri::command]
+fn delete_activity_rule(state: State<'_, AppState>, id: String) -> Res<()> {
+    with(&state, |s| s.delete_activity_rule(&id))
+}
+
+/// Relabels one observed interval without touching any rule — the YouTube case:
+/// Distraction by default, and *this* video was a lecture.
+#[tauri::command]
+fn set_span_category(
+    state: State<'_, AppState>,
+    span_id: i64,
+    category_id: Option<String>,
+) -> Res<()> {
+    with(&state, |s| {
+        s.set_span_category(span_id, category_id.as_deref())
+    })
+}
+
+#[tauri::command]
+fn get_unlabelled(
+    state: State<'_, AppState>,
+    from: String,
+    to: String,
+    tz: String,
+    limit: u32,
+) -> Res<Vec<UnlabelledRow>> {
+    with(&state, |s| s.get_unlabelled(&from, &to, &tz, limit))
 }
 
 #[tauri::command]
@@ -846,9 +916,15 @@ pub fn run() {
             set_activity_setting,
             get_activity_day,
             clear_activity,
-            get_domain_rules,
-            set_domain_rule,
-            delete_domain_rule,
+            get_categories,
+            create_category,
+            update_category,
+            delete_category,
+            get_activity_rules,
+            set_activity_rule,
+            delete_activity_rule,
+            set_span_category,
+            get_unlabelled,
             get_domain_totals,
             get_connector_status,
             get_unreconciled_days,

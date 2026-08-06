@@ -341,3 +341,38 @@ why, because a simulated write would be exactly the lie this avoids.
    meaningful states the UI renders rather than edge cases it hides.
 8. A session covers one contiguous *awake* interval, so its endpoints are always
    real system-clock instants. See "Why a session is a segment" above.
+
+## Why the browser and the sampler do not both bill the same hour
+
+Two things write to `activity_span`: the foreground sampler (`chrome.exe`) and
+the browser connector (`chrome.exe` on `youtube.com`). While Chrome is frontmost
+both are correct and both produce rows for the same seconds.
+
+`resolve_day` was never affected — it gives each segment exactly one owner by
+precedence — which is why the double-count was invisible on every screen that
+mattered most. But per-app totals, per-label totals and the uncategorised list
+walk spans directly, and those were counting the hour twice.
+
+`dedupe_browser_overlap` subtracts the domain-bearing intervals from the
+app-only ones for the same application. Subtraction rather than deletion,
+because the remainder is real: Chrome open on `chrome://settings` records no
+domain, and that time genuinely is app-only.
+
+The related trap is in the *write* path. `record_activity` used to coalesce
+against the single most recently ended span. With two sources interleaving,
+neither ever matched, so every twenty-second sample became its own row — and
+once a minimum-duration floor existed, all of them were discarded. It now looks
+for the most recent span *describing the same thing*, which is the only version
+that survives more than one writer.
+
+## Why a label is stored on the span, and a rule is separate
+
+`activity_span.category_id` is stamped at write time from the rules in force
+then — the same argument as `category` before it. A rule added in September
+cannot rewrite what August said you were doing.
+
+That leaves the case where the rule is right in general and wrong right here: a
+YouTube lecture. Fruit sees a registrable domain and deliberately never the URL
+or the page title, so it cannot tell. `set_span_category` changes one interval
+and leaves the rule alone, which is the only honest arrangement available — the
+person who watched it is the only one who knows.

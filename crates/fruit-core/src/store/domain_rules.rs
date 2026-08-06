@@ -1,8 +1,9 @@
-//! Domain rules — turning `youtube.com` into "entertainment" (Plan Rev 3 §5.4).
+//! The browser connector's plumbing (Plan Rev 3 §5.4).
 //!
-//! This is the half of the browser connector that lives in the database. The
-//! other half — the protocol — is in `crate::connector`, and the two meet in
-//! [`Store::record_browser_sample`].
+//! What may be recorded about a website, and how a queued sample becomes a row.
+//! The *meaning* of a domain moved to `categories.rs` in migration 0007 — a rule
+//! is no longer domain-only, because "Instagram is a distraction" is the same
+//! statement whether Instagram is a website or an app.
 //!
 //! Three things are settled here.
 //!
@@ -22,13 +23,9 @@
 //! Anything else means a user reclassifying a domain silently rewrites their own
 //! history, which is the one thing a record of what you did must never do.
 
-use rusqlite::{params, Row};
-
-
 use super::Store;
 use crate::connector::{registrable_domain, Sample};
-use crate::error::{AppError, Result};
-use crate::ids::new_id;
+use crate::error::Result;
 use crate::model::*;
 
 /// Whether domains may be recorded at all. Off by default, and independent of
@@ -37,151 +34,7 @@ pub const DOMAINS_ENABLED: &str = "activity.domainsEnabled";
 /// Registrable domains that are never written.
 pub const EXCLUDED_DOMAINS: &str = "activity.excludedDomains";
 
-/// The rules that make the primary outcome measurable on first run.
-///
-/// Short on purpose. A long shipped list is a long list of small wrong guesses:
-/// `reddit.com` is entertainment for most people and a work tool for some, and
-/// being wrong about it teaches the user to distrust the whole classification.
-/// These three are the ones the plan names, and the reconciler is how the rest
-/// of the list gets built — by the person whose time it is.
-pub const DEFAULT_RULES: &[(&str, DomainCategory)] = &[
-    ("youtube.com", DomainCategory::Entertainment),
-    ("youtu.be", DomainCategory::Entertainment),
-    ("twitch.tv", DomainCategory::Entertainment),
-];
-
-fn map_rule(r: &Row) -> rusqlite::Result<DomainRuleRow> {
-    let category: String = r.get(2)?;
-    Ok(DomainRuleRow {
-        id: r.get(0)?,
-        domain: r.get(1)?,
-        category: DomainCategory::parse(&category).unwrap_or(DomainCategory::Other),
-        life_area_id: r.get(3)?,
-        is_builtin: r.get::<_, i64>(4)? == 1,
-    })
-}
-
 impl Store {
-    /// Idempotent, and called on every launch for the same reason
-    /// `seed_life_areas` is: a database that predates this migration would
-    /// otherwise never acquire the defaults.
-    ///
-    /// Seeds only when the table is empty. A user who deletes the YouTube rule
-    /// has said something, and re-adding it every launch would be arguing.
-    pub fn seed_domain_rules(&mut self) -> Result<usize> {
-        let existing: i64 =
-            self.conn
-                .query_row("SELECT COUNT(*) FROM domain_rule", [], |r| r.get(0))?;
-        if existing > 0 {
-            return Ok(0);
-        }
-        let now = self.now();
-        let tx = self.conn.transaction()?;
-        for (domain, category) in DEFAULT_RULES {
-            tx.execute(
-                "INSERT INTO domain_rule
-                   (id, domain, category, is_builtin, device_id, created_at, updated_at)
-                 VALUES (?1,?2,?3,1,?4,?5,?5)",
-                params![new_id(), domain, category.as_str(), self.device_id, now],
-            )?;
-        }
-        tx.commit()?;
-        Ok(DEFAULT_RULES.len())
-    }
-
-    pub fn list_domain_rules(&self) -> Result<Vec<DomainRuleRow>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, domain, category, life_area_id, is_builtin
-               FROM domain_rule ORDER BY domain",
-        )?;
-        let rows = stmt.query_map([], map_rule)?;
-        Ok(rows.collect::<std::result::Result<_, _>>()?)
-    }
-
-    /// Creates or replaces the rule for a domain.
-    ///
-    /// This is what the reconciler's "apply my choice to future activity in this
-    /// context" calls: one decision, made once, that stops the same question
-    /// being asked tomorrow. Editing a built-in rule makes it the user's — the
-    /// row stops being built-in rather than being shadowed by a second one.
-    pub fn set_domain_rule(
-        &mut self,
-        domain: &str,
-        category: DomainCategory,
-        life_area_id: Option<String>,
-    ) -> Result<DomainRuleRow> {
-        let domain = registrable_domain(domain)
-            .ok_or_else(|| AppError::invalid(format!("'{domain}' isn't a website address.")))?;
-        if let Some(area) = &life_area_id {
-            let exists: i64 = self.conn.query_row(
-                "SELECT COUNT(*) FROM life_area WHERE id = ?1 AND deleted_at IS NULL",
-                [area],
-                |r| r.get(0),
-            )?;
-            if exists == 0 {
-                return Err(AppError::invalid("That life area no longer exists."));
-            }
-        }
-        let now = self.now();
-        self.conn.execute(
-            "INSERT INTO domain_rule
-               (id, domain, category, life_area_id, is_builtin, device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,0,?5,?6,?6)
-             ON CONFLICT(domain) DO UPDATE SET
-               category = excluded.category,
-               life_area_id = excluded.life_area_id,
-               is_builtin = 0,
-               updated_at = excluded.updated_at",
-            params![
-                new_id(),
-                domain,
-                category.as_str(),
-                life_area_id,
-                self.device_id,
-                now
-            ],
-        )?;
-        self.conn
-            .query_row(
-                "SELECT id, domain, category, life_area_id, is_builtin
-                   FROM domain_rule WHERE domain = ?1",
-                [&domain],
-                map_rule,
-            )
-            .map_err(Into::into)
-    }
-
-    pub fn delete_domain_rule(&mut self, id: &str) -> Result<()> {
-        let n = self
-            .conn
-            .execute("DELETE FROM domain_rule WHERE id = ?1", [id])?;
-        if n == 0 {
-            return Err(AppError::invalid("That rule no longer exists."));
-        }
-        Ok(())
-    }
-
-    /// The verdict for a domain, or `None` when no rule covers it.
-    ///
-    /// `None` is a real answer, not a failure: an unclassified domain shows up
-    /// as observed-only time in the reconciler, which is exactly where the user
-    /// gets asked what it was. Guessing a default here would replace a question
-    /// with a wrong answer nobody is prompted to correct.
-    pub fn classify_domain(&self, domain: &str) -> Result<Option<DomainCategory>> {
-        let Some(domain) = registrable_domain(domain) else {
-            return Ok(None);
-        };
-        let found: Option<String> = self
-            .conn
-            .query_row(
-                "SELECT category FROM domain_rule WHERE domain = ?1",
-                [&domain],
-                |r| r.get(0),
-            )
-            .ok();
-        Ok(found.as_deref().and_then(DomainCategory::parse))
-    }
-
     /// Whether the connector should be listening at all. The extension asks on
     /// connect, and the host answers honestly rather than accepting samples it
     /// intends to throw away.
@@ -276,47 +129,62 @@ impl Store {
     }
 
     /// How much observed browser time each domain accounted for on a local date,
-    /// longest first. The Day view's evidence column and the month dashboard's
-    /// entertainment trend both read this.
+    /// longest first, with the label it was written with.
+    ///
+    /// Goes through `labelled_spans` rather than a `GROUP BY`, so the
+    /// short-observation floor applies here exactly as it does on the Day view.
+    /// A SQL aggregate would have been shorter and would have quietly disagreed
+    /// with every other screen about the same afternoon.
     pub fn domain_totals(&self, date: &str, tz: &str) -> Result<Vec<DomainTotal>> {
-        use crate::time::{day_end, day_start, parse_date, zone};
-        let zone_ = zone(tz)?;
-        let day = parse_date(date)?;
-        let (from, to) = (day_start(day, &zone_), day_end(day, &zone_));
+        use std::collections::HashMap;
+        let mut totals: HashMap<(String, Option<String>), i64> = HashMap::new();
+        for span in self.labelled_spans(date, tz)? {
+            let Some(domain) = span.domain.clone() else {
+                continue;
+            };
+            *totals
+                .entry((domain, span.category_id.clone()))
+                .or_insert(0) += span.seconds();
+        }
 
-        let mut stmt = self.conn.prepare(
-            // Clipped to the day on both ends, so a span running over midnight
-            // is counted once in each day it actually occupied rather than
-            // wholly in the one it started in.
-            "SELECT domain,
-                    category,
-                    SUM(MIN(ended_at, ?2) - MAX(started_at, ?1)) / 1000
-               FROM activity_span
-              WHERE domain IS NOT NULL AND started_at < ?2 AND ended_at >= ?1
-              GROUP BY domain, category
-              ORDER BY 3 DESC, 1 ASC",
-        )?;
-        let rows = stmt.query_map(params![from, to], |r| {
-            let category: Option<String> = r.get(1)?;
-            Ok(DomainTotal {
-                domain: r.get(0)?,
-                category: category.as_deref().and_then(DomainCategory::parse),
-                seconds: r.get(2)?,
+        let names: HashMap<String, (String, String)> = self
+            .get_categories(None, tz)?
+            .into_iter()
+            .map(|c| (c.id, (c.name, c.colour)))
+            .collect();
+
+        let mut out: Vec<DomainTotal> = totals
+            .into_iter()
+            .map(|((domain, category_id), seconds)| {
+                let meta = category_id.as_ref().and_then(|id| names.get(id));
+                DomainTotal {
+                    domain,
+                    category_name: meta.map(|m| m.0.clone()),
+                    category_colour: meta.map(|m| m.1.clone()),
+                    category_id,
+                    seconds,
+                }
             })
-        })?;
-        Ok(rows.collect::<std::result::Result<_, _>>()?)
+            .collect();
+        // Longest first, ties by name — without the tie-break the order comes
+        // from a hash seed and changes between two reads of the same day.
+        out.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.domain.cmp(&b.domain)));
+        Ok(out)
     }
 }
 
-/// Seconds spent on one domain, with the verdict recorded at the time.
+/// Seconds spent on one domain, with the label recorded at the time.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainTotal {
     pub domain: String,
-    pub category: Option<DomainCategory>,
+    /// `None` when no rule covered it — a question for the labelling surface,
+    /// not a failure.
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub category_colour: Option<String>,
     pub seconds: i64,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -338,12 +206,13 @@ mod tests {
         s.set_activity_setting(super::super::activity::ENABLED, json!(true))
             .unwrap();
         s.set_setting(DOMAINS_ENABLED, &json!(true)).unwrap();
+        // The floor exists to keep noise out of a day's account; these tests are
+        // about the connector, and a 20-second sample is below it by design.
+        s.set_setting(super::super::activity::MIN_SPAN_SEC, &json!(0))
+            .unwrap();
         (s, clock)
     }
 
-    /// Stamped with the clock the store is reading, because that is what the
-    /// native-messaging host does before the sample reaches the spool — the app
-    /// keeps that stamp rather than re-stamping on drain.
     fn sample(clock: &TestClock, domain: &str) -> Sample {
         Sample {
             domain: domain.into(),
@@ -365,21 +234,6 @@ mod tests {
             .unwrap()
     }
 
-    #[test]
-    fn defaults_classify_the_domains_the_plan_names() {
-        let (s, _) = store();
-        assert_eq!(
-            s.classify_domain("www.youtube.com").unwrap(),
-            Some(DomainCategory::Entertainment)
-        );
-        assert_eq!(
-            s.classify_domain("youtu.be").unwrap(),
-            Some(DomainCategory::Entertainment)
-        );
-        // Unknown is a question for the reconciler, not a guess.
-        assert_eq!(s.classify_domain("example.com").unwrap(), None);
-    }
-
     /// The switch the Settings note promises. Apps on, domains off, and nothing
     /// about a website is written — not even a span with the domain stripped,
     /// because the connector's sample *is* the domain.
@@ -391,7 +245,10 @@ mod tests {
             .unwrap();
         assert!(!s.domains_enabled());
         assert!(!s.record_browser_sample(sample(&clock, "youtube.com")).unwrap());
-        assert!(spans(&s, "domain").is_empty(), "a domain was written with the switch off");
+        assert!(
+            spans(&s, "domain").is_empty(),
+            "a domain was written with the switch off"
+        );
     }
 
     /// Turning app tracking off must not leave the domain switch armed
@@ -414,66 +271,13 @@ mod tests {
             .unwrap();
         // Excluding the registrable domain excludes every subdomain of it —
         // there is no `secure.` that slips past.
-        assert!(!s.record_browser_sample(sample(&clock, "secure.bank.co.uk")).unwrap());
+        assert!(!s
+            .record_browser_sample(sample(&clock, "secure.bank.co.uk"))
+            .unwrap());
         clock.advance(SAMPLE_INTERVAL_MS);
         assert!(s.record_browser_sample(sample(&clock, "youtube.com")).unwrap());
 
         assert_eq!(spans(&s, "domain"), vec![Some("youtube.com".to_string())]);
-    }
-
-    #[test]
-    fn a_recorded_sample_carries_the_verdict_in_force_when_it_was_written() {
-        let (mut s, clock) = store();
-        s.record_browser_sample(sample(&clock, "www.youtube.com")).unwrap();
-        assert_eq!(spans(&s, "domain"), vec![Some("youtube.com".to_string())]);
-        assert_eq!(
-            spans(&s, "category"),
-            vec![Some("entertainment".to_string())]
-        );
-    }
-
-    /// The reason `activity_span.category` is stored rather than joined: a rule
-    /// written today must not rewrite what last week said you were doing.
-    #[test]
-    fn changing_a_rule_does_not_reclassify_what_is_already_recorded() {
-        let (mut s, clock) = store();
-        s.record_browser_sample(sample(&clock, "youtube.com")).unwrap();
-        s.set_domain_rule("youtube.com", DomainCategory::Core, None)
-            .unwrap();
-        // A new observation gets the new verdict...
-        clock.advance(10 * 60_000);
-        s.record_browser_sample(sample(&clock, "youtube.com")).unwrap();
-
-        // ...and the old one keeps the one it was given.
-        assert_eq!(
-            spans(&s, "category"),
-            vec![
-                Some("entertainment".to_string()),
-                Some("core".to_string())
-            ]
-        );
-    }
-
-    #[test]
-    fn a_user_rule_replaces_the_builtin_rather_than_competing_with_it() {
-        let (mut s, _) = store();
-        let rule = s
-            .set_domain_rule("www.youtube.com", DomainCategory::Core, None)
-            .unwrap();
-        assert_eq!(rule.domain, "youtube.com", "the rule is stored reduced");
-        assert!(!rule.is_builtin, "an edited rule belongs to the user");
-
-        let for_youtube: Vec<_> = s
-            .list_domain_rules()
-            .unwrap()
-            .into_iter()
-            .filter(|r| r.domain == "youtube.com")
-            .collect();
-        assert_eq!(for_youtube.len(), 1, "two rules would need a tie-break");
-        assert_eq!(
-            s.classify_domain("m.youtube.com").unwrap(),
-            Some(DomainCategory::Core)
-        );
     }
 
     /// Coalescing is app-based, and a browser is one app. Without the domain in
@@ -503,31 +307,37 @@ mod tests {
             s.record_browser_sample(sample(&clock, "youtube.com")).unwrap();
             clock.advance(SAMPLE_INTERVAL_MS);
         }
-        assert_eq!(spans(&s, "domain").len(), 1, "one stretch of watching is one row");
-
-        // And it is as long as the watching was, not as long as one sample.
+        assert_eq!(
+            spans(&s, "domain").len(),
+            1,
+            "one stretch of watching is one row"
+        );
         let totals = s.domain_totals("2026-08-04", "UTC").unwrap();
         assert_eq!(totals[0].seconds, 5 * SAMPLE_INTERVAL_MS / 1000);
     }
 
     #[test]
-    fn domain_totals_rank_by_time_and_carry_the_category() {
+    fn domain_totals_rank_by_time_and_carry_the_label() {
         let (mut s, clock) = store();
         for _ in 0..6 {
             s.record_browser_sample(sample(&clock, "youtube.com")).unwrap();
             clock.advance(SAMPLE_INTERVAL_MS);
         }
         for _ in 0..2 {
-            s.record_browser_sample(sample(&clock, "github.com")).unwrap();
+            s.record_browser_sample(sample(&clock, "notarule.example"))
+                .unwrap();
             clock.advance(SAMPLE_INTERVAL_MS);
         }
 
         let totals = s.domain_totals("2026-08-04", "UTC").unwrap();
         assert_eq!(totals.len(), 2);
         assert_eq!(totals[0].domain, "youtube.com");
-        assert_eq!(totals[0].category, Some(DomainCategory::Entertainment));
+        assert_eq!(totals[0].category_name.as_deref(), Some("Distraction"));
         assert!(totals[0].seconds > totals[1].seconds);
-        assert_eq!(totals[1].category, None, "github has no rule, and says so");
+        assert_eq!(
+            totals[1].category_name, None,
+            "an unlabelled site says so rather than being filed as Other"
+        );
     }
 
     /// The whole hand-off, end to end: the host queues, the app drains, and the
@@ -551,7 +361,6 @@ mod tests {
 
         let totals = s.domain_totals("2026-08-04", "UTC").unwrap();
         assert_eq!(totals.len(), 1);
-        assert_eq!(totals[0].domain, "youtube.com");
         assert_eq!(
             totals[0].seconds,
             3 * SAMPLE_INTERVAL_MS / 1000,
@@ -572,16 +381,5 @@ mod tests {
         s.set_activity_setting(DOMAINS_ENABLED, json!(false)).unwrap();
         s.drain_browser_spool(dir.path()).unwrap();
         assert!(!crate::spool::spooling_permitted(dir.path()));
-    }
-
-    #[test]
-    fn a_rule_can_only_be_written_for_something_that_is_a_website() {
-        let (mut s, _) = store();
-        assert!(s
-            .set_domain_rule("not a domain", DomainCategory::Other, None)
-            .is_err());
-        assert!(s
-            .set_domain_rule("youtube.com", DomainCategory::Other, Some("nope".into()))
-            .is_err());
     }
 }

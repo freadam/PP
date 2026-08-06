@@ -66,6 +66,16 @@ impl TestClock {
         self.wall.load(Ordering::SeqCst)
     }
 
+    /// Jumps the wall clock to an exact instant, monotonic time with it.
+    ///
+    /// For tests that have to write two sources describing the *same* interval —
+    /// the foreground sampler and the browser connector both observe the hour
+    /// you spent in Chrome, and in life they interleave.
+    pub fn set(&self, wall_ms: i64) {
+        let delta = wall_ms - self.wall.swap(wall_ms, Ordering::SeqCst);
+        self.mono.fetch_add(delta, Ordering::SeqCst);
+    }
+
     /// Ordinary passage of time: both clocks advance together.
     pub fn advance(&self, ms: i64) {
         self.wall.fetch_add(ms, Ordering::SeqCst);

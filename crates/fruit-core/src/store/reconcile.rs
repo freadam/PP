@@ -454,18 +454,22 @@ impl Store {
             // that reached backwards would silently rewrite a month someone has
             // already signed off.
             if let Some(domain) = &action.rule_for_domain {
-                let category = match action.verb {
-                    // The user has just called this interval personal time. What
-                    // that means for a *domain* is "not work", which is the
-                    // entertainment bucket the reduction target is measured in.
-                    ReconcileVerb::RecordAsLife => DomainCategory::Entertainment,
-                    // Attached to a task: this domain is how work gets done.
-                    ReconcileVerb::AssignToTask => DomainCategory::Core,
-                    // Anything else is not a verdict about the domain, and
+                let category_id = match &action.rule_category_id {
+                    Some(id) => id.clone(),
+                    // No explicit label, so the verb decides. Two cases only —
+                    // anything else is not a verdict about the site, and
                     // inventing one would put a rule behind a shrug.
-                    _ => continue,
+                    None => match action.verb {
+                        // Just called this interval personal time. What that
+                        // means for a *site* is "not work", which is the bucket
+                        // the reduction target is measured in.
+                        ReconcileVerb::RecordAsLife => category::DISTRACTION.to_string(),
+                        // Attached to a task: this is how work gets done.
+                        ReconcileVerb::AssignToTask => category::WORK.to_string(),
+                        _ => continue,
+                    },
                 };
-                self.set_domain_rule(domain, category, action.life_area_id.clone())?;
+                self.set_activity_rule(MatchKind::Domain, domain, &category_id)?;
             }
             match action.verb {
                 ReconcileVerb::Accept | ReconcileVerb::Ignore | ReconcileVerb::LeaveUnscheduled => {}

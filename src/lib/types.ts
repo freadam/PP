@@ -113,6 +113,8 @@ export interface ActivitySettings {
   excludedTitlePatterns: string[];
   /** 30 / 90 / 0 for forever. */
   retentionDays: number;
+  /** Observation shorter than this is not reported. 0 disables the floor. */
+  minSpanSec: number;
   nextPurgeAt: Millis | null;
 }
 
@@ -128,19 +130,61 @@ export interface ActivityStatus {
 /** Three values, not `AreaKind`'s four: no domain implies rest. */
 export type DomainCategory = "core" | "entertainment" | "other";
 
-export interface DomainRule {
+/**
+ * A label the user can put on observed time — Work, Study, Distraction, Life,
+ * and any they add.
+ *
+ * `countsAs` is the roll-up every report written before this feature reads, so
+ * adding a category can never move a number that was already on screen.
+ */
+export interface ObservationCategory {
   id: string;
-  domain: string;
-  category: DomainCategory;
-  lifeAreaId: string | null;
+  name: string;
+  colour: string;
+  countsAs: DomainCategory;
+  isBuiltin: boolean;
+  sortRank: number;
+  /** Observed seconds over whatever range was asked for; 0 if none was. */
+  seconds: number;
+}
+
+/** Built-in category ids, fixed in migration 0007. */
+export const CATEGORY = {
+  work: "00000000-0000-7000-8000-000000000001",
+  study: "00000000-0000-7000-8000-000000000002",
+  distraction: "00000000-0000-7000-8000-000000000003",
+  life: "00000000-0000-7000-8000-000000000004",
+  other: "00000000-0000-7000-8000-000000000005",
+} as const;
+
+export type MatchKind = "app" | "domain";
+
+export interface ActivityRule {
+  id: string;
+  matchKind: MatchKind;
+  matchValue: string;
+  categoryId: string;
+  categoryName: string;
+  categoryColour: string;
   /** Shipped with the app. Editing one makes it yours. */
   isBuiltin: boolean;
+}
+
+/** Something observed that no rule covers, ranked by how much time it took. */
+export interface UnlabelledRow {
+  matchKind: MatchKind;
+  matchValue: string;
+  seconds: number;
+  /** One 4-hour stretch and forty 6-minute ones are different problems. */
+  occurrences: number;
 }
 
 export interface DomainTotal {
   domain: string;
   /** `null` when no rule covered it — a question, not a failure. */
-  category: DomainCategory | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryColour: string | null;
   seconds: number;
 }
 
@@ -159,6 +203,10 @@ export interface ActivitySpanRow {
   endedAt: Millis;
   appId: string;
   windowTitle: string | null;
+  /** The site, where the connector saw one. What the row is named after. */
+  domain: string | null;
+  /** The label in force when this was written. `null` is unlabelled. */
+  categoryId: string | null;
 }
 
 export interface AppTotal {
@@ -389,6 +437,11 @@ export interface ReconcileAction {
    * already reconciled keep the verdict they were written with.
    */
   ruleForDomain?: string | null;
+  /**
+   * Which label the rule applies. Optional — when absent the verb decides, so
+   * the checkbox alone is enough for the common case.
+   */
+  ruleCategoryId?: string | null;
 }
 
 export interface DayReview {

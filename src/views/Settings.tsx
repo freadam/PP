@@ -10,7 +10,12 @@ import { useEffect, useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { ConnectorStatus, IntegrityReport } from "../lib/types";
+import type {
+  ActivityRule,
+  ConnectorStatus,
+  IntegrityReport,
+  ObservationCategory,
+} from "../lib/types";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -206,6 +211,7 @@ export function Settings() {
       </Section>
 
       <ActivitySettings />
+      <LabelSettings />
 
       <Section title="Data">
         <Field label="Export" hint="Written to your Downloads folder. JSON round-trips exactly, ids included. CSV ships tasks and sessions. ICS is export-only.">
@@ -500,6 +506,25 @@ function ActivitySettings() {
       </Field>
 
       <Field
+        label="Ignore anything shorter than"
+        hint="Alt-tabbing to check a message is not a context switch worth a row in the day's account. A blip between two stretches of the same thing is absorbed into it; anything else is left out. Nothing is deleted — the floor is applied when the day is read, so lowering it brings the detail back."
+      >
+        <div className="row">
+          {[0, 60, 120, 300].map((sec) => (
+            <button
+              key={sec}
+              className="btn"
+              aria-pressed={s.minSpanSec === sec}
+              disabled={!supported}
+              onClick={() => void put("activity.minSpanSec", sec)}
+            >
+              {sec === 0 ? "Nothing" : `${sec / 60} min`}
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      <Field
         label="Keep for"
         hint={
           s.retentionDays > 0 && s.nextPurgeAt
@@ -546,6 +571,134 @@ function ActivitySettings() {
         >
           Delete activity data
         </button>
+      </Field>
+    </Section>
+  );
+}
+
+/**
+ * Labels, and the rules that apply them (migration 0007).
+ *
+ * The rules list is here; the *labelling* is on the Activity screen, where the
+ * thing being labelled is on screen next to its total. That split is deliberate
+ * — the source review's sharpest criticism of this class of tool is that
+ * configuring it becomes the work, and a taxonomy editor is where that starts.
+ * This screen is for repairing a rule you regret, not for building the set.
+ */
+function LabelSettings() {
+  const run = useApp((s) => s.run);
+  const [cats, setCats] = useState<ObservationCategory[]>([]);
+  const [rules, setRules] = useState<ActivityRule[]>([]);
+  const [name, setName] = useState("");
+
+  const load = async () => {
+    const [c, r] = await Promise.all([
+      ipc.getCategories(null, null, fmt.tz()).catch(() => []),
+      ipc.getActivityRules().catch(() => []),
+    ]);
+    setCats(c);
+    setRules(r);
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const add = async () => {
+    if (!name.trim()) return;
+    // New categories roll up as "other" — the neutral bucket. Anything else
+    // would silently move the month dashboard's Work or Entertainment figure
+    // the moment the category was created.
+    const ok = await run(
+      () => ipc.createCategory(name.trim(), "other"),
+      "Couldn't add that label.",
+    );
+    if (ok) {
+      setName("");
+      void load();
+    }
+  };
+
+  return (
+    <Section title="Labels">
+      <Field
+        label="Your labels"
+        hint="What observed time can be filed as. Work and Other can be renamed but not deleted — everything unlabelled has to land somewhere. Deleting a label frees its time rather than destroying it: those intervals go back to unlabelled."
+      >
+        <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
+          {cats.map((c) => (
+            <span key={c.id} className="tag" style={{ borderColor: c.colour }}>
+              <span className="swatch" style={{ background: c.colour }} aria-hidden="true" />
+              {c.name}
+              {!["work", "other"].includes(c.name.toLowerCase()) && (
+                <button
+                  className="btn micro"
+                  aria-label={`Delete ${c.name}`}
+                  onClick={async () => {
+                    const ok = await run(
+                      () => ipc.deleteCategory(c.id),
+                      "Couldn't delete that label.",
+                    );
+                    if (ok !== null) void load();
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <input
+            value={name}
+            placeholder="Add a label — e.g. AI tools"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void add()}
+            style={{ maxWidth: 240 }}
+          />
+          <button className="btn" onClick={() => void add()}>
+            Add
+          </button>
+        </div>
+      </Field>
+
+      <Field
+        label="Rules"
+        hint="One verdict per app or site. A site rule beats an app rule, always and without a setting — otherwise a browser labelled Work would make every site inside it work, which is the exact failure the connector was built to fix."
+      >
+        {rules.length === 0 ? (
+          <p className="caption">No rules yet.</p>
+        ) : (
+          <div className="stack" style={{ gap: 4, maxHeight: 260, overflowY: "auto" }}>
+            {rules.map((r) => (
+              <div key={r.id} className="row">
+                <span className="tag micro">{r.matchKind === "domain" ? "site" : "app"}</span>
+                <span className="grow data">{r.matchValue}</span>
+                <span className="tag" style={{ borderColor: r.categoryColour }}>
+                  {r.categoryName}
+                </span>
+                {r.isBuiltin && <span className="micro caption">shipped</span>}
+                <button
+                  className="btn micro"
+                  aria-label={`Delete rule for ${r.matchValue}`}
+                  onClick={async () => {
+                    const ok = await run(
+                      () => ipc.deleteActivityRule(r.id),
+                      "Couldn't delete that rule.",
+                    );
+                    if (ok !== null) void load();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="caption">
+          Add rules from Activity → <b>Not labelled yet</b>, where the thing being labelled is
+          on screen beside how long it took.
+        </p>
       </Field>
     </Section>
   );

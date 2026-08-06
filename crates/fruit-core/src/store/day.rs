@@ -182,24 +182,56 @@ impl Store {
         Ok(claims)
     }
 
-    fn observed_spans(&self, from: Millis, to: Millis) -> Result<Vec<ObservedSpan>> {
+    /// The one place observation is read. The Day view, the Activity screen,
+    /// the category totals and the uncategorised list all come through here, so
+    /// the short-span floor cannot apply to some of them and not others.
+    pub(crate) fn observed_spans(&self, from: Millis, to: Millis) -> Result<Vec<ObservedSpan>> {
         let mut stmt = self.conn.prepare(
-            "SELECT started_at, ended_at, app_id, domain, category, is_idle
+            "SELECT id, started_at, ended_at, app_id, window_title, domain, category,
+                    category_id, is_idle
                FROM activity_span
               WHERE started_at < ?2 AND ended_at > ?1
               ORDER BY started_at",
         )?;
         let rows = stmt.query_map(params![from, to], |r| {
             Ok(ObservedSpan {
-                started_at: r.get(0)?,
-                ended_at: r.get(1)?,
-                app_id: r.get(2)?,
-                domain: r.get(3)?,
-                category: r.get(4)?,
-                is_idle: r.get::<_, i64>(5)? == 1,
+                id: r.get(0)?,
+                started_at: r.get(1)?,
+                ended_at: r.get(2)?,
+                app_id: r.get(3)?,
+                window_title: r.get(4)?,
+                domain: r.get(5)?,
+                category: r.get(6)?,
+                category_id: r.get(7)?,
+                is_idle: r.get::<_, i64>(8)? == 1,
             })
         })?;
-        Ok(rows.collect::<std::result::Result<_, _>>()?)
+        let spans: Vec<ObservedSpan> = rows.collect::<std::result::Result<_, _>>()?;
+        // Order matters: remove the double-count first, then apply the floor —
+        // so a two-second remainder left by subtraction is dropped as the noise
+        // it is rather than surviving into a total.
+        Ok(apply_min_span(
+            dedupe_browser_overlap(spans),
+            self.min_span_sec(),
+        ))
+    }
+
+    /// The same, for one local date. Clipped to the day so a span running over
+    /// midnight is counted in each day it actually occupied.
+    pub(crate) fn labelled_spans(&self, date: &str, tz: &str) -> Result<Vec<ObservedSpan>> {
+        let zone_ = zone(tz)?;
+        let day = parse_date(date)?;
+        let (from, to) = (day_start(day, &zone_), day_end(day, &zone_));
+        Ok(self
+            .observed_spans(from, to)?
+            .into_iter()
+            .map(|mut s| {
+                s.started_at = s.started_at.max(from);
+                s.ended_at = s.ended_at.min(to);
+                s
+            })
+            .filter(|s| s.ended_at > s.started_at)
+            .collect())
     }
 
     /// The plan overlay — never part of the precedence order.
@@ -372,13 +404,154 @@ impl Store {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObservedSpan {
+    pub id: i64,
     pub started_at: Millis,
     pub ended_at: Millis,
     pub app_id: String,
+    pub window_title: Option<String>,
     pub domain: Option<String>,
+    /// The roll-up — `core` / `entertainment` / `other`. What the Day view and
+    /// the month dashboard have keyed off since 0006.
     pub category: Option<String>,
+    /// The specific label, since 0007. `None` means *nobody has said*, which is
+    /// what the uncategorised list is built on.
+    pub category_id: Option<String>,
     pub is_idle: bool,
+}
+
+impl ObservedSpan {
+    pub fn seconds(&self) -> i64 {
+        (self.ended_at - self.started_at) / 1000
+    }
+
+    /// What makes two spans "the same thing", for absorption below.
+    fn subject(&self) -> (bool, &str, Option<&str>) {
+        (self.is_idle, self.app_id.as_str(), self.domain.as_deref())
+    }
+}
+
+/// Observation shorter than this is noise rather than activity, and is not
+/// reported. Alt-tabbing to check a message is not a context switch worth a row
+/// in a day's account.
+///
+/// Two minutes by default, at the user's request, and overridable per install.
+pub const DEFAULT_MIN_SPAN_SEC: i64 = 120;
+
+/// Removes the double-count where the foreground sampler and the browser
+/// connector both describe the same interval.
+///
+/// Both write to `activity_span`, and while Chrome is frontmost both are
+/// correct: the sampler says `chrome.exe`, the connector says `chrome.exe` on
+/// `youtube.com`. Two rows, same seconds. `resolve_day` is unaffected — it picks
+/// one owner per segment by precedence — but anything that walks spans directly
+/// (per-app totals, category totals, the unlabelled list) would count the hour
+/// twice.
+///
+/// The rule: **where a domain-bearing span covers the same app at the same
+/// time, the app-only span gives way.** It is the same claim, less precisely
+/// stated.
+///
+/// Subtraction rather than deletion, because the remainder is real: Chrome open
+/// on `chrome://settings` records no domain, and that time genuinely is
+/// app-only. Dropping the whole app span would lose it.
+pub fn dedupe_browser_overlap(spans: Vec<ObservedSpan>) -> Vec<ObservedSpan> {
+    // Per app, the intervals a domain was seen on.
+    let mut covered: HashMap<&str, Vec<(Millis, Millis)>> = HashMap::new();
+    for s in spans.iter().filter(|s| s.domain.is_some() && !s.is_idle) {
+        covered
+            .entry(s.app_id.as_str())
+            .or_default()
+            .push((s.started_at, s.ended_at));
+    }
+    if covered.is_empty() {
+        return spans;
+    }
+
+    let mut out = Vec::with_capacity(spans.len());
+    for span in &spans {
+        if span.domain.is_some() || span.is_idle {
+            out.push(span.clone());
+            continue;
+        }
+        let Some(ranges) = covered.get(span.app_id.as_str()) else {
+            out.push(span.clone());
+            continue;
+        };
+        // Walk left to right, emitting whatever is not already described.
+        let mut cursor = span.started_at;
+        let mut sorted: Vec<(Millis, Millis)> = ranges
+            .iter()
+            .copied()
+            .filter(|(a, b)| *b > span.started_at && *a < span.ended_at)
+            .collect();
+        sorted.sort();
+        for (a, b) in sorted {
+            if a > cursor {
+                out.push(ObservedSpan {
+                    ended_at: a.min(span.ended_at),
+                    ..span.clone()
+                });
+                out.last_mut().unwrap().started_at = cursor;
+            }
+            cursor = cursor.max(b);
+            if cursor >= span.ended_at {
+                break;
+            }
+        }
+        if cursor < span.ended_at {
+            let mut tail = span.clone();
+            tail.started_at = cursor;
+            out.push(tail);
+        }
+    }
+    out.sort_by_key(|s| (s.started_at, s.id));
+    out
+}
+
+/// Drops observation below the floor, closing the hole where the same subject
+/// sits on both sides.
+///
+/// The absorption is the part worth arguing about. Simply deleting short spans
+/// would leave a thirty-second gap in the middle of two hours of one editor —
+/// and on untimed time that gap becomes **Unaccounted**, which is a worse lie
+/// than the one it was trying to avoid. So:
+///
+/// - short span flanked by the *same* app-and-domain → absorbed into the run,
+///   because that is what it was: one stretch with a blip in it;
+/// - anything else → dropped, and the interval falls to whatever else owns it,
+///   or to Unaccounted, which is honest — nothing worth recording happened.
+///
+/// Bridging is bounded by the floor itself, so this closes a blip and never a
+/// genuine ten-minute absence.
+///
+/// **Nothing is deleted.** The floor is applied on read, so raising it to five
+/// minutes and lowering it back recovers every row. The record is the record.
+pub fn apply_min_span(spans: Vec<ObservedSpan>, min_sec: i64) -> Vec<ObservedSpan> {
+    if min_sec <= 0 {
+        return spans;
+    }
+    let min_ms = min_sec * 1000;
+    let mut kept: Vec<ObservedSpan> = spans
+        .into_iter()
+        .filter(|s| s.ended_at - s.started_at >= min_ms)
+        .collect();
+
+    let mut out: Vec<ObservedSpan> = Vec::with_capacity(kept.len());
+    for span in kept.drain(..) {
+        match out.last_mut() {
+            Some(prev)
+                if prev.subject() == span.subject()
+                    && span.started_at >= prev.ended_at
+                    && span.started_at - prev.ended_at <= min_ms =>
+            {
+                prev.ended_at = span.ended_at;
+            }
+            _ => out.push(span),
+        }
+    }
+    out
 }
 
 /// Cuts `[from, to)` at every boundary any claim introduces and gives each

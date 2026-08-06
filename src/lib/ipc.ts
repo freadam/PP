@@ -20,9 +20,12 @@ import type {
   ConnectorStatus,
   DayReview,
   DeletedRow,
+  ActivityRule,
   DomainCategory,
-  DomainRule,
   DomainTotal,
+  MatchKind,
+  ObservationCategory,
+  UnlabelledRow,
   IdleActionKind,
   IntegrityReport,
   LocalDate,
@@ -274,16 +277,43 @@ export const clearActivity = () => call<number>("clear_activity", {});
 
 /* ─── browser connector (Plan Rev 3 §5.4) ─────────────────────────────── */
 
-export const getDomainRules = () => call<DomainRule[]>("get_domain_rules", {});
+/* ─── labelling observed time ──────────────────────────────────────────── */
 
-/** Creates or replaces the rule for a domain — there is only ever one. */
-export const setDomainRule = (
-  domain: string,
-  category: DomainCategory,
-  lifeAreaId: string | null = null,
-) => call<DomainRule>("set_domain_rule", { domain, category, lifeAreaId });
+export const getCategories = (from: LocalDate | null, to: LocalDate | null, tz: string) =>
+  call<ObservationCategory[]>("get_categories", { from, to, tz });
 
-export const deleteDomainRule = (id: string) => call<void>("delete_domain_rule", { id });
+/** `colour` omitted: the core picks the next one in its palette (I1 — a
+ *  component may not hold a literal colour). */
+export const createCategory = (name: string, countsAs: DomainCategory = "other") =>
+  call<ObservationCategory>("create_category", { name, colour: null, countsAs });
+
+export const updateCategory = (
+  id: string,
+  name: string | null = null,
+  colour: string | null = null,
+) => call<ObservationCategory>("update_category", { id, name, colour });
+
+export const deleteCategory = (id: string) => call<void>("delete_category", { id });
+
+export const getActivityRules = () => call<ActivityRule[]>("get_activity_rules", {});
+
+/** Creates or replaces the rule for one app or domain — there is only ever one. */
+export const setActivityRule = (matchKind: MatchKind, matchValue: string, categoryId: string) =>
+  call<ActivityRule>("set_activity_rule", { matchKind, matchValue, categoryId });
+
+export const deleteActivityRule = (id: string) => call<void>("delete_activity_rule", { id });
+
+/**
+ * Relabels one observed interval without touching any rule.
+ *
+ * The YouTube case: Distraction by default, and *this* video was a lecture.
+ * Fruit never sees the URL or the page title, so only you can say.
+ */
+export const setSpanCategory = (spanId: number, categoryId: string | null) =>
+  call<void>("set_span_category", { spanId, categoryId });
+
+export const getUnlabelled = (from: LocalDate, to: LocalDate, tz: string, limit = 12) =>
+  call<UnlabelledRow[]>("get_unlabelled", { from, to, tz, limit });
 
 export const getDomainTotals = (date: LocalDate, tz: string) =>
   call<DomainTotal[]>("get_domain_totals", { date, tz });

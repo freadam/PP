@@ -591,6 +591,12 @@ pub struct ReconcileAction {
     /// by accident is a rule that quietly mislabels a month.
     #[serde(default)]
     pub rule_for_domain: Option<String>,
+    /// Which label the rule should apply. Optional: when absent the verb
+    /// decides, so the checkbox alone is enough for the common case and the
+    /// picker only appears when the user wants something more specific than
+    /// "work" or "not work".
+    #[serde(default)]
+    pub rule_category_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -701,6 +707,8 @@ pub struct ActivitySettings {
     pub excluded_title_patterns: Vec<String>,
     /// 30 / 90 / 0 for forever.
     pub retention_days: i64,
+    /// Observation shorter than this is not reported. 0 disables the floor.
+    pub min_span_sec: i64,
     /// Shown in Settings, because "we delete it eventually" is not a promise.
     pub next_purge_at: Option<Millis>,
 }
@@ -746,18 +754,93 @@ impl DomainCategory {
     }
 }
 
-/// One row of "this domain means this".
+/// A label the user can put on observed time.
+///
+/// Replaces `DomainCategory` as the thing rules point at. That enum survives as
+/// [`ObservationCategory::counts_as`] — the roll-up every existing report reads,
+/// so adding "Study" can never move a number that was already on screen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DomainRuleRow {
+pub struct ObservationCategory {
     pub id: String,
-    pub domain: String,
-    pub category: DomainCategory,
-    pub life_area_id: Option<String>,
+    pub name: String,
+    pub colour: String,
+    /// Which of the three original verdicts this rolls up into. Fixed once, for
+    /// the reason above.
+    pub counts_as: DomainCategory,
+    pub is_builtin: bool,
+    pub sort_rank: f64,
+    /// Observed seconds carrying this label, over whatever range was asked for.
+    /// Zero when the caller did not ask for totals.
+    pub seconds: i64,
+}
+
+/// Built-in category ids. Fixed rather than generated so migration 0007 can
+/// seed them and backfill in one transaction — see the migration's own note.
+pub mod category {
+    pub const WORK: &str = "00000000-0000-7000-8000-000000000001";
+    pub const STUDY: &str = "00000000-0000-7000-8000-000000000002";
+    pub const DISTRACTION: &str = "00000000-0000-7000-8000-000000000003";
+    pub const LIFE: &str = "00000000-0000-7000-8000-000000000004";
+    /// Where observation lands when the user has decided it is nothing in
+    /// particular. Distinct from *unlabelled*, which is `NULL`.
+    pub const OTHER: &str = "00000000-0000-7000-8000-000000000005";
+}
+
+/// What a rule matches against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MatchKind {
+    /// The executable or bundle name — `chrome.exe`, `Code.exe`.
+    App,
+    /// A registrable domain, already reduced — `instagram.com`.
+    Domain,
+}
+
+impl MatchKind {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "app" => Self::App,
+            "domain" => Self::Domain,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::App => "app",
+            Self::Domain => "domain",
+        }
+    }
+}
+
+/// One row of "this thing means this".
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityRuleRow {
+    pub id: String,
+    pub match_kind: MatchKind,
+    pub match_value: String,
+    pub category_id: String,
+    pub category_name: String,
+    pub category_colour: String,
     /// Shipped with the app and never edited. A rule the user has touched is
     /// theirs, and the Settings list says so rather than silently replacing it
     /// on the next update.
     pub is_builtin: bool,
+}
+
+/// Something observed that no rule covers, ranked by how much of your time it
+/// took. The list the labelling UI is built on: the app names the few things
+/// worth naming instead of presenting an empty taxonomy.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnlabelledRow {
+    pub match_kind: MatchKind,
+    pub match_value: String,
+    pub seconds: i64,
+    /// How many separate stretches. One 4-hour stretch and forty 6-minute ones
+    /// are different problems wearing the same total.
+    pub occurrences: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -768,6 +851,11 @@ pub struct ActivitySpanRow {
     pub ended_at: Millis,
     pub app_id: String,
     pub window_title: Option<String>,
+    /// The site, where the connector saw one. What the row should be named
+    /// after — `chrome.exe` is not an answer to "what was I doing".
+    pub domain: Option<String>,
+    /// The label in force when this was written. `None` is unlabelled.
+    pub category_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

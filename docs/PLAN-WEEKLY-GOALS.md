@@ -341,9 +341,11 @@ already on screen.
 
 ---
 
-## W7 · Categories you define
+## W7 · Categories you define — **built**
 
-**The standout, and the first draft missed it completely.**
+**The standout, and the first draft missed it completely.** Built ahead of the
+rest of this plan, on request, in migration 0007. What follows is the design as
+it shipped; see `ACCEPTANCE.md` W7/W8 for what is covered.
 
 The review's most enthusiastic passage is not about a report. It is about a
 question he had and answered himself:
@@ -393,7 +395,7 @@ thing they want to name, and never from an empty editor in Settings.
 
 ---
 
-## W8 · What is not categorised yet
+## W8 · What is not categorised yet — **built**
 
 The review's setup advice, turned into a feature so it does not have to be advice:
 
@@ -527,7 +529,7 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 |---|---|---|---|
 | 1 | **`aggregate_range` extraction** + `get_week_review` | — | Pure refactor of `get_month`'s loop. Nothing new is computed; the point is that nothing is computed twice. |
 | 2 | **W1 goals + W2 pace** | 1 | **Closes M11.** The entertainment budget is this with `direction = at_most`. |
-| 3 | **W7 categories + W8 uncategorised surface** | — | Paired. The migration is the larger half; the surface is what makes it usable without configuration. |
+| 3 | ~~**W7 categories + W8 uncategorised surface**~~ | — | **Built.** Migration 0007, plus a short-observation floor and the fix for the sampler and the connector both billing the same hour. |
 | 4 | **W6 fragmentation** | 1 | No new capture. Derived from `resolve_day`. |
 | 5 | **W9 weekly review + report** | 2, 3, 4 | Including goal calibration. |
 | 6 | **W3 focus sessions** | — | Independent. The `+`-to-extend interaction is the valuable part. |
@@ -565,3 +567,97 @@ W7/W8 are paired the way they are because of it.
 ## Source
 
 - [2 Years with Rize: Can a Productivity Tracker Change Your Work Habits?](https://freshvanroot.com/blog/rize-productivity-tracker-review/) — Rolf Mistelbacher, Fresh Van Root, 24 March 2025 (updated 12 April 2025). Full text supplied by the user; the host is unreachable from this environment. The post discloses affiliate links to Rize.
+
+---
+
+## Appendix B · W7/W8 as built
+
+Migration 0007, delivered ahead of the rest of this plan. Four requirements, and
+three things they turned up.
+
+### What was asked for
+
+1. Label observed time as **Work · Study · Distraction · Life** — and anything
+   else the user wants.
+2. Label the **site inside the browser**, not just the browser: Instagram as a
+   distraction, Coursera as study, Google Docs as work.
+3. **YouTube distraction by default, changeable when it was something else.**
+4. **Ignore anything under two minutes.**
+
+### The four decisions
+
+**One rule table, not two.** "Instagram is a distraction" is the same statement
+whether Instagram is a website or an application, so `activity_rule` carries a
+`match_kind` rather than splitting across two tables that would need two
+commands and two lists in Settings.
+
+**The site beats the app, always, with no setting.** A rule on `instagram.com`
+outranks a rule on `chrome.exe`. The alternative — a browser labelled Work
+making every site inside it work — is precisely the failure the connector was
+built to fix, so it is not something to leave configurable.
+
+**`counts_as` keeps the arithmetic still.** Every report written before this
+keyed off the fixed `core`/`entertainment`/`other` split. A category declares
+which of the three it rolls up into, and `activity_span` stores **both** the
+specific label and the roll-up. Adding "Study" cannot move the month dashboard's
+Entertainment card. There is a test that asserts exactly that.
+
+**Unlabelled stays NULL, never "Other".** *Nobody has said* and *someone decided
+it was nothing in particular* are different facts. Collapsing them would empty
+the uncategorised list, which is the surface the whole feature is usable from.
+
+### Request 3, and the honest limit
+
+Fruit sees a registrable domain and deliberately never the URL or the page
+title, so it **cannot** tell a lecture from a music video. Two mechanisms rather
+than a guess:
+
+- `youtube.com` ships as Distraction, because that is the common case;
+- `set_span_category` relabels **one interval** without touching the rule, so a
+  lecture is a lecture and tomorrow's video is still Distraction.
+
+Clicking any interval on the Activity timeline does it. This is the one place
+the product asks the user for something it could not work out itself, and it says
+so on screen rather than pretending otherwise.
+
+### Request 4, and why it needed a rule
+
+Deleting short spans alone leaves a thirty-second hole in the middle of two hours
+in one editor — and on untimed time that hole reads as **Unaccounted**, which is
+a worse lie than the noise it was removing. So:
+
+- a short span flanked by the **same** app-and-domain is absorbed into the run,
+  because that is what it was: one stretch with a blip in it;
+- anything else is dropped, and the interval falls to whatever else owns it.
+
+**Nothing is deleted.** The floor is applied on read, so raising it to five
+minutes and lowering it back recovers every row.
+
+### Two bugs this turned up
+
+**The sampler and the connector were both billing the same hour.** While Chrome
+is frontmost, the foreground sampler writes `chrome.exe` and the connector writes
+`chrome.exe` on `youtube.com`. Both are correct; both are rows. `resolve_day` was
+unaffected — it picks one owner per segment — but every total that walks spans
+directly would have counted the hour twice. `dedupe_browser_overlap` subtracts
+the domain-bearing intervals from the app-only ones, keeping the remainder,
+because Chrome on `chrome://settings` records no domain and that time is real.
+
+**Coalescing looked at the wrong row.** `record_activity` compared each sample
+against the single most recently *ended* span. With two sources interleaving,
+neither ever matched, every sample became its own twenty-second row — and the new
+floor then discarded all of them. The feature would have recorded a full day and
+reported nothing. It now looks for the most recent span *describing the same
+thing*. This was latent from the moment the connector landed and only became
+visible when something depended on span length.
+
+### Not done
+
+- The Day view's detail panel does not yet offer relabelling; the Activity
+  timeline does. Same command either way.
+- `counts_as` is fixed after creation. Changing it would move totals on months
+  already exported, so correcting a mistake means deleting the category and
+  making a new one — which is visible.
+- New categories roll up as `other`. Letting the renderer choose would let a new
+  label silently change the Work or Entertainment figure the moment it was
+  created.

@@ -29,6 +29,8 @@ pub const PAUSED: &str = "activity.paused";
 pub const EXCLUDED_APPS: &str = "activity.excludedApps";
 pub const TITLE_PATTERNS: &str = "activity.excludedTitlePatterns";
 pub const RETENTION_DAYS: &str = "activity.retentionDays";
+/// The short-observation floor, in seconds. See `day::apply_min_span`.
+pub const MIN_SPAN_SEC: &str = "activity.minSpanSec";
 pub const LAST_PURGE: &str = "activity.lastPurgeAt";
 
 /// The contract between the shell's sampler and this module: a sample means
@@ -90,8 +92,21 @@ impl Store {
             excluded_domains: list(super::domain_rules::EXCLUDED_DOMAINS),
             excluded_title_patterns: list(TITLE_PATTERNS),
             retention_days: retention,
+            min_span_sec: self.min_span_sec(),
             next_purge_at: self.next_purge_at(retention)?,
         })
+    }
+
+    /// Observation shorter than this is not reported. Read here rather than
+    /// passed around, because every reader has to agree — a floor that applies
+    /// to the Day view and not to the totals would put two different answers
+    /// about the same afternoon on two screens.
+    pub(crate) fn min_span_sec(&self) -> i64 {
+        match self.get_setting(MIN_SPAN_SEC) {
+            Ok(Some(Value::Number(n))) => n.as_i64().unwrap_or(super::day::DEFAULT_MIN_SPAN_SEC),
+            _ => super::day::DEFAULT_MIN_SPAN_SEC,
+        }
+        .clamp(0, 3600)
     }
 
     fn next_purge_at(&self, retention_days: i64) -> Result<Option<Millis>> {
@@ -140,11 +155,13 @@ impl Store {
             .and_then(crate::connector::registrable_domain)
             .filter(|d| !self.domain_is_excluded(d));
         // Stamped now, from the rules in force now — never re-derived on read.
-        // See migrations/0006_domain_rules.sql.
-        let category = match &domain {
-            Some(d) => self.classify_domain(d)?.map(|c| c.as_str()),
-            None => None,
-        };
+        // See migrations/0006_domain_rules.sql and 0007's own note.
+        //
+        // Both columns: `category_id` is the label the user chose, `category` is
+        // the three-way roll-up every report written before 0007 already reads.
+        let hit = self.classify(app_id, domain.as_deref())?;
+        let category_id = hit.as_ref().map(|(id, _)| id.clone());
+        let category = hit.as_ref().map(|(_, c)| c.as_str());
 
         let title = if settings.titles_enabled {
             sample.window_title.as_deref().and_then(|t| {
@@ -163,28 +180,37 @@ impl Store {
         };
 
         let at = sample.at;
-        let previous: Option<(i64, i64, String, Option<String>, Option<String>)> = self
+        // The most recent span **describing the same thing**, not the most
+        // recent span full stop.
+        //
+        // Two sources write here now: the foreground sampler says `chrome.exe`,
+        // and twenty seconds later the connector says `chrome.exe` on
+        // `youtube.com`. Looking only at the globally-latest row means the two
+        // interleave, neither ever matches, and every sample becomes its own
+        // twenty-second span — which the short-observation floor then discards
+        // entirely. The feature would record a full day and report nothing.
+        //
+        // The domain is part of "same thing", not incidental to it: without it
+        // ten minutes of YouTube and ten of GitHub coalesce into one span
+        // labelled with whichever arrived first, and the entertainment figure
+        // the product exists to reduce would be measuring the wrong interval.
+        let previous: Option<(i64, i64)> = self
             .conn
             .query_row(
-                "SELECT id, ended_at, app_id, window_title, domain FROM activity_span
+                "SELECT id, ended_at FROM activity_span
+                  WHERE app_id = ?1
+                    AND (window_title IS ?2)
+                    AND (domain IS ?3)
                   ORDER BY ended_at DESC LIMIT 1",
-                [],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+                params![app_id, title, domain],
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .ok();
 
-        if let Some((id, ended_at, prev_app, prev_title, prev_domain)) = previous {
-            // The domain is part of "same thing", not incidental to it. A
-            // browser is one app, so without this ten minutes of YouTube and ten
-            // of GitHub coalesce into one span labelled with whichever arrived
-            // first — and the entertainment figure the product exists to reduce
-            // would be measuring the wrong interval.
-            let same = prev_app == app_id
-                && prev_title.as_deref() == title.as_deref()
-                && prev_domain.as_deref() == domain.as_deref();
+        if let Some((id, ended_at)) = previous {
             let contiguous = at >= ended_at && at - ended_at <= COALESCE_GAP_MS;
             let short_enough = (at - ended_at) / 1000 < MAX_SPAN_SEC;
-            if same && contiguous && short_enough {
+            if contiguous && short_enough {
                 self.conn.execute(
                     "UPDATE activity_span SET ended_at = ?2 WHERE id = ?1",
                     params![id, at + SAMPLE_INTERVAL_MS],
@@ -195,9 +221,17 @@ impl Store {
 
         self.conn.execute(
             "INSERT INTO activity_span
-               (started_at, ended_at, app_id, window_title, domain, category, is_idle)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0)",
-            params![at, at + SAMPLE_INTERVAL_MS, app_id, title, domain, category],
+               (started_at, ended_at, app_id, window_title, domain, category, category_id, is_idle)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
+            params![
+                at,
+                at + SAMPLE_INTERVAL_MS,
+                app_id,
+                title,
+                domain,
+                category,
+                category_id
+            ],
         )?;
         Ok(true)
     }
@@ -209,24 +243,23 @@ impl Store {
         let day = parse_date(date)?;
         let (from, to) = (day_start(day, &zone_), day_end(day, &zone_));
 
-        let mut stmt = self.conn.prepare(
-            "SELECT id, started_at, ended_at, app_id, window_title
-               FROM activity_span
-              WHERE started_at < ?2 AND ended_at >= ?1
-              ORDER BY started_at",
-        )?;
-        let rows = stmt.query_map(params![from, to], |r| {
-            Ok(ActivitySpanRow {
-                id: r.get(0)?,
-                // Clipped to the day, so a span running over midnight draws
-                // inside the column instead of past it.
-                started_at: r.get::<_, i64>(1)?.max(from),
-                ended_at: r.get::<_, i64>(2)?.min(to),
-                app_id: r.get(3)?,
-                window_title: r.get(4)?,
+        // Through the shared reader, so the short-span floor applies here
+        // exactly as it does on the Day view. Two screens disagreeing about the
+        // same afternoon is the failure this indirection exists to prevent.
+        let _ = (from, to);
+        let spans: Vec<ActivitySpanRow> = self
+            .labelled_spans(date, tz)?
+            .into_iter()
+            .map(|s| ActivitySpanRow {
+                id: s.id,
+                started_at: s.started_at,
+                ended_at: s.ended_at,
+                app_id: s.app_id,
+                window_title: s.window_title,
+                domain: s.domain,
+                category_id: s.category_id,
             })
-        })?;
-        let spans: Vec<ActivitySpanRow> = rows.collect::<std::result::Result<_, _>>()?;
+            .collect();
 
         // By app, longest first — the question is "where did the day go".
         let mut totals: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
@@ -312,7 +345,7 @@ impl Store {
     pub fn set_activity_setting(&mut self, key: &str, value: Value) -> Result<ActivitySettings> {
         // A closed allow-list: the renderer cannot invent an activity key and
         // have it silently persisted as a flag nothing reads.
-        const ALLOWED: [&str; 8] = [
+        const ALLOWED: [&str; 9] = [
             ENABLED,
             TITLES_ENABLED,
             super::domain_rules::DOMAINS_ENABLED,
@@ -321,6 +354,7 @@ impl Store {
             super::domain_rules::EXCLUDED_DOMAINS,
             TITLE_PATTERNS,
             RETENTION_DAYS,
+            MIN_SPAN_SEC,
         ];
         if !ALLOWED.contains(&key) {
             return Err(AppError::invalid(format!("'{key}' isn't an Activity setting.")));

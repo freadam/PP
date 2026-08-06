@@ -21,6 +21,7 @@ use crate::time::now_ms;
 mod activity;
 mod blocks;
 mod data;
+mod categories;
 mod day;
 mod domain_rules;
 mod excel;
@@ -36,10 +37,16 @@ mod tasks;
 mod timer;
 mod week;
 
-pub use activity::{ENABLED as ACTIVITY_ENABLED, PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS};
-pub use day::{resolve_day, Segment, SegmentOwner};
+pub use activity::{
+    ENABLED as ACTIVITY_ENABLED, MIN_SPAN_SEC as ACTIVITY_MIN_SPAN_SEC,
+    PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS,
+};
+pub use day::{
+    apply_min_span, dedupe_browser_overlap, resolve_day, ObservedSpan, Segment, SegmentOwner,
+    DEFAULT_MIN_SPAN_SEC,
+};
 pub use domain_rules::{
-    DomainTotal, DEFAULT_RULES, DOMAINS_ENABLED as ACTIVITY_DOMAINS_ENABLED,
+    DomainTotal, DOMAINS_ENABLED as ACTIVITY_DOMAINS_ENABLED,
     EXCLUDED_DOMAINS as ACTIVITY_EXCLUDED_DOMAINS,
 };
 pub use recurrence::{IcsImportSummary, SeriesScope, HORIZON_DAYS};
@@ -85,7 +92,6 @@ impl Store {
         // never acquire them, leaving the Day view with nowhere to file
         // non-work time.
         store.seed_life_areas()?;
-        store.seed_domain_rules()?;
         Ok(store)
     }
 

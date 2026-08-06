@@ -56,7 +56,12 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    drives them, fragmentation reported rather than scored, focus sessions you
    can extend in one key, notices including an off-plan nudge, and a weekly
    review that sets next week's goals from what actually happened. Planned in
-   [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), W1–W10. *(next)*
+   [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), W1–W10.
+
+   **W7 and W8 are built** — migration 0007. Observation is labelled Work ·
+   Study · Distraction · Life or anything the user adds, per **application and
+   per website**, with a short-observation floor and a ranked list of what has
+   no label yet. See Appendix B of the plan. *(W1/W2 next)*
 
    This is **not new scope**: M11's entertainment budget is a weekly goal with
    `direction = at_most`, so the general mechanism closes it as a side effect.

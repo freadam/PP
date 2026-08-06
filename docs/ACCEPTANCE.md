@@ -67,12 +67,30 @@ clock and no webview.
 | W4 | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
 | W5 | The off-plan nudge fires only during **plotted** time, and is silenceable for the session | Both rules come from the reviewer's own false-positive caveat. Time nobody planned is time Fruit has no standing to have an opinion about. |
 | W6 | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
-| W7 | A user-defined category collects **both apps and domains**, and adding one never changes an existing month total | Claude is a website to one person and a desktop app to another; a bucket catching one of them answers the question wrongly. `counts_as` is what keeps the dashboard's arithmetic stable. |
-| W8 | The uncategorised surface ranks by time and is reachable **without opening Settings** | The governing constraint. The app names the three things worth categorising instead of presenting an empty taxonomy. |
+| W7 ✅ | A user-defined category collects **both apps and domains**, and adding one never changes an existing month total | `an_application_can_be_labelled_as_well_as_a_website`, `adding_a_category_does_not_move_an_existing_total`. Claude is a website to one person and a desktop app to another; a bucket catching one of them answers the question wrongly. |
+| W8 ✅ | The uncategorised surface ranks by time and is reachable **without opening Settings** | `the_unlabelled_list_ranks_by_time_and_names_the_site_not_the_browser`; it is the second panel on Activity. The app names the things worth categorising instead of presenting an empty taxonomy. |
 | W9 | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
 | W10 | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
 
 **W2 is the one that matters most**, for the reason given in its own row.
+
+### Labelling, as built (migration 0007)
+
+W7 and W8 shipped ahead of the rest. Their own measures, all covered:
+
+| # | Criterion | Covered by |
+|---|---|---|
+| L1 | The same browser, four sites, four different answers | `one_browser_four_sites_four_labels` |
+| L2 | **The site beats the app**, always and with no setting | `the_site_beats_the_browser_it_was_open_in` |
+| L3 | YouTube is Distraction by default, and one interval can be relabelled **without changing the rule** | `a_youtube_lecture_can_be_relabelled_without_changing_the_rule` |
+| L4 | A new rule classifies forwards and never backwards | `a_new_rule_never_relabels_what_is_already_recorded` |
+| L5 | Deleting a label **frees its time** rather than destroying the observation | `deleting_a_category_frees_its_time_rather_than_destroying_it` |
+| L6 | Observation under the floor is absorbed when it sits inside one stretch, dropped otherwise, and **never deleted** | `a_blip_between_two_stretches_of_the_same_thing_is_absorbed`, `a_blip_between_two_different_things_is_dropped_not_bridged`, `the_floor_hides_rows_and_never_deletes_them` |
+| L7 | The foreground sampler and the browser connector **do not both bill the same hour**, and app-only remainder survives | `the_browser_and_the_sampler_do_not_both_bill_the_same_hour`, `app_only_time_the_connector_could_not_see_is_kept` |
+
+L7 is the one worth the most. Both sources are correct and both write; nothing
+on screen would have shown the double-count, because `resolve_day` picks one
+owner per segment and only the per-app and per-label totals were wrong.
 
 ---
 

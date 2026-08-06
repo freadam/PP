@@ -1,25 +1,39 @@
 /**
  * Activity (§3.5, P2) — "was I actually doing the thing the timer said?"
  *
- * Three panels, and the order is the argument:
+ * Five panels, and the order is the argument:
  *
- *   1. **Against the plan.** Each block on the day, with the apps that were
+ *   1. **Where the day went, by label.** Work · Study · Distraction · Life, in
+ *      the words the user chose. First because it is the only panel that answers
+ *      the question in one line; everything below it is the working.
+ *   2. **What has no label yet**, ranked by time, each row one click from having
+ *      one. An empty taxonomy and a text field is a chore — "these three things
+ *      took eleven hours between them" is a question people answer.
+ *   3. **Against the plan.** Each block on the day, with the apps that were
  *      actually in front of you while it ran. This is the only place in Fruit
  *      where an intention meets an *observation* rather than another record of
  *      itself, and it is the reason the feature exists at all.
- *   2. **Where the day went.** Per-app totals, longest first.
- *   3. **The day itself**, on the Planner's exact time axis and hour height, so
+ *   4. **Per-app totals**, longest first.
+ *   5. **The day itself**, on the Planner's exact time axis and hour height, so
  *      a block and the app usage beneath it read as one picture rather than as
- *      two charts that happen to be about the same hours.
+ *      two charts that happen to be about the same hours. Every interval here is
+ *      relabellable on the spot — the YouTube-lecture case.
  *
  * Off by default. When it is off this screen says so and links to the switch —
  * it never shows an empty chart that implies the data is merely missing.
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../store/app";
+import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { ActivityDay, AppTotal } from "../lib/types";
+import type {
+  ActivityDay,
+  ActivitySpanRow,
+  AppTotal,
+  ObservationCategory,
+  UnlabelledRow,
+} from "../lib/types";
 import { Empty } from "../components/chrome";
 
 /**
@@ -51,9 +65,22 @@ export function Activity() {
   const go = useApp((s) => s.go);
   const hourHeight = useApp((s) => s.hourHeight);
 
+  const [cats, setCats] = useState<ObservationCategory[]>([]);
+  const [unlabelled, setUnlabelled] = useState<UnlabelledRow[]>([]);
+
+  const reload = useCallback(async () => {
+    await load();
+    const [c, u] = await Promise.all([
+      ipc.getCategories(date, date, fmt.tz()).catch(() => []),
+      ipc.getUnlabelled(date, date, fmt.tz()).catch(() => []),
+    ]);
+    setCats(c);
+    setUnlabelled(u);
+  }, [load, date]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void reload();
+  }, [reload]);
 
   if (!status) return <Empty>Loading Activity…</Empty>;
 
@@ -107,9 +134,11 @@ export function Activity() {
         </Empty>
       ) : (
         <>
+          <ByCategory cats={cats} />
+          <Unlabelled rows={unlabelled} cats={cats} onDone={reload} />
           <Correlations day={day} />
           <ByApp totals={day.byApp} trackedSec={day.trackedSec} />
-          <DayTimeline day={day} hourHeight={hourHeight} />
+          <DayTimeline day={day} hourHeight={hourHeight} cats={cats} onDone={reload} />
         </>
       )}
     </div>
@@ -220,7 +249,18 @@ function ByApp({ totals, trackedSec }: { totals: AppTotal[]; trackedSec: number 
  * The same 24-hour column as the Planner, at the same hour height, so the two
  * screens can be compared by looking rather than by reading numbers off both.
  */
-function DayTimeline({ day, hourHeight }: { day: ActivityDay; hourHeight: number }) {
+function DayTimeline({
+  day,
+  hourHeight,
+  cats,
+  onDone,
+}: {
+  day: ActivityDay;
+  hourHeight: number;
+  cats: ObservationCategory[];
+  onDone: () => void;
+}) {
+  const [picking, setPicking] = useState<ActivitySpanRow | null>(null);
   const dayStart = useMemo(() => new Date(`${day.localDate}T00:00:00`).getTime(), [day.localDate]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -240,6 +280,18 @@ function DayTimeline({ day, hourHeight }: { day: ActivityDay; hourHeight: number
   return (
     <section className="panel">
       <h2>The day</h2>
+      <p className="caption">
+        Click any interval to label it. Labelling one interval never changes the rule — a
+        YouTube lecture stays a lecture without making every future video one.
+      </p>
+      {picking && (
+        <SpanLabeller
+          span={picking}
+          cats={cats}
+          onClose={() => setPicking(null)}
+          onDone={onDone}
+        />
+      )}
       <div className="activity-timeline" ref={scrollRef}>
         <div className="activity-canvas" style={{ height: 24 * hourHeight }}>
           {Array.from({ length: 24 }, (_, h) => (
@@ -253,27 +305,227 @@ function DayTimeline({ day, hourHeight }: { day: ActivityDay; hourHeight: number
             {day.spans.map((s) => {
               const top = ((s.startedAt - dayStart) / 3_600_000) * hourHeight;
               const height = Math.max(2, ((s.endedAt - s.startedAt) / 3_600_000) * hourHeight);
+              const cat = cats.find((c) => c.id === s.categoryId);
+              // Named after the site where there is one. `chrome.exe` is not an
+              // answer to "what was I doing", and that is the whole point of the
+              // connector.
+              const name = s.domain ?? appLabel(s.appId);
               return (
-                <span
+                <button
                   key={s.id}
                   className="activity-span"
-                  style={{ top, height, background: appColour(s.appId) }}
-                  title={`${appLabel(s.appId)}${s.windowTitle ? ` — ${s.windowTitle}` : ""} · ${fmt.clock(
+                  style={{
+                    top,
+                    height,
+                    background: cat ? cat.colour : appColour(s.appId),
+                  }}
+                  title={`${name}${cat ? ` · ${cat.name}` : " · no label yet"} · ${fmt.clock(
                     s.startedAt,
-                  )}–${fmt.clock(s.endedAt)}`}
+                  )}–${fmt.clock(s.endedAt)} — click to label`}
+                  onClick={() => setPicking(s)}
                 >
                   {height >= 14 && (
                     <span className="micro">
-                      {appLabel(s.appId)}
-                      {s.windowTitle && height >= 28 && <> — {s.windowTitle}</>}
+                      {name}
+                      {cat && height >= 28 && <> — {cat.name}</>}
                     </span>
                   )}
-                </span>
+                </button>
               );
             })}
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Where the day went, in the user's own words.
+ *
+ * First panel on the screen because it is the only one that answers the
+ * question in a line. Zero-second categories are dropped: a label you have not
+ * used today is not news, and five empty rows push the two that matter off the
+ * fold.
+ */
+function ByCategory({ cats }: { cats: ObservationCategory[] }) {
+  const used = cats.filter((c) => c.seconds > 0);
+  const total = used.reduce((n, c) => n + c.seconds, 0);
+  if (used.length === 0) return null;
+
+  return (
+    <section className="panel">
+      <h2>By label</h2>
+      <div className="stack" style={{ gap: 6 }}>
+        {used.map((c) => (
+          <div key={c.id} className="row">
+            <span className="swatch" style={{ background: c.colour }} aria-hidden="true" />
+            <span style={{ width: 120 }}>{c.name}</span>
+            <span className="bar grow" aria-hidden="true">
+              <i style={{ width: `${(c.seconds / total) * 100}%`, background: c.colour }} />
+            </span>
+            <span className="data caption">{fmt.duration(c.seconds)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="caption">
+        Observed time only — what the machine saw, not what you confirmed. The Day view is
+        where the two are reconciled.
+      </p>
+    </section>
+  );
+}
+
+/**
+ * What has no label yet, ranked by time.
+ *
+ * The surface this whole feature is usable from. Presenting an empty taxonomy
+ * and asking someone to populate it is a chore nobody finishes; naming the four
+ * things that actually ate the day is a question people answer in ten seconds.
+ *
+ * Labelling here writes a **rule**, so it applies from now on. Past intervals
+ * keep what they were given — a rule that reached backwards would rewrite days
+ * already reconciled.
+ */
+function Unlabelled({
+  rows,
+  cats,
+  onDone,
+}: {
+  rows: UnlabelledRow[];
+  cats: ObservationCategory[];
+  onDone: () => void;
+}) {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  if (rows.length === 0) return null;
+
+  const label = async (row: UnlabelledRow, categoryId: string) => {
+    const ok = await run(
+      () => ipc.setActivityRule(row.matchKind, row.matchValue, categoryId),
+      "Couldn't save that label.",
+    );
+    if (ok) {
+      const name = cats.find((c) => c.id === categoryId)?.name ?? "labelled";
+      toast(`${row.matchValue} → ${name}. Applies from now on.`);
+      onDone();
+    }
+  };
+
+  return (
+    <section className="panel">
+      <h2>Not labelled yet</h2>
+      <p className="caption">
+        Ranked by how much of the day each took. Labelling one writes a rule, so it applies
+        from now on — today&rsquo;s record keeps what it was given.
+      </p>
+      <div className="stack" style={{ gap: 8 }}>
+        {rows.map((row) => (
+          <div key={`${row.matchKind}:${row.matchValue}`} className="row">
+            <span className="tag micro">{row.matchKind === "domain" ? "site" : "app"}</span>
+            <span className="grow">
+              {row.matchValue}{" "}
+              <span className="caption">
+                {/* One 4-hour stretch and forty 6-minute ones are different
+                    problems wearing the same total. */}
+                {row.occurrences === 1 ? "one stretch" : `${row.occurrences} stretches`}
+              </span>
+            </span>
+            <span className="data caption" style={{ width: 64, textAlign: "right" }}>
+              {fmt.duration(row.seconds)}
+            </span>
+            <CategoryPicker cats={cats} onPick={(id) => void label(row, id)} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The label buttons, as buttons rather than a `<select>`.
+ *
+ * Four or five labels is exactly the range where a row of buttons is one click
+ * and a dropdown is three. It also puts the colours on screen, which is what
+ * makes the timeline below readable without a legend.
+ */
+function CategoryPicker({
+  cats,
+  onPick,
+  current,
+}: {
+  cats: ObservationCategory[];
+  onPick: (id: string) => void;
+  current?: string | null;
+}) {
+  return (
+    <div className="row" style={{ gap: 4 }}>
+      {cats.map((c) => (
+        <button
+          key={c.id}
+          className="btn micro"
+          aria-pressed={current === c.id || undefined}
+          title={`Label as ${c.name}`}
+          onClick={() => onPick(c.id)}
+          style={{ borderColor: c.colour }}
+        >
+          {c.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Relabelling one interval — the case the feature turns on.
+ *
+ * YouTube defaults to Distraction and *this* video was a lecture. Fruit sees a
+ * registrable domain and deliberately never the URL or the page title, so it
+ * cannot tell the difference and must not pretend to. The person who watched it
+ * says so, for that interval alone, and the rule is left as it was.
+ */
+function SpanLabeller({
+  span,
+  cats,
+  onClose,
+  onDone,
+}: {
+  span: ActivitySpanRow;
+  cats: ObservationCategory[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const run = useApp((s) => s.run);
+  const name = span.domain ?? appLabel(span.appId);
+
+  const apply = async (categoryId: string | null) => {
+    const ok = await run(
+      () => ipc.setSpanCategory(span.id, categoryId),
+      "Couldn't relabel that interval.",
+    );
+    onClose();
+    if (ok !== null) onDone();
+  };
+
+  return (
+    <div className="row" style={{ gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+      <strong>
+        {name}{" "}
+        <span className="data caption">
+          {fmt.clock(span.startedAt)}–{fmt.clock(span.endedAt)}
+        </span>
+      </strong>
+      <CategoryPicker cats={cats} current={span.categoryId} onPick={(id) => void apply(id)} />
+      <button className="btn micro" onClick={() => void apply(null)}>
+        Clear
+      </button>
+      <button className="btn micro" onClick={onClose}>
+        Cancel
+      </button>
+      <span className="caption" style={{ flexBasis: "100%" }}>
+        This interval only. To change it for every future visit, use the rule under
+        &ldquo;Not labelled yet&rdquo; or Settings → Activity.
+      </span>
+    </div>
   );
 }
