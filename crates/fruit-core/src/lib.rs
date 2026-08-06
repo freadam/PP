@@ -29,6 +29,7 @@ pub mod rrule;
 pub mod spool;
 pub mod store;
 pub mod time;
+pub mod xlsx;
 
 pub use error::{AppError, Result};
 pub use store::Store;

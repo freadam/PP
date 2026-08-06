@@ -1130,6 +1130,126 @@ pub struct WeekReview {
     pub calibration: Vec<GoalCalibration>,
 }
 
+// ─── workbook import (M13, §4.8) ───────────────────────────────────────
+
+/// What a label in the sheet means. There are exactly four answers, and one of
+/// them is "nothing" — because the alternative to an explicit *ignore* is an
+/// implicit one, and §4.8's "no silent loss" is a rule about silence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// `rename_all` renames the *variants*; `rename_all_fields` renames what is
+// inside them. Both are needed, and forgetting the second is silent — the JSON
+// simply carries `life_area_id` and the renderer reads `undefined`.
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
+pub enum ImportTarget {
+    /// Read, counted, and deliberately not written. The preview says how much.
+    Ignore,
+    /// `task_id` omitted means "a task named after the label", created once and
+    /// reused — otherwise a second import of the same month doubles the backlog
+    /// rather than the hours.
+    Work {
+        #[serde(default)]
+        task_id: Option<String>,
+    },
+    Life {
+        life_area_id: String,
+    },
+    /// Intentionally untracked: the interval is accounted for, nothing is
+    /// recorded about it.
+    Private,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRule {
+    pub label: String,
+    pub target: ImportTarget,
+}
+
+/// Everything the importer needs, all of it confirmed by a person.
+///
+/// `suggest_import_mapping` fills this in from what the file looks like; every
+/// field remains the user's to change, and the ones it cannot fill honestly it
+/// leaves empty rather than guessing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportMapping {
+    pub sheet: String,
+    /// Zero-based, as the sheet is indexed.
+    pub header_row: usize,
+    pub time_col: usize,
+    pub columns: Vec<crate::xlsx::DayColumn>,
+    pub slot_minutes: i64,
+    /// `YYYY-MM`. Empty blocks the import: a sheet headed "1 … 31" does not say
+    /// which month it is, and picking one for the user is picking wrong.
+    pub month: String,
+    pub tz: String,
+    pub rules: Vec<ImportRule>,
+    /// The user's answer to a conflict. False refuses; true replaces.
+    #[serde(default)]
+    pub replace_existing: bool,
+}
+
+/// The variance preview — §4.8's precondition for importing anything.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPreview {
+    pub sheet: String,
+    pub month: String,
+    pub tz: String,
+    pub slot_minutes: i64,
+    pub total_sec: i64,
+    /// Time a rule says to drop. Reported because dropping it was a decision.
+    pub ignored_sec: i64,
+    pub days: Vec<ImportDay>,
+    /// Labels nobody has placed. Non-empty blocks the commit.
+    pub unmapped: Vec<crate::xlsx::LabelCount>,
+    pub conflicting_dates: Vec<String>,
+    /// Everything standing between this preview and a commit, in sentences.
+    /// Empty means the import will go through.
+    pub blocking: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportDay {
+    pub local_date: String,
+    pub slots: i64,
+    /// What the sheet holds for this day, once the rules are applied.
+    pub seconds: i64,
+    /// What Fruit already holds. The pair is the point.
+    pub existing_sec: i64,
+    /// `seconds − existing_sec`. Signed, because "12h of variance" without a
+    /// direction is a number nobody can act on.
+    pub variance_sec: i64,
+    pub conflicts: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub batch_id: String,
+    pub month: String,
+    pub sessions_written: i64,
+    pub life_entries_written: i64,
+    /// Rows the import replaced, because the user chose to replace them.
+    pub records_replaced: i64,
+    pub total_sec: i64,
+}
+
+/// One past import. Kept so it can be named, and undone.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportBatch {
+    pub id: String,
+    pub source_path: String,
+    pub sheet: String,
+    pub month: String,
+    pub tz: String,
+    pub sessions_written: i64,
+    pub life_entries_written: i64,
+    pub created_at: Millis,
+}
+
 // ─── the Monday-morning report (W9) ────────────────────────────────────
 
 /// Everything the weekly report says, in the order it says it.

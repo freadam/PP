@@ -73,6 +73,11 @@ import type {
   WeekReport,
   WeekReportDue,
   WeekReportResult,
+  WorkbookInspection,
+  ImportMapping,
+  ImportPreview,
+  ImportResult,
+  ImportBatch,
   IcsImportSummary,
   NewBlock,
   RrulePreset,
@@ -471,3 +476,24 @@ export const markWeekReportSeen = (week: string) =>
  *  whatever the machine associates with `.xlsx` is a bigger assumption than
  *  putting the folder in front of someone. */
 export const revealPath = (path: string) => call<void>("reveal_path", { path });
+
+/* ─── workbook import (M13, §4.8) ──────────────────────────────────────── */
+
+/** Read-only. Says what the file looks like; decides nothing. */
+export const inspectWorkbook = (path: string) =>
+  call<WorkbookInspection>("inspect_workbook", { path });
+
+/** A starting mapping. Every label it cannot place exactly is left unmapped —
+ *  and unmapped blocks the commit, which is the whole point. */
+export const suggestImportMapping = (path: string, sheet: string, tz: string) =>
+  call<ImportMapping>("suggest_import_mapping", { path, sheet, tz });
+
+export const previewImport = (path: string, mapping: ImportMapping) =>
+  call<ImportPreview>("preview_import", { path, mapping });
+
+export const commitImport = (path: string, mapping: ImportMapping) =>
+  call<ImportResult>("commit_import", { path, mapping });
+
+export const getImportBatches = () => call<ImportBatch[]>("get_import_batches", {});
+
+export const undoImport = (batchId: string) => call<UndoToken>("undo_import", { batchId });

@@ -18,6 +18,7 @@ use fruit_core::clock::SystemClock;
 use fruit_core::db::IntegrityReport;
 use fruit_core::model::*;
 use fruit_core::parser::{parse, DateOrder, ParseCtx};
+use fruit_core::xlsx::WorkbookInspection;
 use fruit_core::store::{
     IcsImportSummary, IdleReport, SeriesScope, ACTIVITY_ENABLED, ACTIVITY_PAUSED,
     SAMPLE_INTERVAL_MS,
@@ -668,6 +669,62 @@ fn mark_week_report_seen(state: State<'_, AppState>, week: String) -> Res<()> {
     with(&state, |s| s.mark_week_report_seen(&week))
 }
 
+// ─── workbook import (M13, §4.8) ───────────────────────────────────────
+
+/// Read-only. Says what the file looks like so the mapping step is a
+/// confirmation instead of twenty questions.
+#[tauri::command]
+fn inspect_workbook(state: State<'_, AppState>, path: PathBuf) -> Res<WorkbookInspection> {
+    with(&state, |s| s.inspect_workbook(&path))
+}
+
+/// Takes the path rather than the inspection: shipping a whole inspection back
+/// across the boundary to have it read once is a round trip that buys nothing,
+/// and re-reading a file the user just picked is cheap.
+#[tauri::command]
+fn suggest_import_mapping(
+    state: State<'_, AppState>,
+    path: PathBuf,
+    sheet: String,
+    tz: String,
+) -> Res<ImportMapping> {
+    with(&state, |s| {
+        let inspection = s.inspect_workbook(&path)?;
+        s.suggest_import_mapping(&inspection, &sheet, &tz)
+    })
+}
+
+/// The variance preview. Reads the file; writes nothing.
+#[tauri::command]
+fn preview_import(
+    state: State<'_, AppState>,
+    path: PathBuf,
+    mapping: ImportMapping,
+) -> Res<ImportPreview> {
+    with(&state, |s| s.preview_import(&path, &mapping))
+}
+
+/// Refuses while the preview is blocked — the check lives in the core, not
+/// here, because the renderer is not a trusted caller (§6.8).
+#[tauri::command]
+fn commit_import(
+    state: State<'_, AppState>,
+    path: PathBuf,
+    mapping: ImportMapping,
+) -> Res<ImportResult> {
+    with(&state, |s| s.commit_import(&path, &mapping))
+}
+
+#[tauri::command]
+fn get_import_batches(state: State<'_, AppState>) -> Res<Vec<ImportBatch>> {
+    with(&state, |s| s.get_import_batches())
+}
+
+#[tauri::command]
+fn undo_import(state: State<'_, AppState>, batch_id: String) -> Res<UndoToken> {
+    with(&state, |s| s.undo_import(&batch_id))
+}
+
 /// Shows a file in the OS file manager.
 ///
 /// Reveal rather than open: the report is a spreadsheet, and launching whatever
@@ -1080,6 +1137,12 @@ pub fn run() {
             export_week_report,
             mark_week_report_seen,
             reveal_path,
+            inspect_workbook,
+            suggest_import_mapping,
+            preview_import,
+            commit_import,
+            get_import_batches,
+            undo_import,
             get_life_areas,
             create_life_area,
             update_life_area,

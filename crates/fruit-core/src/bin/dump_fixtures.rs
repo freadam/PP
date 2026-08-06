@@ -490,6 +490,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "due_week_report".into(),
         json!(store.due_week_report(&tz)?),
     );
+    // Workbook import (M13). The preview cannot open a file the user has not
+    // picked, so the fixture is the one real workbook this codebase can make:
+    // Fruit's own export of the month above, inspected. The screen therefore
+    // shows a genuine detection rather than an invented one.
+    {
+        let dir = std::env::temp_dir().join("fruit-fixture-export");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("fixture-month.xlsx");
+        store.write_excel(&today[..7], &tz, &path, &ExcelOptions::default())?;
+        let inspection = store.inspect_workbook(&path)?;
+        let sheet = inspection
+            .sheets
+            .iter()
+            .find(|s| !s.day_columns.is_empty())
+            .map(|s| s.name.clone())
+            .unwrap_or_default();
+        out.insert("inspect_workbook".into(), json!(inspection));
+        if !sheet.is_empty() {
+            let mut mapping = store.suggest_import_mapping(&inspection, &sheet, &tz)?;
+            mapping.month = today[..7].to_string();
+            out.insert("suggest_import_mapping".into(), json!(mapping));
+            out.insert(
+                "preview_import".into(),
+                json!(store.preview_import(&path, &mapping)?),
+            );
+        }
+        out.insert("get_import_batches".into(), json!(store.get_import_batches()?));
+        let _ = std::fs::remove_file(&path);
+    }
     out.insert(
         "get_goal_templates".into(),
         json!(store.get_goal_templates(&today, &tz)?),

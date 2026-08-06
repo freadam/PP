@@ -169,8 +169,7 @@ for (const [width, height, scale] of [
   }
   await page.waitForTimeout(400);
   const worst = { doc: 0, body: 0, view: "Planner" };
-  for (const view of VIEWS) {
-    await page.click(`button[aria-label^="${view}"]`);
+  const measure = async (view) => {
     await page.waitForTimeout(250);
     const overflow = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -179,6 +178,26 @@ for (const [width, height, scale] of [
     if (overflow.doc > worst.doc || overflow.body > worst.body) {
       Object.assign(worst, overflow, { view });
     }
+  };
+  for (const view of VIEWS) {
+    await page.click(`button[aria-label^="${view}"]`);
+    await measure(view);
+  }
+  // Import and Export are reached from Reports rather than the rail, and both
+  // are wide tables — the exact shape that overflows first.
+  for (const label of ["Import a workbook", "Export month to Excel"]) {
+    await page.click(`button[aria-label^="Reports"]`);
+    await page.waitForTimeout(200);
+    await page.click(`button:text-is("${label}")`);
+    if (label === "Import a workbook") {
+      // Land on the mapping and variance tables rather than the empty state:
+      // the empty state has never overflowed anything, and the tables are the
+      // reason this view is in the list.
+      await page.fill("#import-path", "fixture.xlsx");
+      await page.click('button:text-is("Read it")');
+      await page.waitForTimeout(500);
+    }
+    await measure(label);
   }
   check(
     `I5 no horizontal overflow at ${width}×${height}${scale === 1 ? "" : " @125% text"}`,

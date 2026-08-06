@@ -535,7 +535,7 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 | 6 | ~~**W3 focus sessions**~~ | — | **Built.** The intended length is a plotted block; extending moves the reminder and not the plan. |
 | 7 | ~~**W4 notices + W5 off-plan nudge**~~ | 3 | **Built.** Three switches, one Settings group, all off by default. |
 | 8 | ~~**W10 templates**~~ | 2 | **Built.** Numbers from your own weeks; a template with no history says so. |
-| 9 | **Workbook import (M13)** | — | Unchanged in scope, after the goals work per the phase order above. |
+| 9 | ~~**Workbook import (M13)**~~ | — | **Built.** Detection, then a mapping nobody can skip, then a signed per-day variance, then a commit that refuses while anything is unmapped or unresolved — and an undo, because an import that cannot be undone is one nobody dares run. |
 
 ## Acceptance
 

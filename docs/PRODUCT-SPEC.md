@@ -497,12 +497,12 @@ in bold; each is reversible.
 | Entertainment **budgets** | **Built** — a weekly goal with `direction = atMost`, migration 0008 |
 | Planned entertainment **windows** | **Not built** — the other half of M11 |
 | **Weekly goals and pacing** (W1/W2) | **Built** — migration 0008. Direction is first-class; the future is never a shortfall. |
-| The rest of the week horizon — fragmentation, weekly review and report, focus sessions, notices, templates | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W3–W6, W9, W10. |
+| The rest of the week horizon — fragmentation, weekly review and report, focus sessions, notices, templates | **Built** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W3–W6, W9, W10. The report is an `.xlsx` and a card that waits until it has been read; not a PDF and not an email, because an offline app has no mailer. |
 | **User-defined observation categories** and the uncategorised surface | **Built** — migration 0007. Work · Study · Distraction · Life, extensible, per app **and** per site. `counts_as` keeps every existing total stable. |
-| **Focus sessions with an intended length**, extendable in one key | **Planned** — W3. The timer runs until stopped; a session that commits to 45 minutes is a different act. |
-| **Off-plan nudge** (a notice, never a block) | **Planned** — W5. |
+| **Focus sessions with an intended length**, extendable in one key | **Built** — W3. The intended length is a plotted block, so extending shows as an overrun rather than as a larger plan. |
+| **Off-plan nudge** (a notice, never a block) | **Built** — W5. Fires only during plotted time, and is silenceable for the session. |
 | Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
-| Excel **import** | **Not built** (M13) |
+| Excel **import** | **Built** (M13) — detection, then a mapping nobody can skip, then a signed per-day variance, then a commit that refuses while anything is unmapped or unresolved. Still unproven against the client's own workbook, which is open question 6 below. |
 | Task notes | Built as **Markdown**; the plan requires compact plain text |
 
 ### A sequencing correction to the plan

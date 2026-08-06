@@ -38,6 +38,7 @@ mod seed;
 mod tasks;
 mod timer;
 mod week;
+mod import;
 mod week_report;
 
 pub use activity::{

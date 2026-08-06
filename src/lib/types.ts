@@ -1039,6 +1039,118 @@ export interface MonthView {
 
 // ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────
 
+// ─── workbook import (M13, §4.8) ───────────────────────────────────────
+
+/** One sheet, described rather than interpreted. `null` fields are findings,
+ *  not failures — the sheet genuinely has no header row Fruit can see. */
+export interface SheetShape {
+  name: string;
+  rows: number;
+  cols: number;
+  headerRow: number | null;
+  timeCol: number | null;
+  dayColumns: ImportDayColumn[];
+  firstMinute: number | null;
+  slotMinutes: number | null;
+  /** Every distinct label, most slots first. Its length is the honest measure
+   *  of how much work the mapping step is. */
+  labels: LabelCount[];
+}
+
+export interface ImportDayColumn {
+  col: number;
+  header: string;
+  dayOfMonth: number;
+}
+
+export interface LabelCount {
+  label: string;
+  /** Slots, not hours: hours need the slot length, which is a mapping decision
+   *  rather than a fact about the file. */
+  slots: number;
+}
+
+export interface WorkbookInspection {
+  path: string;
+  sheets: SheetShape[];
+}
+
+/**
+ * What a label means. Four answers, and one of them is "nothing" — the
+ * alternative to an explicit ignore is an implicit one, and §4.8's "no silent
+ * loss" is a rule about silence.
+ */
+export type ImportTarget =
+  | { kind: "ignore" }
+  | { kind: "work"; taskId?: string | null }
+  | { kind: "life"; lifeAreaId: string }
+  | { kind: "private" };
+
+export interface ImportRule {
+  label: string;
+  target: ImportTarget;
+}
+
+export interface ImportMapping {
+  sheet: string;
+  headerRow: number;
+  timeCol: number;
+  columns: ImportDayColumn[];
+  slotMinutes: number;
+  /** `YYYY-MM`. Empty blocks the import: a sheet headed "1 … 31" does not say
+   *  which month it is, and picking one for the user is picking wrong. */
+  month: string;
+  tz: string;
+  rules: ImportRule[];
+  replaceExisting: boolean;
+}
+
+export interface ImportPreview {
+  sheet: string;
+  month: string;
+  tz: string;
+  slotMinutes: number;
+  totalSec: number;
+  /** Time a rule says to drop. Reported, because dropping it was a decision. */
+  ignoredSec: number;
+  days: ImportDay[];
+  unmapped: LabelCount[];
+  conflictingDates: LocalDate[];
+  /** Everything between this preview and a commit, in sentences. Empty means
+   *  the import will go through. */
+  blocking: string[];
+}
+
+export interface ImportDay {
+  localDate: LocalDate;
+  slots: number;
+  seconds: number;
+  existingSec: number;
+  /** Signed: "12h of variance" without a direction is unusable. */
+  varianceSec: number;
+  conflicts: boolean;
+}
+
+export interface ImportResult {
+  batchId: string;
+  month: string;
+  sessionsWritten: number;
+  lifeEntriesWritten: number;
+  recordsReplaced: number;
+  totalSec: number;
+}
+
+export interface ImportBatch {
+  id: string;
+  sourcePath: string;
+  sheet: string;
+  month: string;
+  tz: string;
+  sessionsWritten: number;
+  lifeEntriesWritten: number;
+  createdAt: Millis;
+}
+
 // ─── the Monday-morning report (W9) ────────────────────────────────────
 
 /** Everything the weekly report says, in the order it says it. */

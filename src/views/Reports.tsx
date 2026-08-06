@@ -85,6 +85,9 @@ export function Reports() {
           ))}
         </div>
         <span className="grow" />
+        <button className="btn" onClick={() => go("import")}>
+          Import a workbook
+        </button>
         <button className="btn btn-primary" onClick={() => go("export")}>
           Export month to Excel
         </button>

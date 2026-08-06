@@ -41,7 +41,9 @@ export type ViewName =
   | "reports"
   | "settings"
   /** Reached from Reports, not the rail: it acts on the month you are looking at. */
-  | "export";
+  | "export"
+  /** Also reached from Reports. A historical month arrives here once. */
+  | "import";
 
 /**
  * A task being dragged toward the planner (§4.3 — "sidebar backlog item" and
