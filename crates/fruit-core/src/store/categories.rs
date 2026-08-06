@@ -812,6 +812,58 @@ mod tests {
         assert_eq!(rows[0].seconds, 30 * 60, "the time survived the label");
     }
 
+    /// Rules are the user's to edit and remove — including the ones shipped
+    /// with the app. A "shipped" rule you cannot argue with is a rule that
+    /// mislabels your month and tells you to live with it.
+    #[test]
+    fn a_shipped_rule_can_be_repointed_and_deleted() {
+        let (mut s, _) = store();
+        fn youtube(s: &Store) -> Option<ActivityRuleRow> {
+            s.get_activity_rules()
+                .unwrap()
+                .into_iter()
+                .find(|r| r.match_value == "youtube.com")
+        }
+        let before = youtube(&s).expect("youtube ships as a rule");
+        assert!(before.is_builtin);
+        assert_eq!(before.category_name, "Distraction");
+
+        // Repoint it. Editing a shipped rule makes it the user's — one row, not
+        // a second one shadowing the first.
+        let study = named(&s, "Study");
+        s.set_activity_rule(MatchKind::Domain, "youtube.com", &study)
+            .unwrap();
+        let after = youtube(&s).unwrap();
+        assert_eq!(after.category_name, "Study");
+        assert!(!after.is_builtin, "an edited rule belongs to the user");
+        assert_eq!(
+            s.get_activity_rules()
+                .unwrap()
+                .iter()
+                .filter(|r| r.match_value == "youtube.com")
+                .count(),
+            1
+        );
+
+        // And remove it entirely.
+        s.delete_activity_rule(&after.id).unwrap();
+        assert!(youtube(&s).is_none());
+        assert_eq!(s.classify("chrome.exe", Some("youtube.com")).unwrap(), None);
+    }
+
+    /// Typing a site by hand is the path that works before the browser
+    /// extension is installed — and the one that lets someone set up their
+    /// labels in advance rather than waiting for a day of observation.
+    #[test]
+    fn a_site_can_be_labelled_before_it_has_ever_been_observed() {
+        let (mut s, clock) = store();
+        let study = named(&s, "Study");
+        s.set_activity_rule(MatchKind::Domain, "docs.rs", &study).unwrap();
+
+        observe(&mut s, &clock, "chrome.exe", Some("docs.rs"), 25);
+        assert_eq!(totals(&s), [("Study".to_string(), 25 * 60)]);
+    }
+
     #[test]
     fn the_two_categories_the_schema_needs_cannot_be_deleted() {
         let (mut s, _) = store();

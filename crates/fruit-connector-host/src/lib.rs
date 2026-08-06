@@ -32,6 +32,8 @@
 //! `Store::record_browser_sample`, below the IPC boundary, where every other
 //! privacy rule in this app is enforced.
 
+pub mod install;
+
 use std::io::{Read, Write};
 use std::path::Path;
 

@@ -681,6 +681,53 @@ instant, recorded by the other of two observers.
 With titles off, a stretch says which *site* and not which video, and the panel
 explains that rather than showing a blank column.
 
+### Editing rules, and typing one in
+
+The first cut let you *make* a rule from the Activity screen and *delete* one in
+Settings, and that was it. Two gaps, both blocking:
+
+- **No edit.** Repointing `youtube.com` from Distraction to Study meant deleting
+  the rule and making a new one from a stretch you happened to still have. Each
+  rule row now carries a category dropdown showing its current value, which *is*
+  the edit affordance — there is exactly one editable field on a rule, so hiding
+  it behind a pencil would be ceremony.
+- **No way to type one in.** Every path to a rule started from something already
+  observed, which means **sites were unreachable until the browser extension was
+  installed and had run for a day**. Settings now takes `instagram.com →
+  Distraction` directly, before the site has ever been seen.
+
+Shipped rules are editable and deletable like any other. A "shipped" rule you
+cannot argue with is one that mislabels your month and tells you to live with it.
+
+### Registering the host, on request
+
+The first cut printed two paths and left the user to write a JSON file and an
+`HKCU` registry key by hand. The reasoning was that an app which points a browser
+at an executable without being asked has done something objectionable.
+
+That reasoning was right and the conclusion was wrong. **Silence was the problem,
+not automation.** Someone who cannot face regedit simply never gets domain-level
+tracking, so the feature they asked for does not exist for them. A button they
+press, having read what it does, is consent.
+
+So Settings → Activity → Browser extension now takes the extension id and writes
+the manifest and the per-user registry key itself. Three properties:
+
+- **`HKCU`, never `HKLM`** — a per-user choice must not need administrator
+  rights, which would turn a checkbox into a UAC prompt.
+- **Every step is reported**, successes and failures alike, including the exact
+  `reg.exe` command. A machine that refuses gives the user something to run
+  rather than a dead end.
+- **`reg.exe`, not a registry crate** — it ships with Windows, needs no `unsafe`,
+  and adds no dependency to a crate that cannot be compiled where this was
+  written. The command is also readable, which matters for a step that touches
+  someone's registry.
+
+The extension id still has to be pasted, and always will: Chrome only assigns it
+when the extension is loaded, and `allowed_origins` must name it. The id's shape
+is checked (32 letters, `a`–`p`) so a bad paste says so instead of producing a
+host that silently never connects.
+
 ### Not done
 
 - The Day view's detail panel does not yet offer relabelling; the Activity

@@ -14,6 +14,7 @@ import type {
   ActivityRule,
   ConnectorStatus,
   IntegrityReport,
+  MatchKind,
   ObservationCategory,
 } from "../lib/types";
 
@@ -313,12 +314,28 @@ export function Settings() {
  * samples have arrived, so that is the status line.
  */
 function ConnectorInstall({ enabled }: { enabled: boolean }) {
+  const run = useApp((s) => s.run);
   const [status, setStatus] = useState<ConnectorStatus | null>(null);
+  const [extId, setExtId] = useState("");
+  const [steps, setSteps] = useState<string[]>([]);
+
+  const refresh = () => {
+    void ipc.getConnectorStatus().then(setStatus).catch(() => setStatus(null));
+  };
 
   useEffect(() => {
-    if (!enabled) return;
-    void ipc.getConnectorStatus().then(setStatus).catch(() => setStatus(null));
+    if (enabled) refresh();
   }, [enabled]);
+
+  const install = async () => {
+    const done = await run(() => ipc.installConnector(extId), "Couldn't register the host.");
+    // Every step is reported, successes and failures alike — a registry write
+    // that was refused has to be visible, with the command to run by hand.
+    if (done) {
+      setSteps(done);
+      refresh();
+    }
+  };
 
   if (!enabled) return null;
 
@@ -330,16 +347,39 @@ function ConnectorInstall({ enabled }: { enabled: boolean }) {
       {status ? (
         <div className="stack" style={{ gap: 6 }}>
           <p className="caption">
-            1 · Load <code className="data">{status.extensionDir}</code> in{" "}
-            <code className="data">chrome://extensions</code> with Developer mode on.
+            1 · Open <code className="data">chrome://extensions</code>, turn on Developer
+            mode, and <b>Load unpacked</b> from{" "}
+            <code className="data">{status.extensionDir}</code>.
           </p>
           <p className="caption">
-            2 · Save the host manifest as{" "}
-            <code className="data">{status.hostManifestName}.json</code>, pointing{" "}
-            <code className="data">path</code> at{" "}
-            <code className="data">{status.exePath}</code> and{" "}
-            <code className="data">allowed_origins</code> at the extension&rsquo;s id.
+            2 · Copy the extension&rsquo;s <b>ID</b> from that page and paste it here. Fruit
+            writes the host manifest and the per-user registry key that points Chrome and
+            Edge at <code className="data">{status.exePath}</code>. It is not done on first
+            run, because pointing a browser at an executable is not something an app should
+            arrange without being asked.
           </p>
+          <div className="row">
+            <input
+              value={extId}
+              placeholder="32 letters, a–p"
+              aria-label="Extension ID"
+              onChange={(e) => setExtId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && void install()}
+              style={{ maxWidth: 300 }}
+            />
+            <button className="btn btn-primary" onClick={() => void install()}>
+              Register the host
+            </button>
+          </div>
+          {steps.length > 0 && (
+            <div className="stack" style={{ gap: 2 }}>
+              {steps.map((line) => (
+                <span key={line} className="caption data">
+                  {line}
+                </span>
+              ))}
+            </div>
+          )}
           <p className="caption">
             {status.queuedSamples > 0
               ? "The extension is connected — samples are arriving."
@@ -579,17 +619,27 @@ function ActivitySettings() {
 /**
  * Labels, and the rules that apply them (migration 0007).
  *
- * The rules list is here; the *labelling* is on the Activity screen, where the
- * thing being labelled is on screen next to its total. That split is deliberate
- * — the source review's sharpest criticism of this class of tool is that
- * configuring it becomes the work, and a taxonomy editor is where that starts.
- * This screen is for repairing a rule you regret, not for building the set.
+ * Two lists, and both are fully editable — including the rules shipped with the
+ * app. A "shipped" rule you cannot argue with is a rule that mislabels your
+ * month and tells you to live with it. Editing one makes it yours: the row
+ * stops being built-in rather than being shadowed by a second one.
+ *
+ * The **add** form matters more than it looks. Labelling from the Activity
+ * screen only offers what has already been observed, which means sites are
+ * unreachable until the browser extension is installed and has run for a day.
+ * Typing `instagram.com → Distraction` here works immediately and applies the
+ * moment the first observation arrives.
  */
 function LabelSettings() {
   const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
   const [cats, setCats] = useState<ObservationCategory[]>([]);
   const [rules, setRules] = useState<ActivityRule[]>([]);
   const [name, setName] = useState("");
+
+  const [kind, setKind] = useState<MatchKind>("domain");
+  const [value, setValue] = useState("");
+  const [pick, setPick] = useState<string>("");
 
   const load = async () => {
     const [c, r] = await Promise.all([
@@ -598,23 +648,52 @@ function LabelSettings() {
     ]);
     setCats(c);
     setRules(r);
+    if (!pick && c.length) setPick(c[0]!.id);
   };
 
   useEffect(() => {
     void load();
   }, []);
 
-  const add = async () => {
+  const addCategory = async () => {
     if (!name.trim()) return;
     // New categories roll up as "other" — the neutral bucket. Anything else
-    // would silently move the month dashboard's Work or Entertainment figure
-    // the moment the category was created.
-    const ok = await run(
-      () => ipc.createCategory(name.trim(), "other"),
-      "Couldn't add that label.",
-    );
+    // would move the month dashboard's Work or Entertainment figure the moment
+    // the category was created.
+    const ok = await run(() => ipc.createCategory(name.trim(), "other"), "Couldn't add that label.");
     if (ok) {
       setName("");
+      void load();
+    }
+  };
+
+  const addRule = async () => {
+    if (!value.trim() || !pick) return;
+    const saved = await run(() => ipc.setActivityRule(kind, value.trim(), pick), "Couldn't save that rule.");
+    if (saved) {
+      // Echo what was stored, not what was typed: `https://www.Instagram.com/x`
+      // becomes `instagram.com`, and seeing that is how someone learns the rule
+      // covers every page and every subdomain.
+      toast(`${saved.matchValue} → ${saved.categoryName}. Applies from now on.`);
+      setValue("");
+      void load();
+    }
+  };
+
+  /** Repointing a rule is an upsert on the same (kind, value) — one row. */
+  const repoint = async (rule: ActivityRule, categoryId: string) => {
+    if (categoryId === rule.categoryId) return;
+    const ok = await run(
+      () => ipc.setActivityRule(rule.matchKind, rule.matchValue, categoryId),
+      "Couldn't change that rule.",
+    );
+    if (ok) void load();
+  };
+
+  const removeRule = async (rule: ActivityRule) => {
+    const ok = await run(() => ipc.deleteActivityRule(rule.id), "Couldn't delete that rule.");
+    if (ok !== null) {
+      toast(`Rule for ${rule.matchValue} removed. Past records keep their label.`);
       void load();
     }
   };
@@ -633,16 +712,13 @@ function LabelSettings() {
               {!["work", "other"].includes(c.name.toLowerCase()) && (
                 <button
                   className="btn micro"
-                  aria-label={`Delete ${c.name}`}
+                  aria-label={`Delete the ${c.name} label`}
                   onClick={async () => {
-                    const ok = await run(
-                      () => ipc.deleteCategory(c.id),
-                      "Couldn't delete that label.",
-                    );
+                    const ok = await run(() => ipc.deleteCategory(c.id), "Couldn't delete that label.");
                     if (ok !== null) void load();
                   }}
                 >
-                  ×
+                  Remove
                 </button>
               )}
             </span>
@@ -652,52 +728,89 @@ function LabelSettings() {
           <input
             value={name}
             placeholder="Add a label — e.g. AI tools"
+            aria-label="New label name"
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void add()}
+            onKeyDown={(e) => e.key === "Enter" && void addCategory()}
             style={{ maxWidth: 240 }}
           />
-          <button className="btn" onClick={() => void add()}>
-            Add
+          <button className="btn" onClick={() => void addCategory()}>
+            Add label
+          </button>
+        </div>
+      </Field>
+
+      <Field
+        label="Label a site or app"
+        hint="Type it in — the site does not have to have been observed yet, so labels can be set up before the browser extension is. A site is reduced to its registrable domain, so instagram.com covers every page and every subdomain of it."
+      >
+        <div className="row" style={{ flexWrap: "wrap" }}>
+          {(["domain", "app"] as const).map((k) => (
+            <button key={k} className="btn" aria-pressed={kind === k} onClick={() => setKind(k)}>
+              {k === "domain" ? "Site" : "App"}
+            </button>
+          ))}
+          <input
+            value={value}
+            placeholder={kind === "domain" ? "instagram.com" : "steam.exe"}
+            aria-label={kind === "domain" ? "Site to label" : "Application to label"}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && void addRule()}
+            style={{ maxWidth: 220 }}
+          />
+          <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Label">
+            {cats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-primary" onClick={() => void addRule()}>
+            Save rule
           </button>
         </div>
       </Field>
 
       <Field
         label="Rules"
-        hint="One verdict per app or site. A site rule beats an app rule, always and without a setting — otherwise a browser labelled Work would make every site inside it work, which is the exact failure the connector was built to fix."
+        hint="One verdict per app or site, and every one of them is editable — including the ones shipped with the app. A site rule beats an app rule, always and without a setting: otherwise a browser labelled Work would make every site inside it work, which is the exact failure the browser extension was built to fix."
       >
         {rules.length === 0 ? (
           <p className="caption">No rules yet.</p>
         ) : (
-          <div className="stack" style={{ gap: 4, maxHeight: 260, overflowY: "auto" }}>
+          <div className="stack" style={{ gap: 4, maxHeight: 300, overflowY: "auto" }}>
             {rules.map((r) => (
               <div key={r.id} className="row">
                 <span className="tag micro">{r.matchKind === "domain" ? "site" : "app"}</span>
                 <span className="grow data">{r.matchValue}</span>
-                <span className="tag" style={{ borderColor: r.categoryColour }}>
-                  {r.categoryName}
-                </span>
                 {r.isBuiltin && <span className="micro caption">shipped</span>}
+                {/* Editing in place rather than behind a pencil icon: there is
+                    exactly one editable field on a rule, and a dropdown showing
+                    its current value *is* the edit affordance. */}
+                <select
+                  value={r.categoryId}
+                  aria-label={`Label for ${r.matchValue}`}
+                  onChange={(e) => void repoint(r, e.target.value)}
+                >
+                  {cats.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
                 <button
                   className="btn micro"
-                  aria-label={`Delete rule for ${r.matchValue}`}
-                  onClick={async () => {
-                    const ok = await run(
-                      () => ipc.deleteActivityRule(r.id),
-                      "Couldn't delete that rule.",
-                    );
-                    if (ok !== null) void load();
-                  }}
+                  aria-label={`Delete the rule for ${r.matchValue}`}
+                  onClick={() => void removeRule(r)}
                 >
-                  ×
+                  Remove
                 </button>
               </div>
             ))}
           </div>
         )}
         <p className="caption">
-          Add rules from Activity → <b>Not labelled yet</b>, where the thing being labelled is
-          on screen beside how long it took.
+          Changing a rule applies from now on. Time already recorded keeps the label it was
+          given, so a rule you change today cannot rewrite a week you have already reviewed.
         </p>
       </Field>
     </Section>

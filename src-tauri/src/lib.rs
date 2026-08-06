@@ -441,6 +441,55 @@ fn get_connector_status(app: AppHandle, state: State<'_, AppState>) -> Res<Conne
     })
 }
 
+/// Registers the native-messaging host, on the user's explicit request.
+///
+/// Not on first run, and not silently — see `connector::install`. By the time
+/// this is called the user has loaded the extension, read what registration
+/// does, and pasted the id off `chrome://extensions`.
+///
+/// Every step it took is reported back, including the exact `reg.exe` command,
+/// so someone whose machine refuses it has something to run by hand rather than
+/// a failure with no next move.
+#[tauri::command]
+fn install_connector(app: AppHandle, extension_id: String) -> Res<Vec<String>> {
+    let extension_id =
+        connector::install::validate_extension_id(&extension_id).map_err(AppError::invalid)?;
+    let exe = std::env::current_exe()
+        .map_err(|e| AppError::invalid(format!("Couldn't find Fruit's own path: {e}")))?;
+    let dir = data_dir(&app);
+
+    let manifest = connector::install::write_manifest(&dir, &exe, &extension_id)
+        .map_err(|e| AppError::invalid(format!("Couldn't write the host manifest: {e}")))?;
+    let mut steps = vec![format!("Wrote {}", manifest.display())];
+
+    if cfg!(windows) {
+        for key in connector::install::registry_keys() {
+            let args = connector::install::registry_args(&key, &manifest);
+            match std::process::Command::new("reg.exe").args(&args).output() {
+                Ok(out) if out.status.success() => steps.push(format!("Registered {key}")),
+                Ok(out) => steps.push(format!(
+                    "Could not register {key} — run: reg.exe {} ({})",
+                    args.join(" "),
+                    String::from_utf8_lossy(&out.stderr).trim()
+                )),
+                Err(err) => steps.push(format!("Could not run reg.exe ({err}). Run: reg.exe {}", args.join(" "))),
+            }
+        }
+    } else {
+        // No registry: on macOS and Linux the manifest's *location* is the
+        // registration, so it is copied into each browser's directory.
+        for target in connector::install::manifest_install_dirs() {
+            let dest = target.join(format!("{}.json", connector::HOST_MANIFEST_NAME));
+            match std::fs::create_dir_all(&target).and_then(|_| std::fs::copy(&manifest, &dest)) {
+                Ok(_) => steps.push(format!("Installed {}", dest.display())),
+                Err(err) => steps.push(format!("Skipped {} ({err})", dest.display())),
+            }
+        }
+    }
+    steps.push("Restart the browser, then open a tab — samples arrive within a minute.".into());
+    Ok(steps)
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ConnectorStatus {
@@ -927,6 +976,7 @@ pub fn run() {
             get_unlabelled,
             get_domain_totals,
             get_connector_status,
+            install_connector,
             get_unreconciled_days,
             search,
             parse_capture,

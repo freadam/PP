@@ -89,6 +89,9 @@ W7 and W8 shipped ahead of the rest. Their own measures, all covered:
 | L7 | The foreground sampler and the browser connector **do not both bill the same hour**, and app-only remainder survives | `the_browser_and_the_sampler_do_not_both_bill_the_same_hour`, `app_only_time_the_connector_could_not_see_is_kept` |
 | L8 | Every stretch arrives with its row, longest first, and each carries the id needed to label **it alone** | `every_stretch_comes_with_the_row_so_each_can_be_labelled_alone` |
 | L9 | A domain stretch keeps the **window title** that says which video it was, even though the connector never sends one | `a_stretch_keeps_the_window_title_that_says_which_video_it_was` |
+| L10 | A **shipped** rule can be repointed and deleted, and repointing leaves one row rather than two | `a_shipped_rule_can_be_repointed_and_deleted` |
+| L11 | A site can be labelled **before it has ever been observed** — the path that works before the extension is installed | `a_site_can_be_labelled_before_it_has_ever_been_observed` |
+| L12 | Host registration validates the extension id, escapes a Windows path into valid JSON, and writes **per-user** keys only | `fruit-connector-host`: `an_extension_id_is_checked_for_shape_not_merely_accepted`, `a_windows_path_survives_into_valid_json`, `registration_is_per_user` |
 
 L7 is the one worth the most. Both sources are correct and both write; nothing
 on screen would have shown the double-count, because `resolve_day` picks one

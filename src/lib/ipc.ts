@@ -320,6 +320,15 @@ export const getDomainTotals = (date: LocalDate, tz: string) =>
 
 export const getConnectorStatus = () => call<ConnectorStatus>("get_connector_status", {});
 
+/**
+ * Registers the native-messaging host — on request, never on first run.
+ *
+ * Returns one line per step it took, including the exact `reg.exe` command, so
+ * a machine that refuses gives the user something to run rather than a dead end.
+ */
+export const installConnector = (extensionId: string) =>
+  call<string[]>("install_connector", { extensionId });
+
 /* ─── the unified day and life time (Plan Rev 3 §7, §8.1) ──────────────── */
 
 export const getDay = (date: LocalDate, tz: string, slotMinutes?: number) =>
