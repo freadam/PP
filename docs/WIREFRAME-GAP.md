@@ -144,7 +144,12 @@ What remains is work:
   the school run" is the sentence people actually have. It lives on the time
   cell rather than the fill button because the fill button opens a modal, and a
   modal covers the table you would be shift-clicking into.
-- **Merge** — two adjacent records of the same thing becoming one. Still open,
-  and the smallest thing left on this page.
+- ~~**Merge**~~ — **built.** Two adjacent records of the same thing becoming
+  one, offered from the range selection when it holds two or more records of a
+  single subject. Bounded at five minutes of gap, and the result says how many
+  seconds it absorbed: merging asserts the gap was part of the same thing, and
+  one that annexed time silently would be indistinguishable from a bug.
 
-Everything else here is either built or waiting on the client's workbook.
+Everything on this page is built. What is left is not code: the client's own
+workbook, which is open question 6 and settles both M12's format sign-off and
+M13's proof against a real file.

@@ -171,6 +171,8 @@ export function Day() {
   const setDayDate = useApp((s) => s.setDayDate);
   const setSlotMinutes = useApp((s) => s.setSlotMinutes);
   const load = useApp((s) => s.loadDay);
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
   const areas = useApp((s) => s.lifeAreas);
 
   const [filter, setFilter] = useState("all");
@@ -224,6 +226,34 @@ export function Day() {
     if (!first || !last) return null;
     return { from: first.startsAt, to: last.endsAt, rows: hi - lo + 1 };
   }, [day, range]);
+
+  /**
+   * What the selection could be merged into (wireframe, Day — the last item).
+   *
+   * Offered only when the selection covers two or more records of **one**
+   * subject. Two life areas inside the selection is not a merge, it is a
+   * question, and answering it on the user's behalf is how someone loses an
+   * afternoon.
+   */
+  const mergeable = useMemo(() => {
+    if (!day || !span) return null;
+    const subjects = new Map<string, { kind: "life" | "work"; name: string; ids: string[] }>();
+    for (const g of day.segments) {
+      if (g.from < span.from || g.to > span.to) continue;
+      const entry =
+        g.owner.kind === "life"
+          ? { key: `life:${g.owner.areaId}`, kind: "life" as const, name: g.owner.areaName, id: g.owner.entryId }
+          : g.owner.kind === "work"
+            ? { key: `work:${g.owner.taskId}`, kind: "work" as const, name: g.owner.taskTitle, id: g.owner.sessionId }
+            : null;
+      if (!entry) continue;
+      const at = subjects.get(entry.key) ?? { kind: entry.kind, name: entry.name, ids: [] };
+      if (!at.ids.includes(entry.id)) at.ids.push(entry.id);
+      subjects.set(entry.key, at);
+    }
+    const candidates = [...subjects.values()].filter((v) => v.ids.length > 1);
+    return candidates.length === 1 ? candidates[0]! : null;
+  }, [day, span]);
 
   const subjects = useMemo(() => subjectFilters(day), [day]);
   const rule =
@@ -331,6 +361,34 @@ export function Day() {
             </span>{" "}
             selected · {span.rows} rows · {fmt.duration((span.to - span.from) / 1000)}
           </span>
+          {mergeable && (
+            <button
+              className="btn"
+              onClick={async () => {
+                const result = await run(
+                  () =>
+                    mergeable.kind === "life"
+                      ? ipc.mergeLifeEntries(mergeable.ids)
+                      : ipc.mergeSessions(mergeable.ids),
+                  "Couldn't merge those.",
+                );
+                if (result) {
+                  // The absorbed seconds are the claim the merge just made.
+                  // Saying it is the difference between an edit and a surprise.
+                  toast(
+                    `${result.merged} records became one · ${fmt.duration(result.seconds)}` +
+                      (result.absorbedSec > 0
+                        ? `, including ${fmt.duration(result.absorbedSec)} between them that nothing had claimed.`
+                        : "."),
+                  );
+                  setRange(null);
+                  await load();
+                }
+              }}
+            >
+              Merge {mergeable.ids.length} · {mergeable.name}
+            </button>
+          )}
           <button
             className="btn btn-primary"
             onClick={() => setFill({ from: span.from, to: span.to })}

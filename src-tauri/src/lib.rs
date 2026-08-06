@@ -243,6 +243,21 @@ fn extend_series_to(state: State<'_, AppState>, through: String) -> Res<usize> {
     })
 }
 
+/// Two adjacent records of the same thing becoming one.
+///
+/// The result says how many seconds it absorbed between them: a merge asserts
+/// that the gap was part of the same thing, and one that annexed time silently
+/// would be indistinguishable from a bug.
+#[tauri::command]
+fn merge_life_entries(state: State<'_, AppState>, ids: Vec<String>) -> Res<MergeResult> {
+    with(&state, |s| s.merge_life_entries(&ids))
+}
+
+#[tauri::command]
+fn merge_sessions(state: State<'_, AppState>, ids: Vec<String>) -> Res<MergeResult> {
+    with(&state, |s| s.merge_sessions(&ids))
+}
+
 /// Makes an existing life entry repeat. Sleep is the case this exists for.
 #[tauri::command]
 fn repeat_life_entry(
@@ -1186,6 +1201,8 @@ pub fn run() {
             unschedule_series,
             extend_series_to,
             repeat_life_entry,
+            merge_life_entries,
+            merge_sessions,
             delete_life_series,
             repeat_block,
             describe_rrule,

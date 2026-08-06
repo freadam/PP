@@ -78,6 +78,7 @@ import type {
   ImportPreview,
   ImportResult,
   ImportBatch,
+  MergeResult,
   IcsImportSummary,
   NewBlock,
   RrulePreset,
@@ -282,6 +283,13 @@ export const unscheduleSeries = (id: string, scope: SeriesScope) =>
   call<UndoToken>("unschedule_series", { id, scope });
 
 /** Keeps series materialised as far as the planner is being asked to show. */
+/** Two adjacent records of the same thing becoming one. Bounded at five
+ *  minutes of gap, and the result says how much of it was absorbed. */
+export const mergeLifeEntries = (ids: string[]) =>
+  call<MergeResult>("merge_life_entries", { ids });
+
+export const mergeSessions = (ids: string[]) => call<MergeResult>("merge_sessions", { ids });
+
 /** Makes a life entry repeat. Sleep is the case this exists for. */
 export const repeatLifeEntry = (id: string, rrule: string) =>
   call<LifeEntryRow[]>("repeat_life_entry", { id, rrule });

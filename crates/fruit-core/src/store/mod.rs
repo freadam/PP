@@ -29,6 +29,7 @@ mod goals;
 mod projects;
 mod reconcile;
 mod life;
+mod merge;
 mod month;
 mod notices;
 mod recurrence;

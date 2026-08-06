@@ -263,6 +263,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         note: None,
     })?;
 
+    // One stretch of work recorded as two rows, four minutes apart — a timer
+    // stopped to take a call, which is the ordinary way this happens. It gives
+    // the Day view's range selection something real to offer **Merge** on;
+    // without it the button is code nobody can see working.
+    for (from, to) in [(150i64, 195i64), (199, 240)] {
+        store.add_session(ManualSession {
+            task_id: firefight.id.clone(),
+            block_id: None,
+            started_at: activity_base + from * 60_000,
+            ended_at: activity_base + to * 60_000,
+            note: None,
+        })?;
+    }
+
     // Confirmed non-work time, so the Day view's primary screen has all four
     // record types on it: a night's sleep that starts the previous evening, a
     // lunch, and an evening the user marked private.

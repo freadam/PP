@@ -1130,6 +1130,20 @@ pub struct WeekReview {
     pub calibration: Vec<GoalCalibration>,
 }
 
+/// What a merge did. `absorbed_sec` is the part worth saying out loud: a merge
+/// asserts that the gap between two records was part of the same thing, and a
+/// merge that annexed time silently would be indistinguishable from a bug.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeResult {
+    /// The row that survived — always the earliest, so anything already
+    /// pointing at it still points at something.
+    pub id: String,
+    pub merged: i64,
+    pub seconds: i64,
+    pub absorbed_sec: i64,
+}
+
 // ─── workbook import (M13, §4.8) ───────────────────────────────────────
 
 /// What a label in the sheet means. There are exactly four answers, and one of

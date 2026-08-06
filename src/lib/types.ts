@@ -1046,6 +1046,18 @@ export interface MonthView {
 
 // ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────
 
+/** What a merge did. `absorbedSec` is the part worth saying out loud. */
+export interface MergeResult {
+  /** The row that survived — always the earliest. */
+  id: string;
+  merged: number;
+  seconds: number;
+  /** Time between the records that nothing had claimed, and that the merge has
+   *  now claimed. Reported rather than hidden: a merge that annexed time
+   *  silently would be indistinguishable from a bug. */
+  absorbedSec: number;
+}
+
 // ─── workbook import (M13, §4.8) ───────────────────────────────────────
 
 /** One sheet, described rather than interpreted. `null` fields are findings,

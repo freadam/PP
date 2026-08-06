@@ -43,6 +43,15 @@ To be demonstrated on the client's Windows PC.
 times: the client's own workbook. Neither is a gap in the code — both are open
 question 6, which is a question for the client rather than for the build.
 
+One thing built that is **not** a numbered criterion, recorded here because it
+has tests and a rule worth keeping: **merge** — two adjacent records of the same
+thing becoming one, which was the wireframe's last outstanding verb. It bridges
+at most five minutes of gap and reports every second it absorbed, because
+merging asserts the gap was part of the same thing and one that annexed time
+silently would be indistinguishable from a bug. `two_touching_entries_become_one`,
+`a_small_gap_is_bridged_and_said_out_loud`, `a_gap_past_the_bound_is_a_break_and_is_refused`,
+`records_of_different_things_are_not_merged`, `a_merged_sessions_span_and_elapsed_agree`.
+
 | | |
 |---|---|
 | **M13** — built, unproven against the real file | The importer detects a sheet's shape rather than assuming one, and the round trip it *can* be held against — Fruit reading Fruit's own export — passes (`the_importer_finds_the_shape_of_fruits_own_export`). It has never seen the client's workbook, because nobody has provided one; that is open question 6, not a gap in the code. |
