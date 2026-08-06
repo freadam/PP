@@ -32,21 +32,21 @@ To be demonstrated on the client's Windows PC.
 | M8 | A task timer overlapping PC activity **enriches** the interval instead of adding duplicate duration | `observation_enriches_a_confirmed_session_without_adding_time` | ✅ |
 | M9 | Manual life entries fill gaps, repeat, replace an interval with confirmation, and are editable later | `life_entries_fill_gaps_and_replace_with_confirmation`; repeat is **not built** | ❌ partial |
 | M10 | Daily reconciliation covers overruns, unstarted plans, unplanned work, **observed-only activity and empty hours** | First three by `f3_…` and the reconcile suite; the last two by `reconcile_covers_observed_only_and_empty_hours`, sourced from `resolve_day`'s own segments so the sheet and the Day view cannot disagree about what is left to decide | ✅ |
-| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Not built.** Planned as the `at_most` case of weekly goals — see [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) and W1/W2 below. Unplanned totals are already real; planned entertainment is flat zero because no window can be planned yet, and the dashboard says so rather than drawing an empty axis. | ❌ |
+| M11 | Entertainment budgets and planned/unplanned totals reconcile to the underlying intervals | **Budgets built** (migration 0008): a budget is a goal with `direction = atMost` on `metric:entertainment`, and its figure comes from `aggregate_range` — the same `get_day` totals the Day view renders, so a budget and a day cannot disagree. `an_at_most_goal_reports_budget_left_rather_than_progress_made`. Planned entertainment is still flat zero because no window can be planned yet, and the dashboard says so rather than drawing an empty axis. | ◐ |
 | M12 | Reports open to a month summary by default; a month exports to `.xlsx` in the approved format with accurate totals | Reports is month-first; `get_month` is `get_day` summed, so a figure here and on a day cannot be computed two ways. Export writes three sheets whose totals are `COUNTIF` formulas rather than pasted numbers, from the same matrix the preview renders. | ✅ / format needs client sign-off |
 | M13 | A historical workbook month imports through a preview with no silent loss and a variance report | **Not built** | ❌ |
 | M14 | Backup/restore succeeds on a clean profile; the product stays usable offline with no unexpected outbound connection | `d5_restore_from_snapshot`, `d6_export_import_round_trips_exactly`; I7 asserts zero external requests | ✅ |
 | M15 | Timers and activity segmentation recover safely after restart, sleep/wake or forced close | `u7_recovery_trims_to_the_last_heartbeat`, `d10_sleep_is_not_counted_by_default`, `sleep_splits_the_session_instead_of_spanning_it` | ✅ |
 | M16 | Primary actions reachable by keyboard; important states never colour-only | One `COMMANDS` registry (structural); `check-ui.mjs` U10 and I3 | ✅ |
 
-**12 of 16 fully covered, 2 partial, 2 not started.** Both components that used
+**12 of 16 fully covered, 3 partial, 1 not started.** Both components that used
 to gate the rest — the browser connector and the XLSX writer — now exist, so
 nothing remaining is blocked on a missing capability.
 
 | | |
 |---|---|
 | **M4**, **M9** — partial | The task note is still a Markdown renderer, and life entries do not repeat. |
-| **M11** — not started | Entertainment budgets. Planned below as the `at_most` case of weekly goals. |
+| **M11** — partial | Budgets are built (weekly goals, `atMost`). Planned entertainment windows are not, so the planned-vs-unplanned split is still one line. |
 | **M13** — not started | Workbook import. |
 | **M12** — built, unsigned | The export exists and its totals are formulas; the *format* needs the client's reference month before it can be signed off. |
 
@@ -61,8 +61,8 @@ clock and no webview.
 
 | # | Criterion | Why this one |
 |---|---|---|
-| W1 | A goal in force during a week is the goal that week's review reports, **after that goal has since been edited** | A goal edited into a new number must not retroactively rewrite how a past week went, or reviews stop meaning anything. Same argument as `activity_span.category` being stamped at write time. |
-| W2 | A goal at zero on Monday morning reports **on pace**, not behind; expected progress never counts a day that has not happened | The month dashboard's "6% accounted" bug, in a new place. An app that reports the future as a failure is one whose numbers you learn to discount. |
+| W1 ✅ | A goal in force during a week is the goal that week's review reports, **after that goal has since been edited** | `changing_a_goal_closes_the_old_one_rather_than_erasing_it`. A goal edited into a new number must not retroactively rewrite how a past week went, or reviews stop meaning anything. |
+| W2 ✅ | A goal at zero on Monday morning reports **on pace**, not behind; expected progress never counts a day that has not happened | `a_goal_at_zero_on_monday_morning_is_on_pace_not_behind`, `a_weekday_goal_is_not_behind_at_the_weekend`, `a_goal_says_what_the_rest_of_the_week_has_to_look_like`. The month dashboard's "6% accounted" bug, in a new place. |
 | W3 | Extending a focus session shows in drift as an overrun, not as a larger plan | Extending is a plan revision. Fruit separates plan from record, so an extension has to cost something — the reading Rize cannot offer, because it has no plan to diverge from. |
 | W4 | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
 | W5 | The off-plan nudge fires only during **plotted** time, and is silenceable for the session | Both rules come from the reviewer's own false-positive caveat. Time nobody planned is time Fruit has no standing to have an opinion about. |

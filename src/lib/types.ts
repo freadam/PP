@@ -205,6 +205,78 @@ export interface UnlabelledRow {
   stretches: ObservedInterval[];
 }
 
+// ─── weekly goals (PLAN-WEEKLY-GOALS.md W1/W2) ─────────────────────────
+
+export type GoalSubject = "metric" | "lifeArea" | "project" | "category";
+
+/** The whole-day quantities a goal can be set against. */
+export const METRIC = {
+  allWork: "allWork",
+  life: "life",
+  sleep: "sleep",
+  entertainment: "entertainment",
+  unaccounted: "unaccounted",
+} as const;
+
+/**
+ * First-class, not a sign convention. "At most 5h of entertainment" is a goal
+ * you succeed at by being under it.
+ */
+export type GoalDirection = "atLeast" | "atMost";
+
+export interface GoalRow {
+  id: string;
+  subjectKind: GoalSubject;
+  subjectId: string;
+  /** Resolved in Rust — the renderer never looks a name up. */
+  subjectName: string;
+  direction: GoalDirection;
+  targetSec: number;
+  /** Bitmask, Monday = 1 … Sunday = 64. */
+  appliesDays: number;
+  startsWeek: string;
+  endsWeek: string | null;
+}
+
+export interface NewGoal {
+  subjectKind?: GoalSubject;
+  subjectId: string;
+  direction?: GoalDirection;
+  targetSec: number;
+  appliesDays?: number | null;
+}
+
+export type GoalState = "met" | "onPace" | "behind" | "atRisk" | "over";
+
+export interface GoalProgress {
+  goal: GoalRow;
+  actualSec: number;
+  /** The future is never a shortfall — Monday morning expects nothing. */
+  expectedSec: number;
+  /** Positive is good in both directions: ahead of pace, or under budget. */
+  deltaSec: number;
+  state: GoalState;
+  /** The row that changes behaviour. `null` once the week is out of days. */
+  perDayNeededSec: number | null;
+  applicableDays: number;
+  daysLeft: number;
+  /** Built in Rust, because it differs by direction *and* by state. */
+  summary: string;
+}
+
+export interface WeekReview {
+  week: string;
+  from: LocalDate;
+  to: LocalDate;
+  tz: string;
+  totals: DayTotals;
+  days: MonthDay[];
+  elapsedSec: number;
+  elapsedEmptySec: number;
+  unreconciledDays: number;
+  goals: GoalProgress[];
+}
+
 export interface DomainTotal {
   domain: string;
   /** `null` when no rule covered it — a question, not a failure. */

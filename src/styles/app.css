@@ -1826,6 +1826,20 @@ textarea::placeholder {
   height: 100%;
 }
 
+/* Where the elapsed days say you would be, on a goal bar.
+   A mark rather than a second fill: "ahead" and "behind" are then a glance at
+   which side of the notch the fill ends, with no arithmetic and no reliance on
+   colour. `overflow: hidden` on the bar keeps it inside the track. */
+.bar-notch {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--fg);
+  opacity: 0.55;
+}
+
 .warning-list > div {
   display: flex;
   justify-content: space-between;

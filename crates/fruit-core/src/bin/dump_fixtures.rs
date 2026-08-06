@@ -431,6 +431,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "settings": store.activity_settings()?,
         }),
     );
+    // Two goals, one in each direction, because the *pair* is the point: a
+    // ceiling you succeed at by staying under it has to read differently from a
+    // target you fill, and a preview showing only one of them proves nothing.
+    for (metric, direction, hours, weekdays) in [
+        (fruit_core::model::metric::ALL_WORK, GoalDirection::AtMost, 30, true),
+        (fruit_core::model::metric::ENTERTAINMENT, GoalDirection::AtMost, 7, false),
+        (fruit_core::model::metric::SLEEP, GoalDirection::AtLeast, 52, false),
+    ] {
+        store.set_goal(
+            NewGoal {
+                subject_kind: Some(GoalSubject::Metric),
+                subject_id: metric.into(),
+                direction: Some(direction),
+                target_sec: hours * 3600,
+                applies_days: weekdays.then_some(0b0011111),
+            },
+            &today,
+        )?;
+    }
+    out.insert(
+        "get_week_review".into(),
+        json!(store.get_week_review(&today, &tz)?),
+    );
+    out.insert("get_goals".into(), json!(store.get_goals(false)?));
     out.insert("get_activity_rules".into(), json!(store.get_activity_rules()?));
     out.insert(
         "get_categories".into(),

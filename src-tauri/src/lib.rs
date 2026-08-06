@@ -310,6 +310,31 @@ fn set_activity_setting(
 
 /* ─── browser connector (Plan Rev 3 §5.4) ──────────────────────────────── */
 
+/* ─── weekly goals (migration 0008) ────────────────────────────────────── */
+
+#[tauri::command]
+fn get_week_review(state: State<'_, AppState>, date: String, tz: String) -> Res<WeekReview> {
+    with(&state, |s| s.get_week_review(&date, &tz))
+}
+
+#[tauri::command]
+fn get_goals(state: State<'_, AppState>, include_ended: bool) -> Res<Vec<GoalRow>> {
+    with(&state, |s| s.get_goals(include_ended))
+}
+
+/// Creates a goal, replacing any live one for the same subject. The old one is
+/// closed rather than deleted, so a review of the week it governed still shows
+/// the number that was in force.
+#[tauri::command]
+fn set_goal(state: State<'_, AppState>, input: NewGoal, today: String) -> Res<GoalRow> {
+    with(&state, |s| s.set_goal(input, &today))
+}
+
+#[tauri::command]
+fn end_goal(state: State<'_, AppState>, id: String, today: String) -> Res<()> {
+    with(&state, |s| s.end_goal(&id, &today))
+}
+
 /* ─── labelling observed time (migration 0007) ─────────────────────────── */
 
 #[tauri::command]
@@ -965,6 +990,10 @@ pub fn run() {
             set_activity_setting,
             get_activity_day,
             clear_activity,
+            get_week_review,
+            get_goals,
+            set_goal,
+            end_goal,
             get_categories,
             create_category,
             update_category,

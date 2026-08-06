@@ -25,6 +25,7 @@ mod categories;
 mod day;
 mod domain_rules;
 mod excel;
+mod goals;
 mod projects;
 mod reconcile;
 mod life;
@@ -49,6 +50,7 @@ pub use domain_rules::{
     DomainTotal, DOMAINS_ENABLED as ACTIVITY_DOMAINS_ENABLED,
     EXCLUDED_DOMAINS as ACTIVITY_EXCLUDED_DOMAINS,
 };
+pub use goals::{iso_week, ALL_DAYS as GOAL_ALL_DAYS};
 pub use recurrence::{IcsImportSummary, SeriesScope, HORIZON_DAYS};
 pub use timer::{IdleReport, TimerRuntime};
 

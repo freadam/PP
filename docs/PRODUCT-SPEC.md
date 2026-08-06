@@ -494,8 +494,10 @@ in bold; each is reversible.
 | Day view | **Built** — the primary screen, at 5/15/30/60-minute resolution |
 | Month dashboard | **Built** — `get_month` is `get_day` summed, so the two cannot disagree |
 | Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
-| Entertainment budgets and planned windows | **Not built** — no longer blocked. Planned as the `at_most` case of weekly goals, in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) |
-| **The week horizon** — goals, pacing, fragmentation, weekly review and report | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W1–W10. The week is the one horizon with no working surface. |
+| Entertainment **budgets** | **Built** — a weekly goal with `direction = atMost`, migration 0008 |
+| Planned entertainment **windows** | **Not built** — the other half of M11 |
+| **Weekly goals and pacing** (W1/W2) | **Built** — migration 0008. Direction is first-class; the future is never a shortfall. |
+| The rest of the week horizon — fragmentation, weekly review and report, focus sessions, notices, templates | **Planned** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W3–W6, W9, W10. |
 | **User-defined observation categories** and the uncategorised surface | **Built** — migration 0007. Work · Study · Distraction · Life, extensible, per app **and** per site. `counts_as` keeps every existing total stable. |
 | **Focus sessions with an intended length**, extendable in one key | **Planned** — W3. The timer runs until stopped; a session that commits to 45 minutes is a different act. |
 | **Off-plan nudge** (a notice, never a block) | **Planned** — W5. |

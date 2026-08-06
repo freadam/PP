@@ -20,18 +20,40 @@ use crate::time::{format_date, local_date, month_bounds, parse_date, zone};
 
 use super::Store;
 
+/// What one pass over a range of days produced.
+///
+/// Deliberately not a DTO: it never crosses the IPC boundary. The month view
+/// and the week review each shape it into their own answer, and sharing the
+/// *arithmetic* rather than the *presentation* is the whole point.
+pub(crate) struct RangeTotals {
+    pub days: Vec<MonthDay>,
+    pub totals: DayTotals,
+    /// Days that finished without being reviewed. A day that has not finished
+    /// cannot be un-reconciled — nobody was ever going to review tomorrow.
+    pub unreconciled: i64,
+    /// How much of the range has actually elapsed, and how much of *that* is
+    /// unaccounted for. The pair that agree, and the reason a fresh month does
+    /// not report itself as 6% accounted.
+    pub elapsed_sec: i64,
+    pub elapsed_empty_sec: i64,
+}
+
 impl Store {
-    /// `month` is `YYYY-MM`. Anything parseable as a date in that month works
-    /// too, so the caller can pass a day and get its month.
-    pub fn get_month(&self, month: &str, tz: &str) -> Result<MonthView> {
-        let zone_ = zone(tz)?;
-        let anchor = if month.len() == 7 {
-            parse_date(&format!("{month}-01"))?
-        } else {
-            parse_date(month)?
-        };
-        let first = format_date(anchor.with_day(1).unwrap_or(anchor));
-        let (_from_ms, to_ms) = month_bounds(&first, &zone_)?;
+    /// Sums `get_day` over an inclusive local-date range.
+    ///
+    /// The month dashboard and the week review are the same arithmetic over
+    /// different bounds, and this is where that is made true rather than
+    /// promised. A second aggregate — a weekly `GROUP BY`, say — would be a
+    /// second implementation of the precedence rules, drifting from the first
+    /// the day either changed.
+    pub(crate) fn aggregate_range(
+        &self,
+        from: &str,
+        to: &str,
+        tz: &str,
+    ) -> Result<RangeTotals> {
+        let mut cursor = parse_date(from)?;
+        let last_local = to.to_string();
 
         let mut days = Vec::new();
         let mut totals = DayTotals {
@@ -63,8 +85,6 @@ impl Store {
         let mut elapsed_empty_sec = 0;
         let now = self.now();
 
-        let mut cursor = anchor.with_day(1).unwrap_or(anchor);
-        let last_local = local_date(to_ms - 1, &zone_);
         while format_date(cursor) <= last_local {
             let date = format_date(cursor);
             let day = self.get_day(&date, tz, None)?;
@@ -168,6 +188,37 @@ impl Store {
             v.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.app_id.cmp(&b.app_id)));
             v
         };
+
+        Ok(RangeTotals {
+            days,
+            totals,
+            unreconciled,
+            elapsed_sec,
+            elapsed_empty_sec,
+        })
+    }
+
+    /// `month` is `YYYY-MM`. Anything parseable as a date in that month works
+    /// too, so the caller can pass a day and get its month.
+    pub fn get_month(&self, month: &str, tz: &str) -> Result<MonthView> {
+        let zone_ = zone(tz)?;
+        let anchor = if month.len() == 7 {
+            parse_date(&format!("{month}-01"))?
+        } else {
+            parse_date(month)?
+        };
+        let first_date = anchor.with_day(1).unwrap_or(anchor);
+        let first = format_date(first_date);
+        let (_from_ms, to_ms) = month_bounds(&first, &zone_)?;
+        let last_local = local_date(to_ms - 1, &zone_);
+
+        let RangeTotals {
+            days,
+            mut totals,
+            unreconciled,
+            elapsed_sec,
+            elapsed_empty_sec,
+        } = self.aggregate_range(&first, &last_local, tz)?;
 
         // Monthly targets belong on the area rows here rather than on the day's,
         // because a target is a monthly quantity and showing it against one

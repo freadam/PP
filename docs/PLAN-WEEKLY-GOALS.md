@@ -108,7 +108,7 @@ the same reason: a title is the document name, the customer, the ticket.
 
 ---
 
-## W1 · Goals
+## W1 · Goals — **built**
 
 **A goal is a property of you this week, not of a category.**
 
@@ -157,7 +157,7 @@ shipping a goal builder that invites a dozen.
 
 ---
 
-## W2 · Pace, not a scoreboard
+## W2 · Pace, not a scoreboard — **built**
 
 **The one that earns the feature.** A target you read on Friday is a report card.
 The question worth answering is *where should I be right now, and where am I?*
@@ -527,8 +527,8 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 
 | # | Item | Depends on | Notes |
 |---|---|---|---|
-| 1 | **`aggregate_range` extraction** + `get_week_review` | — | Pure refactor of `get_month`'s loop. Nothing new is computed; the point is that nothing is computed twice. |
-| 2 | **W1 goals + W2 pace** | 1 | **Closes M11.** The entertainment budget is this with `direction = at_most`. |
+| 1 | ~~**`aggregate_range` extraction** + `get_week_review`~~ | — | **Built.** Pure refactor of `get_month`'s loop; nothing new is computed, the point is that nothing is computed twice. |
+| 2 | ~~**W1 goals + W2 pace**~~ | 1 | **Built** (migration 0008). Closes the budget half of M11 — an entertainment budget is this with `direction = atMost`. |
 | 3 | ~~**W7 categories + W8 uncategorised surface**~~ | — | **Built.** Migration 0007, plus a short-observation floor and the fix for the sampler and the connector both billing the same hour. |
 | 4 | **W6 fragmentation** | 1 | No new capture. Derived from `resolve_day`. |
 | 5 | **W9 weekly review + report** | 2, 3, 4 | Including goal calibration. |
@@ -783,3 +783,60 @@ delivering are different things.
 - New categories roll up as `other`. Letting the renderer choose would let a new
   label silently change the Work or Entertainment figure the moment it was
   created.
+
+---
+
+## Appendix C · W1/W2 as built
+
+Migration 0008, plus the `aggregate_range` extraction that had to come first.
+
+### One way to total a range
+
+`get_month` summed `get_day` over a month; a week needed the same thing over
+seven days. The tempting shortcut is a weekly `GROUP BY` — shorter, and a second
+implementation of the precedence rules that would drift from the first the day
+either changed. So the month's loop became `aggregate_range(from, to)`, and both
+horizons call it. **A goal's figure and a day's figure cannot disagree, by
+construction rather than by care.**
+
+### Direction, and the two vocabularies
+
+`atLeast` and `atMost` are peers, not a sign. The wording inverts with them:
+
+> Work: 3h 30m a day for the remaining 4 days.
+> Entertainment: 5h 05m left for the week — 1h 16m a day over 4 days.
+> Entertainment: over by 1h 05m. The rest of the week is already spent.
+
+Those sentences are built in Rust, because they differ by direction *and* by
+state, and a renderer deriving them would be a second implementation of the
+rules with nothing testing it.
+
+### Elapsed counts whole days, and today is not one of them
+
+`week_shape` counts a day as elapsed only once it has finished. Today is
+**available**, not spent.
+
+Counting today fractionally — three hours into a 24-hour day, so 12.5% of a
+day's share owed — would put every goal into *behind* every single morning.
+That is the "reports the future as a failure" problem again, in a smaller frame,
+and it is the reason the month card's clip-to-`now` rule is deliberately *not*
+reused here: a month card measures elapsed *time*, and a goal measures elapsed
+*days*.
+
+### What is exposed, and what is not
+
+The core accepts four subject kinds — metric, life area, project, label. The
+goal form offers **only the five whole-day metrics**. Life areas, projects and
+labels are all valid subjects and all reachable through the command, but putting
+four pickers on the screen is precisely the "configuring the tool becomes the
+work" failure this plan is written against. The five are what a week is about;
+the rest can be surfaced when someone asks for them.
+
+### Not done
+
+- **Goal calibration** (W9) — the trailing-median suggestion that says a goal
+  you miss every week has stopped being a goal.
+- **Planned entertainment windows**, which is the other half of M11. Budgets
+  measure; windows would let the dashboard's dashed line stop being flat zero.
+- A goal is weekly only. The `period` column exists and monthly is the same
+  shape, but writing it before anyone has used a weekly goal would be guessing.

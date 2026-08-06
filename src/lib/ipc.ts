@@ -22,6 +22,10 @@ import type {
   DeletedRow,
   ActivityRule,
   DomainCategory,
+
+  GoalRow,
+  NewGoal,
+  WeekReview,
   DomainTotal,
   MatchKind,
   ObservationCategory,
@@ -276,6 +280,20 @@ export const getActivityDay = (date: LocalDate, tz: string) =>
 export const clearActivity = () => call<number>("clear_activity", {});
 
 /* ─── browser connector (Plan Rev 3 §5.4) ─────────────────────────────── */
+
+/* ─── weekly goals ─────────────────────────────────────────────────────── */
+
+export const getWeekReview = (date: LocalDate, tz: string) =>
+  call<WeekReview>("get_week_review", { date, tz });
+
+export const getGoals = (includeEnded = false) =>
+  call<GoalRow[]>("get_goals", { includeEnded });
+
+/** Replaces any live goal for the same subject; the old one is closed, not deleted. */
+export const setGoal = (input: NewGoal, today: LocalDate) =>
+  call<GoalRow>("set_goal", { input, today });
+
+export const endGoal = (id: string, today: LocalDate) => call<void>("end_goal", { id, today });
 
 /* ─── labelling observed time ──────────────────────────────────────────── */
 

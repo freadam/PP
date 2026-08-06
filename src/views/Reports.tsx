@@ -16,10 +16,19 @@
  * so a number on this screen and the same number on a day cannot disagree.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "../store/app";
+import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { MonthDay, MonthView } from "../lib/types";
+import type {
+  GoalDirection,
+  GoalProgress,
+  GoalState,
+  MonthDay,
+  MonthView,
+  WeekReview,
+} from "../lib/types";
+import { METRIC } from "../lib/types";
 import { DriftBar } from "../components/DriftRail";
 import { Empty } from "../components/chrome";
 
@@ -328,6 +337,7 @@ function WeekReports() {
 
   return (
     <>
+      <Goals />
       <section className="panel">
         <h3>Calibration</h3>
         {cal.sampleCount < 5 ? (
@@ -439,5 +449,229 @@ function WeekReports() {
         )}
       </section>
     </>
+  );
+}
+
+/**
+ * Goals, and pace (PLAN-WEEKLY-GOALS.md W1/W2).
+ *
+ * The week is the horizon where a person can still change the outcome — a month
+ * dashboard is a verdict delivered too late to act on, and a day is too short a
+ * window to see a habit in. So this panel is first on the week screen, above the
+ * calibration and project panels, which are about estimate accuracy rather than
+ * about how the week is going.
+ *
+ * **Pace, not a scoreboard.** Each row leads with the sentence Rust built —
+ * *"3h 20m a day for the remaining 3 days"* — because that is a decision you can
+ * make at breakfast, where "62% of target" is a fact. The bar behind it shows
+ * where the elapsed days say you would be, so being ahead or behind is visible
+ * without reading a number.
+ *
+ * A goal at zero on Monday morning reads **on pace**, and that is not a
+ * courtesy: an app that reports the future as a failure is one whose numbers you
+ * learn to discount.
+ */
+function Goals() {
+  const run = useApp((s) => s.run);
+  const [review, setReview] = useState<WeekReview | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const load = useCallback(async () => {
+    const r = await ipc.getWeekReview(fmt.today(), fmt.tz()).catch(() => null);
+    setReview(r);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (!review) return null;
+
+  return (
+    <section className="panel">
+      <div className="row">
+        <h3 className="grow">This week</h3>
+        <span className="data caption">
+          {review.from} – {review.to}
+        </span>
+        <button className="btn" aria-expanded={adding} onClick={() => setAdding(!adding)}>
+          {adding ? "Cancel" : "Add a goal"}
+        </button>
+      </div>
+
+      {adding && (
+        <GoalForm
+          onSaved={() => {
+            setAdding(false);
+            void load();
+          }}
+        />
+      )}
+
+      {review.goals.length === 0 ? (
+        <p className="caption">
+          No goals yet. A goal is a target with a <b>direction</b> — &ldquo;at least 20h of
+          work&rdquo; or &ldquo;at most 5h of entertainment&rdquo; — and the second kind is
+          one you succeed at by staying under it.
+        </p>
+      ) : (
+        <div className="stack" style={{ gap: 10 }}>
+          {review.goals.map((g) => (
+            <GoalRowView
+              key={g.goal.id}
+              p={g}
+              onEnd={async () => {
+                const ok = await run(
+                  () => ipc.endGoal(g.goal.id, fmt.today()),
+                  "Couldn't end that goal.",
+                );
+                if (ok !== null) void load();
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {review.unreconciledDays > 0 && (
+        <p className="caption">
+          {review.unreconciledDays} day{review.unreconciledDays === 1 ? "" : "s"} this week
+          {review.unreconciledDays === 1 ? " has" : " have"} not been reconciled, so these
+          figures count only what has been recorded so far.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** The state words, in the order a person would rank them. Never colour alone. */
+const GOAL_STATE: Record<GoalState, string> = {
+  met: "met",
+  onPace: "on pace",
+  behind: "behind",
+  atRisk: "at risk",
+  over: "over",
+};
+
+function GoalRowView({ p, onEnd }: { p: GoalProgress; onEnd: () => void }) {
+  // The bar is the *target*; the fill is what happened; the notch is where the
+  // elapsed days say you would be. Three marks, so ahead-or-behind reads without
+  // arithmetic.
+  const pct = (n: number) => `${Math.min(100, Math.max(0, (n / p.goal.targetSec) * 100))}%`;
+  const over = p.state === "over";
+
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <div className="row">
+        <span className="grow">
+          <b>{p.goal.subjectName}</b>{" "}
+          <span className="caption">
+            {p.goal.direction === "atLeast" ? "at least" : "at most"}{" "}
+            <span className="data">{fmt.duration(p.goal.targetSec)}</span>
+            {p.applicableDays < 7 && <> · {p.applicableDays} days a week</>}
+          </span>
+        </span>
+        <span className="tag micro">{GOAL_STATE[p.state]}</span>
+        <span className="data caption">{fmt.duration(p.actualSec)}</span>
+        <button className="btn micro" aria-label={`End the ${p.goal.subjectName} goal`} onClick={onEnd}>
+          End
+        </button>
+      </div>
+      <span className="bar" aria-hidden="true" style={{ position: "relative" }}>
+        <i
+          style={{
+            width: pct(p.actualSec),
+            background: over ? "var(--over)" : "var(--track)",
+          }}
+        />
+        {/* Where the elapsed days say you would be. Absent on Monday morning,
+            when nothing is owed yet. */}
+        {p.expectedSec > 0 && (
+          <span
+            className="bar-notch"
+            style={{ left: pct(p.expectedSec) }}
+            title="expected by now"
+          />
+        )}
+      </span>
+      <span className="caption">{p.summary}</span>
+    </div>
+  );
+}
+
+/**
+ * Adding a goal. Five metrics, two directions, a number.
+ *
+ * Deliberately not a builder over every subject the core supports — life areas,
+ * projects and labels are all valid subjects, and offering all four kinds here
+ * would be exactly the "configuring the tool becomes the work" failure the plan
+ * is written against. The five whole-day quantities are the ones a week is
+ * actually about.
+ */
+function GoalForm({ onSaved }: { onSaved: () => void }) {
+  const run = useApp((s) => s.run);
+  const [subjectId, setSubjectId] = useState<string>(METRIC.allWork);
+  const [direction, setDirection] = useState<GoalDirection>("atLeast");
+  const [hours, setHours] = useState("20");
+  const [weekdaysOnly, setWeekdaysOnly] = useState(false);
+
+  const save = async () => {
+    const target = Math.round(Number(hours) * 3600);
+    if (!Number.isFinite(target) || target <= 0) return;
+    const ok = await run(
+      () =>
+        ipc.setGoal(
+          {
+            subjectKind: "metric",
+            subjectId,
+            direction,
+            targetSec: target,
+            // Monday–Friday is 0b0011111. A weekday goal must not report you
+            // behind on a Sunday morning, which is what the bitmask prevents.
+            appliesDays: weekdaysOnly ? 31 : null,
+          },
+          fmt.today(),
+        ),
+      "Couldn't save that goal.",
+    );
+    if (ok) onSaved();
+  };
+
+  return (
+    <div className="row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+      <select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} aria-label="Measure">
+        {Object.values(METRIC).map((m) => (
+          <option key={m} value={m}>
+            {m === "allWork" ? "Work" : m[0]!.toUpperCase() + m.slice(1)}
+          </option>
+        ))}
+      </select>
+      <select
+        value={direction}
+        onChange={(e) => setDirection(e.target.value as GoalDirection)}
+        aria-label="Direction"
+      >
+        <option value="atLeast">at least</option>
+        <option value="atMost">at most</option>
+      </select>
+      <input
+        type="number"
+        min={0.5}
+        step={0.5}
+        value={hours}
+        aria-label="Hours a week"
+        onChange={(e) => setHours(e.target.value)}
+        style={{ width: 80 }}
+      />
+      <span className="caption">hours a week</span>
+      <button
+        className="btn"
+        aria-pressed={weekdaysOnly}
+        onClick={() => setWeekdaysOnly(!weekdaysOnly)}
+      >
+        Weekdays only
+      </button>
+      <button className="btn btn-primary" onClick={() => void save()}>
+        Save goal
+      </button>
+    </div>
   );
 }

@@ -920,6 +920,162 @@ pub struct ActivityDay {
     pub tracked_sec: i64,
 }
 
+// ─── weekly goals (PLAN-WEEKLY-GOALS.md W1/W2) ─────────────────────────
+
+/// What a goal is measured against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GoalSubject {
+    /// A column of the day's own totals — see [`GoalMetric`].
+    Metric,
+    LifeArea,
+    Project,
+    /// Observed time carrying one label (migration 0007).
+    Category,
+}
+
+impl GoalSubject {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "metric" => Self::Metric,
+            "lifeArea" => Self::LifeArea,
+            "project" => Self::Project,
+            "category" => Self::Category,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Metric => "metric",
+            Self::LifeArea => "lifeArea",
+            Self::Project => "project",
+            Self::Category => "category",
+        }
+    }
+}
+
+/// The whole-day quantities a goal can be set against. Named constants rather
+/// than free text so a typo cannot become a goal that silently measures nothing.
+pub mod metric {
+    pub const ALL_WORK: &str = "allWork";
+    pub const LIFE: &str = "life";
+    pub const SLEEP: &str = "sleep";
+    pub const ENTERTAINMENT: &str = "entertainment";
+    pub const UNACCOUNTED: &str = "unaccounted";
+    pub const ALL: [&str; 5] = [ALL_WORK, LIFE, SLEEP, ENTERTAINMENT, UNACCOUNTED];
+}
+
+/// **First-class, not a sign convention.** "At most 5h of entertainment" is a
+/// goal you succeed at by being under it, and a bar that turns red when you do
+/// the right thing teaches people to ignore bars.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GoalDirection {
+    AtLeast,
+    AtMost,
+}
+
+impl GoalDirection {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "atLeast" => Self::AtLeast,
+            "atMost" => Self::AtMost,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AtLeast => "atLeast",
+            Self::AtMost => "atMost",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalRow {
+    pub id: String,
+    pub subject_kind: GoalSubject,
+    pub subject_id: String,
+    /// Resolved for display — the area's name, the project's, the label's, or
+    /// the metric's own wording. The renderer never looks one up.
+    pub subject_name: String,
+    pub direction: GoalDirection,
+    pub target_sec: i64,
+    /// Bitmask, Monday = 1 … Sunday = 64.
+    pub applies_days: i64,
+    pub starts_week: String,
+    pub ends_week: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewGoal {
+    pub subject_kind: Option<GoalSubject>,
+    pub subject_id: String,
+    pub direction: Option<GoalDirection>,
+    pub target_sec: i64,
+    pub applies_days: Option<i64>,
+}
+
+/// How a goal is doing, in the only terms that let someone act on it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GoalState {
+    /// `atLeast` and the target is reached; `atMost` and the week is over
+    /// without breaching it.
+    Met,
+    /// Inside the band the elapsed part of the week implies.
+    OnPace,
+    /// `atLeast`, and behind where the elapsed days say you would be.
+    Behind,
+    /// `atMost`, over the pace but not yet past the target — still savable.
+    AtRisk,
+    /// `atMost`, and the budget is spent.
+    Over,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalProgress {
+    pub goal: GoalRow,
+    pub actual_sec: i64,
+    /// `target × (elapsed applicable days ÷ all applicable days)`, today clipped
+    /// to the clock. **The future is never a shortfall** — a goal at zero on
+    /// Monday morning is on pace, and has to say so.
+    pub expected_sec: i64,
+    /// Positive is good in both directions: ahead of pace, or under budget.
+    pub delta_sec: i64,
+    pub state: GoalState,
+    /// The row that changes behaviour. `"3h 20m a day for the remaining 3 days"`
+    /// is a decision you can make at breakfast; "62% of target" is a fact.
+    /// `None` once the week is out of applicable days.
+    pub per_day_needed_sec: Option<i64>,
+    pub applicable_days: i64,
+    pub days_left: i64,
+    /// Pre-formatted, because the sentence differs by direction and by state and
+    /// deriving it in the renderer would be a second implementation of the rules.
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekReview {
+    /// ISO week, `YYYY-Www`.
+    pub week: String,
+    pub from: String,
+    pub to: String,
+    pub tz: String,
+    /// The same shape the Day view uses, summed over the week — so a figure here
+    /// and the same figure on a day cannot be computed two ways.
+    pub totals: DayTotals,
+    pub days: Vec<MonthDay>,
+    pub elapsed_sec: i64,
+    pub elapsed_empty_sec: i64,
+    pub unreconciled_days: i64,
+    pub goals: Vec<GoalProgress>,
+}
+
 // ─── search, undo, data ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

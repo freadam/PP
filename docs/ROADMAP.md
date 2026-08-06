@@ -58,7 +58,12 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    review that sets next week's goals from what actually happened. Planned in
    [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), W1–W10.
 
-   **W7 and W8 are built** — migration 0007. Observation is labelled Work ·
+   **W1, W2, W7 and W8 are built** — migrations 0007 and 0008. Weekly goals
+   with a **direction**, reported by pace: where you should be right now, and
+   what the rest of the week has to look like. An entertainment budget is a
+   goal with `direction = atMost`, which is **half of M11**.
+
+   Migration 0007 covers labelling. Observation is labelled Work ·
    Study · Distraction · Life or anything the user adds, per **application and
    per website**, with a short-observation floor and a ranked list of what has
    no label yet. See Appendix B of the plan. *(W1/W2 next)*
