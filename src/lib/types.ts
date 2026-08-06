@@ -205,6 +205,18 @@ export interface UnlabelledRow {
   stretches: ObservedInterval[];
 }
 
+// ─── notices (W4/W5) ───────────────────────────────────────────────────
+
+export type NoticeKind = "continuousWork" | "dailyCeiling" | "offPlan";
+
+export interface Notice {
+  kind: NoticeKind;
+  /** Identifies the crossing, not the notice. */
+  key: string;
+  title: string;
+  body: string;
+}
+
 // ─── weekly goals (PLAN-WEEKLY-GOALS.md W1/W2) ─────────────────────────
 
 export type GoalSubject = "metric" | "lifeArea" | "project" | "category";

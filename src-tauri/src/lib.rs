@@ -346,6 +346,15 @@ fn get_goal_templates(
     with(&state, |s| s.get_goal_templates(&today, &tz))
 }
 
+/* ─── notices (W4/W5) ──────────────────────────────────────────────────── */
+
+/// Silences every notice for a while — the "don't tell me again" the off-plan
+/// nudge needs in order not to become something people learn to dismiss.
+#[tauri::command]
+fn silence_notices(state: State<'_, AppState>, minutes: i64) -> Res<()> {
+    with(&state, |s| s.silence_notices(minutes))
+}
+
 /* ─── labelling observed time (migration 0007) ─────────────────────────── */
 
 #[tauri::command]
@@ -1006,6 +1015,7 @@ pub fn run() {
             set_goal,
             end_goal,
             get_goal_templates,
+            silence_notices,
             get_categories,
             create_category,
             update_category,
@@ -1121,24 +1131,50 @@ fn spawn_activity_loop(app: AppHandle) {
             Err(err) => log::error!("connector.drain.failed code={}", err.code()),
         }
 
-        let Some(front) = frontmost::current() else {
-            continue;
-        };
-        let sample = fruit_core::model::ActivitySample {
-            app_id: front.app_id,
-            window_title: front.window_title,
-            domain: None,
-            at: fruit_core::time::now_ms(),
-        };
-        match store.record_activity(sample) {
-            // The recording indicator in the top bar is driven by this event —
-            // §3.5 requires it to be visible whenever sampling is live.
-            Ok(true) => {
-                drop(store);
-                let _ = app.emit("activity:sampled", ());
+        // Notices ride the same tick. `due_notices` decides *whether there is
+        // anything to say* and records that it said it, so "once per crossing"
+        // is a property of the core with a test rather than a hope about this
+        // loop. Collected under the lock, emitted after it — a notification is
+        // never worth holding the database for.
+        let tz = chrono::Local::now().offset().to_string();
+        let tz = store.tz_or(&system_tz().unwrap_or(tz));
+        let notices = match store.due_notices(&tz) {
+            Ok(n) => n,
+            Err(err) => {
+                log::error!("notice.failed code={}", err.code());
+                Vec::new()
             }
-            Ok(false) => {}
-            Err(err) => log::error!("activity.record.failed code={}", err.code()),
+        };
+
+        let sampled = match frontmost::current() {
+            Some(front) => {
+                let sample = fruit_core::model::ActivitySample {
+                    app_id: front.app_id,
+                    window_title: front.window_title,
+                    domain: None,
+                    at: fruit_core::time::now_ms(),
+                };
+                match store.record_activity(sample) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        log::error!("activity.record.failed code={}", err.code());
+                        false
+                    }
+                }
+            }
+            None => false,
+        };
+
+        drop(store);
+        for n in &notices {
+            // A notice, never a nag: no timer is interrupted, nothing is
+            // blocked, and the whole lot can be silenced from Settings.
+            let _ = app.emit("notice", n);
+        }
+        // The recording indicator in the top bar is driven by this event —
+        // §3.5 requires it to be visible whenever sampling is live.
+        if sampled {
+            let _ = app.emit("activity:sampled", ());
         }
     });
 }

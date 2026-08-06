@@ -229,7 +229,7 @@ invents sessions you did not start is an app whose record you stop trusting.
 
 ---
 
-## W4 · Notices
+## W4 · Notices — **built**
 
 Three notices, one Settings group, each off by default. Bundled deliberately: the
 review's warning about an overwhelming settings screen means three switches under
@@ -259,7 +259,7 @@ the thing that mattered.
 
 ---
 
-## W5 · The off-plan nudge — and why it is not blocking
+## W5 · The off-plan nudge — **built**, and why it is not blocking
 
 This needs care, because the first draft rejected it outright on a misreading.
 
@@ -533,7 +533,7 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 | 4 | ~~**W6 fragmentation**~~ | 1 | **Built.** No new capture — derived from `resolve_day`. |
 | 5 | ◐ **W9 weekly review + report** | 2, 3, 4 | **Calibration built.** The report *artifact* — a file read at a fixed moment — is not. |
 | 6 | **W3 focus sessions** | — | Independent. The `+`-to-extend interaction is the valuable part. |
-| 7 | **W4 notices + W5 off-plan nudge** | 3 | Needs categories to know what "off-plan" means. |
+| 7 | ~~**W4 notices + W5 off-plan nudge**~~ | 3 | **Built.** Three switches, one Settings group, all off by default. |
 | 8 | ~~**W10 templates**~~ | 2 | **Built.** Numbers from your own weeks; a template with no history says so. |
 | 9 | **Workbook import (M13)** | — | Unchanged in scope, after the goals work per the phase order above. |
 
@@ -905,3 +905,55 @@ time it can.
 - **W3 focus sessions**, **W4 notices**, **W5 the off-plan nudge**.
 - **Workbook import (M13)**.
 - **Planned entertainment windows**, the other half of M11.
+
+---
+
+## Appendix E · W4/W5 as built
+
+Three notices, one Settings group, all off by default. Bundled because the
+governing constraint is that configuring the tool must not become the work.
+
+### What does not count toward a break
+
+Rize's good idea is what it *excludes*: only focused work counts. Here that is
+not a rule to remember, it is the schema — `life_entry` has no accumulator,
+`activity_span` is observed rather than confirmed, and a `time_session` with
+`contribution = 'attend'` **ends** a run rather than extending it. Two hours in
+a review is not two hours heads-down, and the column that says so already
+existed.
+
+A ten-minute gap ends a run; a five-minute one does not. Standing up for coffee
+is not a break, and treating it as one would make the notice useless.
+
+### Once per crossing, and where that is decided
+
+`due_notices` records what it said. That puts "once per crossing" in the core
+with a test rather than in a twenty-second loop with a hope. A long stretch
+still speaks again at the next multiple — two hours, then four — because the
+second crossing is news and the first is not.
+
+### The off-plan nudge, and the two rules that keep it honest
+
+Blocking stays out of scope, and could not be built anyway: the connector ships
+with no `host_permissions`, so it cannot touch a page, and that absence *is* the
+privacy argument. A notice needs no such permission.
+
+It is also better placed than a blocker. Rize must guess what counts as a
+distraction from a category; **Fruit knows what you plotted for the hour.** So:
+
+- **Never during unplotted time.** If you did not plan the hour, Fruit has no
+  standing to have an opinion about it — and that single rule removes most of
+  the false positives the source review complains about, because his were all on
+  time nobody had claimed.
+- **Silenceable**, thirty minutes or two hours, from the toast itself and from
+  Settings. A nudge you cannot quiet is one people learn to dismiss.
+
+It fires on a category's `counts_as`, not its name, so a user's own
+"Doomscrolling" triggers it exactly as the shipped "Distraction" does.
+
+### Delivery
+
+The core decides *whether there is anything to say*; the shell decides how to
+say it. Notices are collected under the database lock and emitted after it —
+a notification is never worth holding the database for — and they arrive as an
+ordinary toast carrying the one action that matters: making it stop.

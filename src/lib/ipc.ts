@@ -299,6 +299,9 @@ export const endGoal = (id: string, today: LocalDate) => call<void>("end_goal", 
 export const getGoalTemplates = (today: LocalDate, tz: string) =>
   call<GoalTemplate[]>("get_goal_templates", { today, tz });
 
+/** Silences every notice for a while — the "don't tell me again" a nudge needs. */
+export const silenceNotices = (minutes: number) => call<void>("silence_notices", { minutes });
+
 /* ─── labelling observed time ──────────────────────────────────────────── */
 
 export const getCategories = (from: LocalDate | null, to: LocalDate | null, tz: string) =>

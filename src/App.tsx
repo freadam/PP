@@ -23,7 +23,7 @@ import { ExcelExport } from "./views/ExcelExport";
 import { Focus } from "./views/Focus";
 import { ReconcileSheet } from "./views/Reconcile";
 import { BlockDialogs } from "./components/BlockDialogs";
-import type { TimerState } from "./lib/types";
+import type { Notice, TimerState } from "./lib/types";
 import { BREAK_DETAIL_COLUMN, useViewportWidth } from "./lib/useViewport";
 
 /** §5.8 — the detail panel is a third column at ≥1280px, an overlay sheet below. */
@@ -64,6 +64,19 @@ export default function App() {
        the only honest reason to tell someone they are being recorded. */
     void ipc
       .listen<void>("activity:sampled", () => useApp.getState().noteSample())
+      .then((u) => unsubs.push(u));
+    /* W4/W5 — a notice, never a nag. It arrives as an ordinary toast: nothing
+       is interrupted, nothing is blocked, and it carries the one action that
+       matters, which is making it stop. */
+    void ipc
+      .listen<Notice>("notice", (n) =>
+        useApp.getState().toast(`${n.title} — ${n.body}`, {
+          action: {
+            label: "Quiet for 30m",
+            run: () => void ipc.silenceNotices(30),
+          },
+        }),
+      )
       .then((u) => unsubs.push(u));
     void ipc
       .listen<string>("backup:failed", (why) =>

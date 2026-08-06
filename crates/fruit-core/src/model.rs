@@ -1140,6 +1140,31 @@ pub struct GoalCalibration {
     pub summary: String,
 }
 
+// ─── notices (PLAN-WEEKLY-GOALS.md W4/W5) ──────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NoticeKind {
+    /// Heads-down for a while. Meetings and personal time excluded.
+    ContinuousWork,
+    /// Past the day's work ceiling.
+    DailyCeiling,
+    /// Entertainment observed during an hour you plotted for something else.
+    /// A notice, never a block — see `store::notices`.
+    OffPlan,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Notice {
+    pub kind: NoticeKind,
+    /// Identifies the crossing, not the notice. Recorded so a threshold is
+    /// mentioned once and a second crossing can still speak.
+    pub key: String,
+    pub title: String,
+    pub body: String,
+}
+
 // ─── search, undo, data ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

@@ -214,6 +214,72 @@ export function Settings() {
       <ActivitySettings />
       <LabelSettings />
 
+      <Section title="Notices">
+        <Field
+          label="Without a break"
+          hint="Only heads-down work counts. Meetings — sessions marked Attend — and personal time do not, because sitting in a two-hour review is not two hours heads-down."
+        >
+          <div className="row">
+            {[0, 60, 90, 120].map((min) => (
+              <button
+                key={min}
+                className="btn"
+                aria-pressed={num("notices.continuousWorkSec", 0) === min * 60}
+                onClick={() => void put("notices.continuousWorkSec", min * 60)}
+              >
+                {min === 0 ? "Never" : `${min} min`}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field
+          label="A day's work ceiling"
+          hint="Said once when you cross it, and not again that day."
+        >
+          <div className="row">
+            {[0, 6, 8, 10].map((h) => (
+              <button
+                key={h}
+                className="btn"
+                aria-pressed={num("notices.dailyCeilingSec", 0) === h * 3600}
+                onClick={() => void put("notices.dailyCeilingSec", h * 3600)}
+              >
+                {h === 0 ? "Never" : `${h} hours`}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        <Field
+          label="Off plan"
+          hint="Mentions entertainment observed during an hour you plotted for something else — and never during time you did not plan, because Fruit has no standing to have an opinion about that. It is a notice, not a block: nothing is closed, denied or interrupted, and the browser extension has no permission to touch a page even if it wanted to."
+        >
+          <Switch
+            label="Mention entertainment during plotted work"
+            checked={(settings["notices.offPlan"] as boolean) ?? false}
+            onChange={(v) => void put("notices.offPlan", v)}
+          />
+        </Field>
+
+        <Field label="Quiet" hint="Silences all three. They come back on their own.">
+          <div className="row">
+            {[30, 120].map((min) => (
+              <button
+                key={min}
+                className="btn"
+                onClick={async () => {
+                  const ok = await run(() => ipc.silenceNotices(min), "Couldn't silence notices.");
+                  if (ok !== null) toast(`Quiet for ${min < 60 ? `${min} minutes` : "2 hours"}.`);
+                }}
+              >
+                {min < 60 ? `${min} minutes` : "2 hours"}
+              </button>
+            ))}
+          </div>
+        </Field>
+      </Section>
+
       <Section title="Data">
         <Field label="Export" hint="Written to your Downloads folder. JSON round-trips exactly, ids included. CSV ships tasks and sessions. ICS is export-only.">
           <div className="row">
