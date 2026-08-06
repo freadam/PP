@@ -346,6 +346,26 @@ fn get_goal_templates(
     with(&state, |s| s.get_goal_templates(&today, &tz))
 }
 
+/* ─── focus sessions (W3) ──────────────────────────────────────────────── */
+
+/// Starts a run with an intended length, plotting a block for it. `minutes` of
+/// `None` is an ordinary open-ended timer.
+#[tauri::command]
+fn start_focus(
+    state: State<'_, AppState>,
+    task_id: String,
+    minutes: Option<i64>,
+) -> Res<TimerState> {
+    with(&state, |s| s.start_focus(&task_id, minutes))
+}
+
+/// "Keep going." Moves when Fruit next mentions the session and nothing else —
+/// the block keeps its length, so the overrun stays visible.
+#[tauri::command]
+fn extend_focus(state: State<'_, AppState>, minutes: i64) -> Res<TimerState> {
+    with(&state, |s| s.extend_focus(minutes))
+}
+
 /* ─── notices (W4/W5) ──────────────────────────────────────────────────── */
 
 /// Silences every notice for a while — the "don't tell me again" the off-plan
@@ -1016,6 +1036,8 @@ pub fn run() {
             end_goal,
             get_goal_templates,
             silence_notices,
+            start_focus,
+            extend_focus,
             get_categories,
             create_category,
             update_category,

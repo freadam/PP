@@ -254,6 +254,7 @@ export const useApp = create<AppState>((set, get) => ({
     idleTo: null,
     recoverySessionId: null,
     pomodoro: null,
+    focusEndsAt: null,
   },
   reports: null,
   reconcileDate: null,

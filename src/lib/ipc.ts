@@ -204,6 +204,17 @@ export const startTimer = (taskId: string, blockId?: string | null) =>
 
 export const stopTimer = () => call<TimerState>("stop_timer", {});
 
+/**
+ * Starts a run with an intended length — "45 minutes on this", which is a
+ * different act from starting a stopwatch. Plots a block for it, so the overrun
+ * is visible later. `null` minutes is an ordinary open-ended timer.
+ */
+export const startFocus = (taskId: string, minutes: number | null) =>
+  call<TimerState>("start_focus", { taskId, minutes });
+
+/** "Keep going." Moves the reminder and never the plan. */
+export const extendFocus = (minutes: number) => call<TimerState>("extend_focus", { minutes });
+
 export const resolveIdle = (kind: IdleActionKind) =>
   call<TimerState>("resolve_idle", { action: { kind } });
 

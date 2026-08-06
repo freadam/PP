@@ -129,6 +129,12 @@ export function TimerChip({ timer }: { timer: TimerState }) {
           {timer.phase === "idleChallenge" ? "paused" : timer.phase}
         </span>
       )}
+      {/* W3 — a focus session's intended length, and one key to keep going.
+          The moment you are most productive is the moment you least want a
+          decision, so extending is a keystroke and never a dialog. Nothing here
+          stops anything: going past the length shows in drift as the overrun it
+          is, and the plotted block deliberately does not grow. */}
+      {running && timer.focusEndsAt !== null && <FocusRemaining endsAt={timer.focusEndsAt} />}
       <button
         aria-label={running ? "Stop timer" : "Start timer"}
         onClick={() =>
@@ -366,5 +372,44 @@ export function PreviewNotice() {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * How much of a focus session's intended length is left, and the key that adds
+ * more (W3).
+ *
+ * Counts *down* while there is time and *up* once there is not, because "12m
+ * left" and "8m over" are different facts and one signed number would make the
+ * reader do the work.
+ *
+ * Extending is one press with no dialog: the moment you are most productive is
+ * the moment you least want a decision. It moves the reminder and **not** the
+ * plotted block — growing the plan would quietly rewrite what you meant to do,
+ * and tomorrow's report would say you planned ninety minutes when you planned
+ * forty-five and kept going.
+ */
+function FocusRemaining({ endsAt }: { endsAt: number }) {
+  const run = useApp((s) => s.run);
+  const setTimer = useApp((s) => s.setTimer);
+  const left = Math.round((endsAt - Date.now()) / 1000);
+
+  return (
+    <>
+      <span className="micro data" style={{ color: left < 0 ? "var(--over)" : "var(--muted)" }}>
+        {left >= 0 ? `${fmt.duration(left)} left` : `${fmt.duration(-left)} over`}
+      </span>
+      <button
+        aria-label="Give this session another 15 minutes"
+        title="Another 15 minutes. The plotted length does not change, so the overrun stays visible."
+        onClick={async () => {
+          const next = await run(() => ipc.extendFocus(15), "Couldn't extend the session.");
+          if (next) setTimer(next);
+        }}
+        style={{ color: "var(--muted)" }}
+      >
+        +
+      </button>
+    </>
   );
 }

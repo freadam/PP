@@ -194,7 +194,7 @@ aggregate would quietly create a second way to total a day.
 
 ---
 
-## W3 · Focus sessions
+## W3 · Focus sessions — **built**
 
 **Missed entirely in the first draft, and the reviewer's own headline feature:**
 *"I am sharing this feature first because it is the most crucial one for me."*
@@ -532,7 +532,7 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 | 3 | ~~**W7 categories + W8 uncategorised surface**~~ | — | **Built.** Migration 0007, plus a short-observation floor and the fix for the sampler and the connector both billing the same hour. |
 | 4 | ~~**W6 fragmentation**~~ | 1 | **Built.** No new capture — derived from `resolve_day`. |
 | 5 | ◐ **W9 weekly review + report** | 2, 3, 4 | **Calibration built.** The report *artifact* — a file read at a fixed moment — is not. |
-| 6 | **W3 focus sessions** | — | Independent. The `+`-to-extend interaction is the valuable part. |
+| 6 | ~~**W3 focus sessions**~~ | — | **Built.** The intended length is a plotted block; extending moves the reminder and not the plan. |
 | 7 | ~~**W4 notices + W5 off-plan nudge**~~ | 3 | **Built.** Three switches, one Settings group, all off by default. |
 | 8 | ~~**W10 templates**~~ | 2 | **Built.** Numbers from your own weeks; a template with no history says so. |
 | 9 | **Workbook import (M13)** | — | Unchanged in scope, after the goals work per the phase order above. |
@@ -957,3 +957,37 @@ The core decides *whether there is anything to say*; the shell decides how to
 say it. Notices are collected under the database lock and emitted after it —
 a notification is never worth holding the database for — and they arrive as an
 ordinary toast carrying the one action that matters: making it stop.
+
+---
+
+## Appendix F · W3 as built
+
+Starting *"45 minutes on this"* is a different act from starting a stopwatch,
+and it is the act people perform dozens of times a week.
+
+**The intended length is a plotted block.** That is not bookkeeping — it is the
+only honest place to put an intention in an app that separates plan from record,
+and everything downstream then works already: the drift rail, the reconciler,
+planned-versus-tracked on the week.
+
+**Extending moves the reminder and never the plan.** Rize lets you extend with
+one click, and its extension is free because Rize has no plan to diverge from.
+Growing the block here would quietly rewrite what you meant to do, and tomorrow's
+report would say you planned ninety minutes when you planned forty-five and kept
+going. So `extend_focus` moves only the moment Fruit next mentions it. One key,
+no dialog — the moment you are most productive is the moment you least want a
+decision.
+
+Two smaller decisions:
+
+- **The notice for a focus session is not a setting.** You asked for forty-five
+  minutes, so being told when forty-five minutes have passed is the thing you
+  asked for. Everything else in the Notices group is opt-in because nobody asked
+  for it.
+- **A session started at 23:50 falls back to an open-ended timer.** Blocks may
+  not cross midnight, and someone pressing "start" at that hour wants to work,
+  not to be taught about local dates.
+
+The chip counts *down* while there is time and *up* once there is not — "12m
+left" and "8m over" are different facts, and one signed number would make the
+reader do the work.

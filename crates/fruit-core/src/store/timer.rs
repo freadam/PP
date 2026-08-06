@@ -150,6 +150,7 @@ impl Store {
             idle_to: self.timer.pending_span.map(|(_, b)| b),
             recovery_session_id: self.timer.recovery_session_id.clone(),
             pomodoro: self.timer.pomodoro,
+            focus_ends_at: if running { self.focus_ends_at() } else { None },
         })
     }
 
@@ -345,6 +346,9 @@ impl Store {
         // The end of a session is a system-clock instant, always — never a
         // number derived from the counter.
         self.close_segment(self.now())?;
+        // An intended length belongs to the run that had it. Leaving it behind
+        // would have the next timer inherit a deadline nobody set.
+        self.clear_focus()?;
         let pomodoro = self.timer.pomodoro;
         self.timer = TimerRuntime {
             pomodoro,
@@ -750,3 +754,96 @@ fn map_session(r: &rusqlite::Row) -> rusqlite::Result<SessionRow> {
             .and_then(Contribution::parse),
     })
 }
+
+/// Focus sessions (PLAN-WEEKLY-GOALS.md W3).
+///
+/// Fruit's timer runs until stopped. Starting **"45 minutes on this"** is a
+/// different act from starting a stopwatch, and it is the act people perform
+/// dozens of times a week.
+///
+/// # The intended length is a plot, and the overrun is real
+///
+/// Starting a focus session creates a block at the current instant. That is not
+/// bookkeeping — it is the only honest place to put an intention in an app that
+/// separates plan from record. Everything downstream then works already: the
+/// drift rail, the reconciler, the week's planned-versus-tracked.
+///
+/// # Extending does not enlarge the plan
+///
+/// This is the decision worth defending. Rize lets you extend a session with one
+/// click, and its extension is free because Rize has no plan to diverge from.
+/// Here, growing the block would quietly rewrite what you meant to do — and
+/// tomorrow's report would say you planned ninety minutes when you planned
+/// forty-five and kept going.
+///
+/// So `extend_focus` moves **only the moment Fruit next mentions it**. The block
+/// keeps its length, the record keeps growing, and drift shows the overrun,
+/// which is exactly what happened. One key, no dialog: the moment you are most
+/// productive is the moment you least want a decision.
+impl Store {
+    /// When Fruit next mentions that the intended length has run out.
+    pub(crate) fn focus_ends_at(&self) -> Option<Millis> {
+        match self.get_setting(FOCUS_ENDS_AT) {
+            Ok(Some(serde_json::Value::Number(n))) => n.as_i64(),
+            _ => None,
+        }
+    }
+
+    /// Starts a timed run with an intended length.
+    ///
+    /// `minutes` of `None` is an ordinary open-ended timer, which is still the
+    /// right thing when you genuinely do not know.
+    pub fn start_focus(&mut self, task_id: &str, minutes: Option<i64>) -> Result<TimerState> {
+        let Some(minutes) = minutes.filter(|m| *m > 0) else {
+            self.clear_focus()?;
+            return self.start_timer(task_id, None);
+        };
+        let minutes = minutes.min(8 * 60);
+        let now = self.now();
+        let tz = self.tz_or("UTC");
+
+        // A block at this instant. `schedule_block` refuses one that crosses
+        // midnight, and a focus session started at 23:50 is exactly that — so
+        // fall back to an open-ended run rather than refusing to start at all.
+        // Someone pressing "start" at midnight wants to work, not to be taught
+        // about local dates.
+        let block = self
+            .schedule_block(NewBlock {
+                task_id: Some(task_id.to_string()),
+                starts_at: now,
+                duration_sec: minutes * 60,
+                tz: tz.clone(),
+                ..Default::default()
+            })
+            .ok();
+
+        let state = self.start_timer(task_id, block.as_ref().map(|b| b.id.as_str()))?;
+        self.set_setting(
+            FOCUS_ENDS_AT,
+            &serde_json::Value::from(now + minutes * 60_000),
+        )?;
+        self.timer_state().map(|mut s| {
+            s.focus_ends_at = state.focus_ends_at.or(Some(now + minutes * 60_000));
+            s
+        })
+    }
+
+    /// "Keep going" — one key, no dialog.
+    ///
+    /// Moves when Fruit next mentions the session and **nothing else**. The
+    /// block is not resized: see the note above.
+    pub fn extend_focus(&mut self, minutes: i64) -> Result<TimerState> {
+        let minutes = minutes.clamp(1, 8 * 60);
+        let from = self.focus_ends_at().unwrap_or_else(|| self.now()).max(self.now());
+        self.set_setting(FOCUS_ENDS_AT, &serde_json::Value::from(from + minutes * 60_000))?;
+        self.timer_state()
+    }
+
+    pub(crate) fn clear_focus(&mut self) -> Result<()> {
+        self.set_setting(FOCUS_ENDS_AT, &serde_json::Value::Null)
+    }
+}
+
+/// When the running focus session's intended length runs out. Cleared when the
+/// timer stops.
+pub const FOCUS_ENDS_AT: &str = "timer.focusEndsAt";

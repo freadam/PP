@@ -207,7 +207,7 @@ export interface UnlabelledRow {
 
 // ─── notices (W4/W5) ───────────────────────────────────────────────────
 
-export type NoticeKind = "continuousWork" | "dailyCeiling" | "offPlan";
+export type NoticeKind = "focusElapsed" | "continuousWork" | "dailyCeiling" | "offPlan";
 
 export interface Notice {
   kind: NoticeKind;
@@ -510,6 +510,13 @@ export interface TimerState {
   idleTo: Millis | null;
   recoverySessionId: string | null;
   pomodoro: PomodoroState | null;
+  /**
+   * When a focus session's intended length runs out (W3).
+   *
+   * Advisory, never enforcing: nothing stops, and going past it shows in drift
+   * as the overrun it is.
+   */
+  focusEndsAt: Millis | null;
 }
 
 export type ReconcileKind =

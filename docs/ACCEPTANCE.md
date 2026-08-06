@@ -63,7 +63,7 @@ clock and no webview.
 |---|---|---|
 | W1 ✅ | A goal in force during a week is the goal that week's review reports, **after that goal has since been edited** | `changing_a_goal_closes_the_old_one_rather_than_erasing_it`. A goal edited into a new number must not retroactively rewrite how a past week went, or reviews stop meaning anything. |
 | W2 ✅ | A goal at zero on Monday morning reports **on pace**, not behind; expected progress never counts a day that has not happened | `a_goal_at_zero_on_monday_morning_is_on_pace_not_behind`, `a_weekday_goal_is_not_behind_at_the_weekend`, `a_goal_says_what_the_rest_of_the_week_has_to_look_like`. The month dashboard's "6% accounted" bug, in a new place. |
-| W3 | Extending a focus session shows in drift as an overrun, not as a larger plan | Extending is a plan revision. Fruit separates plan from record, so an extension has to cost something — the reading Rize cannot offer, because it has no plan to diverge from. |
+| W3 ✅ | Extending a focus session shows in drift as an overrun, not as a larger plan | Extending is a plan revision. Fruit separates plan from record, so an extension has to cost something — the reading Rize cannot offer, because it has no plan to diverge from. |
 | W4 ✅ | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
 | W5 ✅ | The off-plan nudge fires only during **plotted** time, and is silenceable for the session | Both rules come from the reviewer's own false-positive caveat. Time nobody planned is time Fruit has no standing to have an opinion about. |
 | W6 ✅ | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
@@ -85,6 +85,7 @@ Covering tests for the four now built:
 | W10 | `a_template_with_no_history_asks_rather_than_guesses` |
 | W4 | `a_meeting_does_not_count_toward_going_without_a_break`, `a_real_break_ends_the_run_and_a_coffee_does_not`, `a_threshold_is_mentioned_once_per_crossing`, `nothing_is_said_until_a_threshold_is_set` |
 | W5 | `the_off_plan_nudge_says_nothing_about_an_hour_you_did_not_plan`, `everything_can_be_silenced_for_a_while` |
+| W3 | `a_focus_session_plots_the_length_it_was_started_for`, `extending_moves_the_reminder_and_never_the_plan`, `the_intended_length_is_mentioned_once_and_stops_nothing`, `stopping_forgets_the_deadline_rather_than_passing_it_on` |
 
 ### Labelling, as built (migration 0007)
 

@@ -168,6 +168,28 @@ impl Store {
             });
         };
 
+        // ── a focus session's intended length ──────────────────────────
+        //
+        // Not a setting: you asked for forty-five minutes, so being told when
+        // forty-five minutes have passed is the thing you asked for. Everything
+        // else here is opt-in because nobody asked for it.
+        if let Some(ends_at) = self.focus_ends_at() {
+            if now >= ends_at {
+                let state = self.timer_state()?;
+                if state.phase == TimerPhase::Running {
+                    claim(
+                        format!("focus:{ends_at}"),
+                        NoticeKind::FocusElapsed,
+                        format!(
+                            "{} — the time you asked for",
+                            state.task_title.clone().unwrap_or_else(|| "This session".into())
+                        ),
+                        "Nothing has stopped. Keep going and it shows as an overrun, which is what it is.".into(),
+                    );
+                }
+            }
+        }
+
         // ── continuous work ────────────────────────────────────────────
         let threshold = self.setting_sec(CONTINUOUS_SEC);
         if threshold > 0 {
@@ -464,6 +486,90 @@ mod tests {
         assert_eq!(notices[0].kind, NoticeKind::OffPlan);
         assert!(notices[0].title.contains("youtube.com"), "{}", notices[0].title);
         assert!(notices[0].title.contains("Refactor auth"), "{}", notices[0].title);
+    }
+
+    // ─── focus sessions (W3) ───────────────────────────────────────────
+
+    /// Starting "45 minutes on this" plots the intention, and the plot is what
+    /// makes the overrun visible later. Everything downstream — drift, the
+    /// reconciler, planned-versus-tracked — then works already.
+    #[test]
+    fn a_focus_session_plots_the_length_it_was_started_for() {
+        let (mut s, _) = store();
+        let t = task(&mut s, "Refactor");
+        let state = s.start_focus(&t, Some(45)).unwrap();
+
+        assert_eq!(state.phase, TimerPhase::Running);
+        assert_eq!(state.focus_ends_at, Some(NINE + 45 * 60_000));
+
+        let blocks = s.blocks_on(DATE).unwrap();
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].duration_sec, 45 * 60);
+        assert_eq!(blocks[0].starts_at, NINE);
+    }
+
+    /// **The decision worth defending.** Rize's extension is free because Rize
+    /// has no plan to diverge from. Growing the block here would rewrite what
+    /// you meant to do, and tomorrow's report would say you planned ninety
+    /// minutes when you planned forty-five and kept going.
+    #[test]
+    fn extending_moves_the_reminder_and_never_the_plan() {
+        let (mut s, clock) = store();
+        let t = task(&mut s, "Refactor");
+        s.start_focus(&t, Some(45)).unwrap();
+
+        clock.advance(45 * 60_000);
+        let state = s.extend_focus(30).unwrap();
+        assert_eq!(state.focus_ends_at, Some(NINE + 75 * 60_000));
+
+        let blocks = s.blocks_on(DATE).unwrap();
+        assert_eq!(
+            blocks[0].duration_sec,
+            45 * 60,
+            "extending enlarged the plan, so the overrun disappeared"
+        );
+    }
+
+    /// You asked for forty-five minutes, so being told when they have passed is
+    /// the thing you asked for — no setting, and once only.
+    #[test]
+    fn the_intended_length_is_mentioned_once_and_stops_nothing() {
+        let (mut s, clock) = store();
+        let t = task(&mut s, "Refactor");
+        s.start_focus(&t, Some(45)).unwrap();
+
+        assert!(s.due_notices(TZ).unwrap().is_empty(), "too early");
+        clock.advance(45 * 60_000);
+
+        let notices = s.due_notices(TZ).unwrap();
+        assert_eq!(notices.len(), 1);
+        assert_eq!(notices[0].kind, NoticeKind::FocusElapsed);
+        assert!(notices[0].title.contains("Refactor"), "{}", notices[0].title);
+        assert_eq!(
+            s.timer_state().unwrap().phase,
+            TimerPhase::Running,
+            "a notice stopped the timer"
+        );
+        assert!(s.due_notices(TZ).unwrap().is_empty(), "it said it twice");
+
+        // Extending moves it, and the next crossing is worth saying again.
+        s.extend_focus(30).unwrap();
+        clock.advance(30 * 60_000);
+        assert_eq!(s.due_notices(TZ).unwrap().len(), 1);
+    }
+
+    /// An intended length belongs to the run that had it.
+    #[test]
+    fn stopping_forgets_the_deadline_rather_than_passing_it_on() {
+        let (mut s, clock) = store();
+        let t = task(&mut s, "Refactor");
+        s.start_focus(&t, Some(45)).unwrap();
+        s.stop_timer().unwrap();
+        clock.advance(60 * 60_000);
+
+        let state = s.start_focus(&t, None).unwrap();
+        assert_eq!(state.focus_ends_at, None, "the next timer inherited a deadline");
+        assert!(s.due_notices(TZ).unwrap().is_empty());
     }
 
     /// The reviewer's own caveat: his false positives were real and common, and

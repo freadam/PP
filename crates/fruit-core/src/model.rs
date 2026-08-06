@@ -418,6 +418,13 @@ pub struct TimerState {
     /// Set in `Recovering`: the orphan session found at boot.
     pub recovery_session_id: Option<String>,
     pub pomodoro: Option<PomodoroState>,
+    /// When a **focus session's** intended length runs out (W3).
+    ///
+    /// Advisory, never enforcing: the timer does not stop, nothing is blocked,
+    /// and going past it shows in drift as the overrun it is. Starting *"45
+    /// minutes on this"* is a different act from starting a stopwatch, and this
+    /// is the difference.
+    pub focus_ends_at: Option<Millis>,
 }
 
 impl TimerState {
@@ -433,6 +440,7 @@ impl TimerState {
             idle_to: None,
             recovery_session_id: None,
             pomodoro: None,
+            focus_ends_at: None,
         }
     }
 }
@@ -1145,6 +1153,8 @@ pub struct GoalCalibration {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NoticeKind {
+    /// A focus session reached the length it was started for (W3).
+    FocusElapsed,
     /// Heads-down for a while. Meetings and personal time excluded.
     ContinuousWork,
     /// Past the day's work ceiling.
