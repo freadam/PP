@@ -58,7 +58,7 @@ than adding any, and Phase 5 keeps targets, reporting and the notes change.
    review that sets next week's goals from what actually happened. Planned in
    [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), W1–W10.
 
-   **W1, W2, W7 and W8 are built** — migrations 0007 and 0008. Weekly goals
+   **W1, W2, W6, W7, W8, W9's calibration and W10 are built** — migrations 0007 and 0008. Weekly goals
    with a **direction**, reported by pace: where you should be right now, and
    what the rest of the week has to look like. An entertainment budget is a
    goal with `direction = atMost`, which is **half of M11**.

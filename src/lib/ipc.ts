@@ -24,6 +24,7 @@ import type {
   DomainCategory,
 
   GoalRow,
+  GoalTemplate,
   NewGoal,
   WeekReview,
   DomainTotal,
@@ -294,6 +295,9 @@ export const setGoal = (input: NewGoal, today: LocalDate) =>
   call<GoalRow>("set_goal", { input, today });
 
 export const endGoal = (id: string, today: LocalDate) => call<void>("end_goal", { id, today });
+
+export const getGoalTemplates = (today: LocalDate, tz: string) =>
+  call<GoalTemplate[]>("get_goal_templates", { today, tz });
 
 /* ─── labelling observed time ──────────────────────────────────────────── */
 

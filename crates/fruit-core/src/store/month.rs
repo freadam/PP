@@ -27,6 +27,10 @@ use super::Store;
 /// *arithmetic* rather than the *presentation* is the whole point.
 pub(crate) struct RangeTotals {
     pub days: Vec<MonthDay>,
+    /// Summed across the range. The longest stretch is a **maximum**, not a
+    /// sum — a week with one three-hour stretch is not a week with a
+    /// twenty-one-hour one.
+    pub fragmentation: Fragmentation,
     pub totals: DayTotals,
     /// Days that finished without being reviewed. A day that has not finished
     /// cannot be un-reconciled — nobody was ever going to review tomorrow.
@@ -83,6 +87,7 @@ impl Store {
         // the missing 27 days are the future, not a gap in the record.
         let mut elapsed_sec = 0;
         let mut elapsed_empty_sec = 0;
+        let mut frag = Fragmentation::default();
         let now = self.now();
 
         while format_date(cursor) <= last_local {
@@ -126,6 +131,8 @@ impl Store {
             if !day.is_reconciled && day.ends_at <= now {
                 unreconciled += 1;
             }
+
+            frag = super::day::add_fragmentation(&frag, &day.fragmentation);
 
             let accounted = d.day_sec - d.empty_sec;
             if day.starts_at < now {
@@ -191,6 +198,7 @@ impl Store {
 
         Ok(RangeTotals {
             days,
+            fragmentation: frag,
             totals,
             unreconciled,
             elapsed_sec,
@@ -215,6 +223,7 @@ impl Store {
         let RangeTotals {
             days,
             mut totals,
+            fragmentation: _,
             unreconciled,
             elapsed_sec,
             elapsed_empty_sec,

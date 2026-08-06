@@ -335,6 +335,17 @@ fn end_goal(state: State<'_, AppState>, id: String, today: String) -> Res<()> {
     with(&state, |s| s.end_goal(&id, &today))
 }
 
+/// Goals Fruit is prepared to suggest, each with the number it picked and where
+/// it came from. A template with no history says so rather than guessing.
+#[tauri::command]
+fn get_goal_templates(
+    state: State<'_, AppState>,
+    today: String,
+    tz: String,
+) -> Res<Vec<GoalTemplate>> {
+    with(&state, |s| s.get_goal_templates(&today, &tz))
+}
+
 /* ─── labelling observed time (migration 0007) ─────────────────────────── */
 
 #[tauri::command]
@@ -994,6 +1005,7 @@ pub fn run() {
             get_goals,
             set_goal,
             end_goal,
+            get_goal_templates,
             get_categories,
             create_category,
             update_category,

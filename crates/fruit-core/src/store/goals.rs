@@ -245,7 +245,19 @@ impl Store {
             .map(|goal| self.progress(goal, &range, &from, &today, tz))
             .collect::<Result<Vec<_>>>()?;
 
+        // The week before, for direction of travel. One week's longest stretch
+        // in isolation says nothing; "up from 42 minutes" is the whole reading.
+        let previous_monday = monday - chrono::Duration::days(7);
+        let previous = self.aggregate_range(
+            &format_date(previous_monday),
+            &format_date(previous_monday + chrono::Duration::days(6)),
+            tz,
+        )?;
+
         Ok(WeekReview {
+            calibration: self.calibrate(monday, tz)?,
+            fragmentation: range.fragmentation.clone(),
+            previous_fragmentation: previous.fragmentation,
             week: iso_week(&from)?,
             from,
             to,
@@ -257,6 +269,131 @@ impl Store {
             unreconciled_days: range.unreconciled,
             goals,
         })
+    }
+
+    /// Goals whose recent history says the number has stopped being a goal.
+    ///
+    /// Trailing completed weeks, median, **n ≥ 5** — the same discipline `f6`
+    /// already holds the estimate calibration to, and for the same reason: five
+    /// samples of noise must not move a recommendation.
+    ///
+    /// Only *completed* weeks count. Including the week in progress would drag
+    /// every median down by however much of it is left, and recommend a cut on
+    /// Tuesday every single time.
+    fn calibrate(&self, monday: chrono::NaiveDate, tz: &str) -> Result<Vec<GoalCalibration>> {
+        const WEEKS: i64 = 6;
+        const MIN_SAMPLES: i64 = 5;
+        /// Below this, the honest reading is "nothing was recorded", not "your
+        /// goal is wrong".
+        const MIN_MEDIAN_SEC: i64 = 30 * 60;
+
+        let goals = self.get_goals(false)?;
+        if goals.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut samples: std::collections::HashMap<String, Vec<i64>> = Default::default();
+        for back in 1..=WEEKS {
+            let start = monday - chrono::Duration::days(7 * back);
+            let range = self.aggregate_range(
+                &format_date(start),
+                &format_date(start + chrono::Duration::days(6)),
+                tz,
+            )?;
+            // A week with nothing recorded in it is not a sample.
+            //
+            // `aggregate_range` answers for any range, so without this every
+            // goal would appear to have six observations from its first day —
+            // and the n ≥ 5 rule below would be decoration rather than a
+            // threshold. A week you did not use Fruit is silence, not evidence.
+            if range.totals.confirmed_work_sec + range.totals.confirmed_life_sec == 0 {
+                continue;
+            }
+            for goal in &goals {
+                let actual = match goal.subject_kind {
+                    GoalSubject::Category => {
+                        let from = format_date(start);
+                        let to = format_date(start + chrono::Duration::days(6));
+                        self.get_categories(Some((&from, &to)), tz)?
+                            .into_iter()
+                            .find(|c| c.id == goal.subject_id)
+                            .map(|c| c.seconds)
+                            .unwrap_or(0)
+                    }
+                    _ => self.actual_for(goal, &range),
+                };
+                samples.entry(goal.id.clone()).or_default().push(actual);
+            }
+        }
+
+        let mut out = Vec::new();
+        for goal in goals {
+            let Some(weeks) = samples.get(&goal.id) else {
+                continue;
+            };
+            if (weeks.len() as i64) < MIN_SAMPLES {
+                continue;
+            }
+            let mut sorted = weeks.clone();
+            sorted.sort_unstable();
+            let median = sorted[sorted.len() / 2];
+
+            // Nothing to calibrate against. A median of zero on an "at least"
+            // goal means the quantity was never recorded, which is a data
+            // problem — and "try 0m?" is not advice, it is an insult dressed as
+            // one.
+            if median < MIN_MEDIAN_SEC {
+                continue;
+            }
+            let met = weeks
+                .iter()
+                .filter(|w| match goal.direction {
+                    GoalDirection::AtLeast => **w >= goal.target_sec,
+                    GoalDirection::AtMost => **w <= goal.target_sec,
+                })
+                .count() as i64;
+
+            // Nothing to say while the goal is working. "Working" is generous on
+            // purpose: a goal met most weeks is a goal, and nagging about the
+            // ones it was not is how advice gets ignored.
+            if met * 2 > weeks.len() as i64 {
+                continue;
+            }
+
+            // Move toward what actually happens, and only ever toward it. A
+            // suggestion that overshoots reality is the same mistake in a new
+            // direction.
+            let suggested = match goal.direction {
+                GoalDirection::AtLeast => median.min(goal.target_sec),
+                GoalDirection::AtMost => median.max(goal.target_sec),
+            };
+            if suggested == goal.target_sec {
+                continue;
+            }
+
+            let summary = format!(
+                "{}: {} target, {} median over {} weeks. A goal you miss most weeks has stopped being a goal. Try {}?",
+                goal.subject_name,
+                hm(goal.target_sec),
+                hm(median),
+                weeks.len(),
+                hm(suggested),
+            );
+            out.push(GoalCalibration {
+                goal_id: goal.id.clone(),
+                subject_kind: goal.subject_kind,
+                subject_id: goal.subject_id.clone(),
+                direction: goal.direction,
+                subject_name: goal.subject_name.clone(),
+                target_sec: goal.target_sec,
+                median_sec: median,
+                weeks: weeks.len() as i64,
+                weeks_met: met,
+                suggested_sec: suggested,
+                summary,
+            });
+        }
+        Ok(out)
     }
 
     /// What this goal measured over the week.
@@ -649,11 +786,312 @@ mod tests {
         assert_eq!(review.week, "2026-W32");
     }
 
+    /// The same discipline `f6` holds estimates to: trailing median, n ≥ 5, so
+    /// a bad fortnight cannot move a recommendation.
+    ///
+    /// A week with nothing recorded is **silence, not evidence**. Without that,
+    /// `aggregate_range` would hand every goal six observations on its first
+    /// day and the threshold would be decoration.
+    #[test]
+    fn calibration_says_nothing_from_weeks_that_were_never_recorded() {
+        let (mut s, _) = store_on(0, 9);
+        goal(&mut s, GoalDirection::AtLeast, metric::ALL_WORK, 20);
+
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let review = s.get_week_review(&today, TZ).unwrap();
+        assert!(
+            review.calibration.is_empty(),
+            "a fresh install was told its goals are wrong: {:?}",
+            review.calibration
+        );
+    }
+
+    /// The case that matters: five recorded weeks, a goal missed in all of
+    /// them, and a suggestion drawn from what actually happened.
+    #[test]
+    fn a_goal_missed_every_recorded_week_is_offered_a_number_that_happened() {
+        let (mut s, clock) = store_on(0, 9);
+        let t = s
+            .create_task(NewTask {
+                title: "Refactor".into(),
+                ..Default::default()
+            })
+            .unwrap();
+
+        // Five earlier weeks, four hours of work in each.
+        for back in 1..=5i64 {
+            let monday = MONDAY - back * 7 * 86_400_000;
+            s.add_session(ManualSession {
+                task_id: t.id.clone(),
+                block_id: None,
+                started_at: monday,
+                ended_at: monday + 4 * 3_600_000,
+                note: None,
+            })
+            .unwrap();
+        }
+        let _ = &clock;
+
+        // A twenty-hour goal against four-hour weeks.
+        goal(&mut s, GoalDirection::AtLeast, metric::ALL_WORK, 20);
+
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let review = s.get_week_review(&today, TZ).unwrap();
+        assert_eq!(review.calibration.len(), 1, "{:?}", review.calibration);
+        let c = &review.calibration[0];
+        assert_eq!(c.weeks, 5, "only the weeks that were actually recorded");
+        assert_eq!(c.weeks_met, 0);
+        assert_eq!(c.median_sec, 4 * 3600);
+        assert_eq!(c.suggested_sec, 4 * 3600, "toward what happened, never past it");
+        assert!(c.summary.contains("Try 4h 00m?"), "{}", c.summary);
+
+        // And the suggestion is applicable as it stands. Reaching back through
+        // the goal id would make the obvious mistake — passing a goal id where a
+        // subject id belongs — fail at the point of use rather than at the
+        // boundary.
+        s.set_goal(
+            NewGoal {
+                subject_kind: Some(c.subject_kind),
+                subject_id: c.subject_id.clone(),
+                direction: Some(c.direction),
+                target_sec: c.suggested_sec,
+                applies_days: None,
+            },
+            &today,
+        )
+        .expect("a suggestion must be applicable without translation");
+    }
+
+    /// A suggestion never overshoots reality in the other direction. Raising an
+    /// "at least" goal because you beat it is a different feature, and not one
+    /// anybody asked for.
+    #[test]
+    fn a_suggestion_only_ever_moves_toward_what_happened() {
+        let (mut s, _) = store_on(0, 9);
+        let t = s
+            .create_task(NewTask {
+                title: "Refactor".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        for back in 1..=5i64 {
+            let monday = MONDAY - back * 7 * 86_400_000;
+            s.add_session(ManualSession {
+                task_id: t.id.clone(),
+                block_id: None,
+                started_at: monday,
+                ended_at: monday + 10 * 3_600_000,
+                note: None,
+            })
+            .unwrap();
+        }
+        // A goal comfortably met every week.
+        goal(&mut s, GoalDirection::AtLeast, metric::ALL_WORK, 4);
+
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let review = s.get_week_review(&today, TZ).unwrap();
+        assert!(
+            review.calibration.is_empty(),
+            "a goal being met was told to change: {:?}",
+            review.calibration
+        );
+    }
+
+    /// A ceiling that is being kept needs no advice. Nagging about a goal that
+    /// is working is how advice gets ignored.
+    #[test]
+    fn calibration_says_nothing_about_a_goal_that_is_working() {
+        let (mut s, _) = store_on(0, 9);
+        // Nothing recorded, so entertainment is zero every week — comfortably
+        // inside an "at most" budget.
+        goal(&mut s, GoalDirection::AtMost, metric::ENTERTAINMENT, 7);
+
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let review = s.get_week_review(&today, TZ).unwrap();
+        assert!(
+            review.calibration.is_empty(),
+            "a budget being kept was told to change: {:?}",
+            review.calibration
+        );
+    }
+
+    /// Direction of travel is the point — one week's longest stretch in
+    /// isolation says nothing.
+    #[test]
+    fn the_review_carries_last_week_to_compare_against() {
+        let (s, _) = store_on(2, 12);
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let review = s.get_week_review(&today, TZ).unwrap();
+        assert_eq!(review.fragmentation.fragment_threshold_sec, 15 * 60);
+        // Empty, but carrying the threshold — the figure is never readable
+        // without the rule that produced it, in either week.
+        assert_eq!(review.previous_fragmentation.stretches, 0);
+        assert_eq!(review.previous_fragmentation.fragment_threshold_sec, 15 * 60);
+    }
+
+    /// A template that opens with an invented round number is one people
+    /// dismiss. Where there is no history, saying so is the honest move.
+    #[test]
+    fn a_template_with_no_history_asks_rather_than_guesses() {
+        let (s, _) = store_on(0, 9);
+        let today = local_date(s.now(), &zone(TZ).unwrap());
+        let templates = s.get_goal_templates(&today, TZ).unwrap();
+
+        let shorter = templates.iter().find(|t| t.key == "shorterWeek").unwrap();
+        assert_eq!(shorter.target_sec, None, "a fresh install has no median");
+        assert!(shorter.rationale.contains("Not enough weeks"), "{}", shorter.rationale);
+        assert_eq!(shorter.direction, GoalDirection::AtMost);
+        assert_eq!(shorter.applies_days, 0b0011111, "a work ceiling is weekdays");
+
+        // Sleep is the one number not taken from your weeks, and it says so.
+        let sleep = templates.iter().find(|t| t.key == "sleep").unwrap();
+        assert_eq!(sleep.target_sec, Some(8 * 3600 * 7));
+        assert!(sleep.rationale.contains("not drawn from your own history"));
+    }
+
     #[test]
     fn iso_weeks_sort_as_strings() {
         assert_eq!(iso_week("2026-08-05").unwrap(), "2026-W32");
         assert!(iso_week("2026-01-05").unwrap() < iso_week("2026-08-05").unwrap());
         // The week a year straddles belongs to whichever year owns it in ISO.
         assert_eq!(iso_week("2026-12-31").unwrap(), "2026-W53");
+    }
+}
+
+/// Goal templates (W10) — the numbers come from your own weeks.
+///
+/// The governing constraint on this whole plan is that configuring the tool must
+/// not become the work. A blank goal form is exactly that failure: it asks for a
+/// number nobody has, and the number people invent is a round one they do not
+/// believe.
+///
+/// So each template looks at the trailing weeks and proposes something reachable
+/// — and where there is not enough history it says so rather than guessing. The
+/// same n ≥ 5 discipline as everything else here.
+impl Store {
+    pub fn get_goal_templates(&self, today: &str, tz: &str) -> Result<Vec<GoalTemplate>> {
+        const WEEKS: i64 = 4;
+        const MIN_SAMPLES: usize = 2;
+        const WEEKDAYS: i64 = 0b0011111;
+
+        let monday = week_start(parse_date(today)?);
+        // Completed weeks only. The week in progress would drag every median
+        // down by however much of it is left.
+        let mut work: Vec<i64> = Vec::new();
+        let mut entertainment: Vec<i64> = Vec::new();
+        let mut sleep: Vec<i64> = Vec::new();
+        for back in 1..=WEEKS {
+            let start = monday - chrono::Duration::days(7 * back);
+            let range = self.aggregate_range(
+                &format_date(start),
+                &format_date(start + chrono::Duration::days(6)),
+                tz,
+            )?;
+            work.push(range.totals.confirmed_work_sec);
+            entertainment.push(range.totals.entertainment_sec);
+            sleep.push(range.totals.sleep_sec);
+        }
+
+        let median = |v: &[i64]| -> Option<i64> {
+            let mut s: Vec<i64> = v.iter().copied().filter(|n| *n > 0).collect();
+            if s.len() < MIN_SAMPLES {
+                return None;
+            }
+            s.sort_unstable();
+            Some(s[s.len() / 2])
+        };
+
+        let mut out = vec![
+            // Rize's "6-hour work day", and the template its reviewer actually
+            // chose. A ceiling, because his goal was a 30-hour week.
+            template(
+                "shorterWeek",
+                "The shorter week",
+                metric::ALL_WORK,
+                GoalDirection::AtMost,
+                median(&work).map(|m| (m as f64 * 0.9) as i64),
+                WEEKDAYS,
+                median(&work),
+                "10% under your median week",
+            ),
+            template(
+                "cutEntertainment",
+                "Cut entertainment",
+                metric::ENTERTAINMENT,
+                GoalDirection::AtMost,
+                median(&entertainment).map(|m| (m as f64 * 0.8) as i64),
+                ALL_DAYS,
+                median(&entertainment),
+                "20% under your median week",
+            ),
+            template(
+                "sleep",
+                "Sleep",
+                metric::SLEEP,
+                GoalDirection::AtLeast,
+                Some(8 * 3600 * 7),
+                ALL_DAYS,
+                // No basis, because there is none: this is the one number not
+                // taken from your weeks, and appending "(56h median)" would
+                // dress a constant up as a measurement.
+                None,
+                "8 hours a night — the only template not drawn from your own history",
+            ),
+        ];
+
+        // "Off zero": a life area with a monthly target and no time at all is
+        // already the most actionable row on the month dashboard.
+        for area in self.get_life_areas(tz, false)? {
+            let Some(monthly) = area.monthly_target_sec else {
+                continue;
+            };
+            if area.month_tracked_sec > 0 {
+                continue;
+            }
+            out.push(GoalTemplate {
+                key: format!("offZero:{}", area.id),
+                name: format!("{} — off zero", area.name),
+                subject_kind: GoalSubject::LifeArea,
+                subject_id: area.id.clone(),
+                direction: GoalDirection::AtLeast,
+                // A quarter of the monthly target, so a week is a step toward it
+                // rather than a restatement of it.
+                target_sec: Some((monthly / 4).max(1800)),
+                applies_days: ALL_DAYS,
+                rationale: format!(
+                    "A quarter of its {} monthly target. It has had none this month.",
+                    hm(monthly)
+                ),
+            });
+        }
+        Ok(out)
+    }
+}
+
+fn template(
+    key: &str,
+    name: &str,
+    metric_id: &str,
+    direction: GoalDirection,
+    target_sec: Option<i64>,
+    applies_days: i64,
+    basis: Option<i64>,
+    how: &str,
+) -> GoalTemplate {
+    GoalTemplate {
+        key: key.into(),
+        name: name.into(),
+        subject_kind: GoalSubject::Metric,
+        subject_id: metric_id.into(),
+        direction,
+        target_sec,
+        applies_days,
+        rationale: match (target_sec, basis) {
+            (Some(_), Some(b)) => format!("{how} ({} median).", hm(b)),
+            (Some(_), None) => format!("{how}."),
+            // Stated, not hidden. A template with no number is still worth
+            // showing — it tells you the app is not guessing.
+            (None, _) => "Not enough weeks recorded yet to pick a number. Set one yourself.".into(),
+        },
     }
 }

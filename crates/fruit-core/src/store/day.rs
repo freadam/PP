@@ -83,6 +83,7 @@ impl Store {
         let now = self.now();
 
         Ok(DayView {
+            fragmentation: fragmentation(&segments, &plans, self.fragment_threshold_sec()),
             local_date: date.to_string(),
             tz: tz.to_string(),
             slot_minutes,
@@ -590,6 +591,108 @@ pub fn apply_min_span(spans: Vec<ObservedSpan>, min_sec: i64) -> Vec<ObservedSpa
     out
 }
 
+/// Confirmed work in a run shorter than this counts as fragmented. Fifteen
+/// minutes: long enough to have done something, short enough that a run of them
+/// is a day that got away from you.
+pub const DEFAULT_FRAGMENT_SEC: i64 = 15 * 60;
+
+/// How close a switch has to fall to a block's edge to count as **planned**.
+///
+/// Two minutes, because a person acting on their own plan does not act on the
+/// second. Tighter and every deliberate switch reads as an interruption, which
+/// would make the distinction worthless; looser and an interruption that happens
+/// to land near a boundary gets excused.
+const BOUNDARY_TOLERANCE_MS: i64 = 2 * 60_000;
+
+/// The components of how broken up a day was. See [`Fragmentation`] for why this
+/// returns four numbers and not a score.
+///
+/// Pure and database-free, like `resolve_day` itself: this is arithmetic over
+/// segments the Day view already renders, so it can be checked against what is
+/// on screen and tested without a store.
+pub fn fragmentation(
+    segments: &[DaySegment],
+    plans: &[DayPlan],
+    fragment_threshold_sec: i64,
+) -> Fragmentation {
+    // Every instant a plotted block starts or ends. A switch landing on one is
+    // you executing your intention.
+    let mut edges: Vec<Millis> = Vec::with_capacity(plans.len() * 2);
+    for p in plans {
+        edges.push(p.starts_at);
+        edges.push(p.starts_at + p.duration_sec * 1000);
+    }
+    let on_edge = |at: Millis| edges.iter().any(|e| (at - e).abs() <= BOUNDARY_TOLERANCE_MS);
+
+    let task_of = |seg: &DaySegment| match &seg.owner {
+        SlotOwner::Work { task_id, .. } => Some(task_id.clone()),
+        _ => None,
+    };
+
+    let mut out = Fragmentation {
+        fragment_threshold_sec,
+        ..Default::default()
+    };
+
+    // Runs of confirmed work on one task. A switch between two tasks ends a run
+    // even though both are work — "unbroken" means unbroken *on the thing*.
+    let mut run: Option<(String, Millis, Millis)> = None;
+    let close = |run: &mut Option<(String, Millis, Millis)>, out: &mut Fragmentation| {
+        if let Some((_, from, to)) = run.take() {
+            let sec = (to - from) / 1000;
+            out.stretches += 1;
+            out.longest_stretch_sec = out.longest_stretch_sec.max(sec);
+            if sec < fragment_threshold_sec {
+                out.fragmented_sec += sec;
+            }
+        }
+    };
+
+    for (i, seg) in segments.iter().enumerate() {
+        match task_of(seg) {
+            Some(task) => match &mut run {
+                Some((current, _, end)) if *current == task && *end == seg.from => {
+                    *end = seg.to;
+                }
+                _ => {
+                    close(&mut run, &mut out);
+                    run = Some((task, seg.from, seg.to));
+                }
+            },
+            None => close(&mut run, &mut out),
+        }
+
+        // A switch is a boundary between two things that both happened. Empty
+        // and idle are not things you switched *to* — nothing was going on.
+        if i + 1 < segments.len() {
+            let next = &segments[i + 1];
+            let real = |o: &SlotOwner| !matches!(o, SlotOwner::Empty | SlotOwner::Idle);
+            if real(&seg.owner) && real(&next.owner) {
+                if on_edge(seg.to) {
+                    out.planned_switches += 1;
+                } else {
+                    out.unplanned_switches += 1;
+                }
+            }
+        }
+    }
+    close(&mut run, &mut out);
+    out
+}
+
+/// Adds two days' worth. Longest stretch is a **maximum**, not a sum — a week
+/// with one three-hour stretch is not a week with a twenty-one-hour one.
+pub fn add_fragmentation(a: &Fragmentation, b: &Fragmentation) -> Fragmentation {
+    Fragmentation {
+        longest_stretch_sec: a.longest_stretch_sec.max(b.longest_stretch_sec),
+        stretches: a.stretches + b.stretches,
+        planned_switches: a.planned_switches + b.planned_switches,
+        unplanned_switches: a.unplanned_switches + b.unplanned_switches,
+        fragmented_sec: a.fragmented_sec + b.fragmented_sec,
+        fragment_threshold_sec: a.fragment_threshold_sec.max(b.fragment_threshold_sec),
+    }
+}
+
 /// Cuts `[from, to)` at every boundary any claim introduces and gives each
 /// resulting segment exactly one owner, by precedence.
 ///
@@ -851,6 +954,141 @@ mod tests {
         sums_to_day(&segments, 0, 24 * H);
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].owner, SlotOwner::Empty);
+    }
+
+    // ─── fragmentation (W6) ────────────────────────────────────────────
+
+    fn work_on(task: &str, from: Millis, to: Millis) -> Claim {
+        Claim {
+            from,
+            to,
+            owner: SlotOwner::Work {
+                session_id: "s".into(),
+                task_id: task.into(),
+                task_title: task.into(),
+                project_id: None,
+                project_colour: None,
+                contribution: None,
+            },
+        }
+    }
+
+    fn plan(from: Millis, minutes: i64) -> DayPlan {
+        DayPlan {
+            block_id: "b".into(),
+            title: "Plotted".into(),
+            project_colour: None,
+            starts_at: from,
+            duration_sec: minutes * 60,
+            tracked_sec: 0,
+            drift_sec: 0,
+            drift_state: DriftState::OnEstimate,
+            is_fixed: false,
+            series_id: None,
+        }
+    }
+
+    const M: Millis = 60_000;
+
+    /// A day of one unbroken session is the simplest case, and the one every
+    /// other number has to be read against.
+    #[test]
+    fn one_unbroken_session_is_one_stretch_and_no_switches() {
+        let segments = resolve_day(9 * H, 12 * H, vec![work(9 * H, 12 * H)], &[]);
+        let f = fragmentation(&segments, &[], DEFAULT_FRAGMENT_SEC);
+        assert_eq!(f.stretches, 1);
+        assert_eq!(f.longest_stretch_sec, 3 * 3600);
+        assert_eq!(f.planned_switches, 0);
+        assert_eq!(f.unplanned_switches, 0);
+        assert_eq!(f.fragmented_sec, 0);
+    }
+
+    /// **The claim an app that only watches window focus cannot make.** The
+    /// same two switches, and the *plan* underneath decides what they mean.
+    #[test]
+    fn a_switch_on_a_block_boundary_is_you_executing_your_intention() {
+        // Two tasks, back to back at 10:00.
+        let segments = resolve_day(
+            9 * H,
+            11 * H,
+            vec![work_on("a", 9 * H, 10 * H), work_on("b", 10 * H, 11 * H)],
+            &[],
+        );
+
+        // Nothing plotted: the switch was an interruption as far as anyone knows.
+        let f = fragmentation(&segments, &[], DEFAULT_FRAGMENT_SEC);
+        assert_eq!((f.planned_switches, f.unplanned_switches), (0, 1));
+
+        // Plotted to end exactly there: the switch was the plan working.
+        let f = fragmentation(&segments, &[plan(9 * H, 60)], DEFAULT_FRAGMENT_SEC);
+        assert_eq!((f.planned_switches, f.unplanned_switches), (1, 0));
+
+        // A minute either side is still the plan. A person acting on their own
+        // intention does not act on the second.
+        let f = fragmentation(&segments, &[plan(9 * H, 61)], DEFAULT_FRAGMENT_SEC);
+        assert_eq!((f.planned_switches, f.unplanned_switches), (1, 0));
+        // Twenty minutes late is not.
+        let f = fragmentation(&segments, &[plan(9 * H, 80)], DEFAULT_FRAGMENT_SEC);
+        assert_eq!((f.planned_switches, f.unplanned_switches), (0, 1));
+    }
+
+    /// Empty and idle are not things you switched *to* — nothing was going on.
+    /// Counting them would make every lunch break two interruptions.
+    #[test]
+    fn a_gap_is_not_a_switch() {
+        let segments = resolve_day(
+            9 * H,
+            12 * H,
+            vec![work_on("a", 9 * H, 10 * H), work_on("a", 11 * H, 12 * H)],
+            &[],
+        );
+        let f = fragmentation(&segments, &[], DEFAULT_FRAGMENT_SEC);
+        assert_eq!(f.unplanned_switches, 0, "an hour of nothing is not a switch");
+        assert_eq!(f.stretches, 2, "but it does end the stretch");
+        assert_eq!(f.longest_stretch_sec, 3600);
+    }
+
+    /// Time that counts and accomplished little. The threshold rides along with
+    /// the figure so it can never be read without the rule that made it.
+    #[test]
+    fn work_in_short_runs_is_reported_as_fragmented() {
+        let claims = vec![
+            work_on("a", 9 * H, 9 * H + 6 * M),
+            work_on("b", 9 * H + 6 * M, 9 * H + 12 * M),
+            work_on("c", 9 * H + 12 * M, 11 * H),
+        ];
+        let segments = resolve_day(9 * H, 11 * H, claims, &[]);
+        let f = fragmentation(&segments, &[], DEFAULT_FRAGMENT_SEC);
+
+        assert_eq!(f.stretches, 3);
+        assert_eq!(f.fragmented_sec, 12 * 60, "the two six-minute runs");
+        assert_eq!(f.longest_stretch_sec, 108 * 60);
+        assert_eq!(f.fragment_threshold_sec, DEFAULT_FRAGMENT_SEC);
+    }
+
+    /// A week's longest stretch is a maximum, not a sum. Adding them would make
+    /// five three-hour days look like a fifteen-hour one.
+    #[test]
+    fn adding_days_takes_the_longest_stretch_rather_than_summing_it() {
+        let a = Fragmentation {
+            longest_stretch_sec: 3 * 3600,
+            stretches: 2,
+            unplanned_switches: 1,
+            fragmented_sec: 300,
+            ..Default::default()
+        };
+        let b = Fragmentation {
+            longest_stretch_sec: 2 * 3600,
+            stretches: 3,
+            unplanned_switches: 4,
+            fragmented_sec: 600,
+            ..Default::default()
+        };
+        let sum = add_fragmentation(&a, &b);
+        assert_eq!(sum.longest_stretch_sec, 3 * 3600);
+        assert_eq!(sum.stretches, 5);
+        assert_eq!(sum.unplanned_switches, 5);
+        assert_eq!(sum.fragmented_sec, 900);
     }
 
     #[test]

@@ -1074,6 +1074,70 @@ pub struct WeekReview {
     pub elapsed_empty_sec: i64,
     pub unreconciled_days: i64,
     pub goals: Vec<GoalProgress>,
+    /// Summed over the week, and against the week before — direction of travel
+    /// is the point. One week's longest stretch in isolation says nothing.
+    pub fragmentation: Fragmentation,
+    pub previous_fragmentation: Fragmentation,
+    /// Goals whose history says the number has stopped being a goal. Offered,
+    /// never applied.
+    pub calibration: Vec<GoalCalibration>,
+}
+
+/// A goal Fruit is prepared to suggest, with the number it picked and where it
+/// came from.
+///
+/// Rize ships eight templates and its reviewer used one, which is the strongest
+/// evidence available that templates beat a blank goal form. The difference here
+/// is that **every template states the number it chose and why**: a template that
+/// opens with an invented round figure is one people dismiss, and a goal you did
+/// not believe when you set it is one you will not honour on Thursday.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalTemplate {
+    pub key: String,
+    pub name: String,
+    pub subject_kind: GoalSubject,
+    pub subject_id: String,
+    pub direction: GoalDirection,
+    /// `None` when there is not enough history to pick honestly. The template
+    /// still appears, and says so — asking beats guessing.
+    pub target_sec: Option<i64>,
+    pub applies_days: i64,
+    /// Where the number came from, in words. Empty templates explain the gap.
+    pub rationale: String,
+}
+
+/// "A goal you miss every week has stopped being a goal."
+///
+/// The same discipline the estimate calibration already holds itself to:
+/// trailing median, reported only at **n ≥ 5**, so five weeks of noise cannot
+/// move a recommendation.
+///
+/// **Offered, never applied.** The user may have a good reason the last three
+/// weeks were atypical, and an app that quietly lowers your ambitions is worse
+/// than one that says nothing.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalCalibration {
+    pub goal_id: String,
+    /// The subject, so applying the suggestion is `set_goal` on the same
+    /// quantity. Without it the caller would have to reach back through the
+    /// goal id, and the obvious mistake — passing the goal id *as* the subject
+    /// — fails validation at the boundary rather than at the point of use.
+    pub subject_kind: GoalSubject,
+    pub subject_id: String,
+    pub direction: GoalDirection,
+    pub subject_name: String,
+    pub target_sec: i64,
+    /// Median of the completed weeks looked at.
+    pub median_sec: i64,
+    pub weeks: i64,
+    /// How many of those weeks the goal was met in.
+    pub weeks_met: i64,
+    /// What the history suggests instead. Never further from reality than the
+    /// current target, and never a change of direction.
+    pub suggested_sec: i64,
+    pub summary: String,
 }
 
 // ─── search, undo, data ────────────────────────────────────────────────
@@ -1542,6 +1606,40 @@ pub struct DayTotals {
     pub by_app: Vec<AppTotal>,
 }
 
+/// How broken up a day's work was — the components, deliberately **not** a
+/// score.
+///
+/// Rize returns a "focus score". This app's whole argument is that its
+/// arithmetic can be checked by eye — the counting invariant, Excel totals as
+/// formulas rather than pasted numbers, a reconciliation table putting the app's
+/// figure beside the sheet's own. A weighted 0–100 would be the single number in
+/// Fruit nobody could verify, and the recurring complaint about scores is
+/// exactly that their inputs are hidden.
+///
+/// And one thing an app that only watches window focus structurally cannot do:
+/// **planned and unplanned switches are counted separately.** A switch landing
+/// on a block boundary is you executing your intention; one that does not is an
+/// interruption. For someone whose work genuinely requires switching, that
+/// distinction is the entire question.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Fragmentation {
+    /// The longest unbroken run of confirmed work on **one task**. The figure
+    /// that actually tracks deep work.
+    pub longest_stretch_sec: i64,
+    /// How many separate runs of confirmed work there were.
+    pub stretches: i64,
+    /// Boundaries that fall on a plotted block's own start or end.
+    pub planned_switches: i64,
+    pub unplanned_switches: i64,
+    /// Confirmed work sitting in runs shorter than the threshold. Time that
+    /// counts and accomplished little.
+    pub fragmented_sec: i64,
+    /// The threshold that produced `fragmented_sec`, so the figure can never be
+    /// read without the rule that made it.
+    pub fragment_threshold_sec: i64,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DayView {
@@ -1556,6 +1654,7 @@ pub struct DayView {
     pub is_reconciled: bool,
     pub is_today: bool,
     pub now: Millis,
+    pub fragmentation: Fragmentation,
 }
 
 // ─── the month (Plan Rev 3 §8.5, wireframe screen 3) ───────────────────

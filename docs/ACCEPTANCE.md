@@ -66,13 +66,23 @@ clock and no webview.
 | W3 | Extending a focus session shows in drift as an overrun, not as a larger plan | Extending is a plan revision. Fruit separates plan from record, so an extension has to cost something — the reading Rize cannot offer, because it has no plan to diverge from. |
 | W4 | A two-hour meeting (`contribution = 'attend'`) does not accrue toward the continuous-work notice; two hours of `own` work does | Sitting in a review is not two hours heads-down, and the schema already records the difference. |
 | W5 | The off-plan nudge fires only during **plotted** time, and is silenceable for the session | Both rules come from the reviewer's own false-positive caveat. Time nobody planned is time Fruit has no standing to have an opinion about. |
-| W6 | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
+| W6 ✅ | Planned and unplanned switches are counted **separately**; a day of one unbroken session reports one stretch and zero unplanned switches | A switch landing on a block boundary is you executing your intention. Counting it as an interruption throws away the plan — the thing Fruit knows that an app-watcher cannot. |
 | W7 ✅ | A user-defined category collects **both apps and domains**, and adding one never changes an existing month total | `an_application_can_be_labelled_as_well_as_a_website`, `adding_a_category_does_not_move_an_existing_total`. Claude is a website to one person and a desktop app to another; a bucket catching one of them answers the question wrongly. |
 | W8 ✅ | The uncategorised surface ranks by time and is reachable **without opening Settings** | `the_unlabelled_list_ranks_by_time_and_names_the_site_not_the_browser`; it is the second panel on Activity. The app names the things worth categorising instead of presenting an empty taxonomy. |
-| W9 | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
-| W10 | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
+| W9 ✅ | Goal calibration reports at **n ≥ 5 weeks** and uses the **median** | The same discipline `f6` already holds estimates to: five samples of noise must not move a recommendation. |
+| W10 ✅ | A template with insufficient history **says so** instead of guessing | A template that opens with an invented round number is a goal you did not believe when you set it. |
 
 **W2 is the one that matters most**, for the reason given in its own row.
+
+Covering tests for the four now built:
+
+| # | Covered by |
+|---|---|
+| W1 | `changing_a_goal_closes_the_old_one_rather_than_erasing_it` |
+| W2 | `a_goal_at_zero_on_monday_morning_is_on_pace_not_behind`, `a_weekday_goal_is_not_behind_at_the_weekend`, `a_goal_says_what_the_rest_of_the_week_has_to_look_like` |
+| W6 | `one_unbroken_session_is_one_stretch_and_no_switches`, `a_switch_on_a_block_boundary_is_you_executing_your_intention`, `a_gap_is_not_a_switch`, `work_in_short_runs_is_reported_as_fragmented`, `adding_days_takes_the_longest_stretch_rather_than_summing_it` |
+| W9 | `a_goal_missed_every_recorded_week_is_offered_a_number_that_happened`, `calibration_says_nothing_from_weeks_that_were_never_recorded`, `a_suggestion_only_ever_moves_toward_what_happened` |
+| W10 | `a_template_with_no_history_asks_rather_than_guesses` |
 
 ### Labelling, as built (migration 0007)
 

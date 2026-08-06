@@ -455,6 +455,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!(store.get_week_review(&today, &tz)?),
     );
     out.insert("get_goals".into(), json!(store.get_goals(false)?));
+    out.insert(
+        "get_goal_templates".into(),
+        json!(store.get_goal_templates(&today, &tz)?),
+    );
     out.insert("get_activity_rules".into(), json!(store.get_activity_rules()?));
     out.insert(
         "get_categories".into(),

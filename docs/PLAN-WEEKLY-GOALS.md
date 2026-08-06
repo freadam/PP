@@ -301,7 +301,7 @@ Two rules, both taken from the reviewer's own caveat:
 
 ---
 
-## W6 · Fragmentation, reported and not scored
+## W6 · Fragmentation, reported and not scored — **built**
 
 **Reframed.** The first draft called this "Rize's focus score, done better".
 There is no focus score in this review — that came from a different article
@@ -478,7 +478,7 @@ says nothing.
 
 ---
 
-## W10 · Goal templates
+## W10 · Goal templates — **built**
 
 Rize ships templates and the reviewer used one — *"What fits best to my work week
 is the 6-hour work day, so I enabled that"* — which is the strongest possible
@@ -530,11 +530,11 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 | 1 | ~~**`aggregate_range` extraction** + `get_week_review`~~ | — | **Built.** Pure refactor of `get_month`'s loop; nothing new is computed, the point is that nothing is computed twice. |
 | 2 | ~~**W1 goals + W2 pace**~~ | 1 | **Built** (migration 0008). Closes the budget half of M11 — an entertainment budget is this with `direction = atMost`. |
 | 3 | ~~**W7 categories + W8 uncategorised surface**~~ | — | **Built.** Migration 0007, plus a short-observation floor and the fix for the sampler and the connector both billing the same hour. |
-| 4 | **W6 fragmentation** | 1 | No new capture. Derived from `resolve_day`. |
-| 5 | **W9 weekly review + report** | 2, 3, 4 | Including goal calibration. |
+| 4 | ~~**W6 fragmentation**~~ | 1 | **Built.** No new capture — derived from `resolve_day`. |
+| 5 | ◐ **W9 weekly review + report** | 2, 3, 4 | **Calibration built.** The report *artifact* — a file read at a fixed moment — is not. |
 | 6 | **W3 focus sessions** | — | Independent. The `+`-to-extend interaction is the valuable part. |
 | 7 | **W4 notices + W5 off-plan nudge** | 3 | Needs categories to know what "off-plan" means. |
-| 8 | **W10 templates** | 2, and trailing history | Last: the numbers need weeks of data to be worth offering. |
+| 8 | ~~**W10 templates**~~ | 2 | **Built.** Numbers from your own weeks; a template with no history says so. |
 | 9 | **Workbook import (M13)** | — | Unchanged in scope, after the goals work per the phase order above. |
 
 ## Acceptance
@@ -840,3 +840,68 @@ the rest can be surfaced when someone asks for them.
   measure; windows would let the dashboard's dashed line stop being flat zero.
 - A goal is weekly only. The `period` column exists and monthly is the same
   shape, but writing it before anyone has used a weekly goal would be guessing.
+
+---
+
+## Appendix D · W6, W9's calibration and W10 as built
+
+### Fragmentation: three numbers, and the one nobody else can produce
+
+`longest_stretch_sec`, `stretches`, `planned_switches` / `unplanned_switches`,
+`fragmented_sec` — each checkable against the Day view that produced it. No
+score, for the reason W6 already gives.
+
+The split between planned and unplanned switches is the part worth having.
+Rize sees that you moved from one app to another; **Fruit sees the plan
+underneath**, so a switch landing within two minutes of a plotted block's edge
+is you executing your intention and one that does not is an interruption. Two
+minutes because a person acting on their own plan does not act on the second;
+tighter and every deliberate switch reads as an interruption, which would make
+the distinction worthless.
+
+Two rules that took thinking about:
+
+- **A gap is not a switch.** Empty and idle are not things you switched *to*.
+  Counting them would make every lunch break two interruptions.
+- **A week's longest stretch is a maximum, not a sum.** Adding them would make
+  five three-hour days look like a fifteen-hour one.
+
+### Calibration, and two ways it could have lied
+
+`aggregate_range` answers for any range, including weeks before the database
+existed. The first cut therefore handed every goal six observations on its first
+day, all zero, and told a brand-new install that its goals had "stopped being
+goals" — with a straight face, and a suggestion of **0m**.
+
+Both halves were wrong and both are now rules:
+
+- **A week with nothing recorded is silence, not evidence.** Without that the
+  n ≥ 5 threshold was decoration rather than a threshold.
+- **A median under half an hour is a data problem, not a goal problem.** "Try
+  0m?" is not advice; it is an insult dressed as one.
+
+A suggestion also only ever moves *toward* what happened, never past it — a
+goal you beat every week is not offered a harder one, because that is a
+different feature and nobody asked for it.
+
+### Templates, and the one honest constant
+
+Four templates. Three take their number from the trailing four weeks and say so
+— *"10% under your median week (32h 00m median)"*. **Sleep is the exception**:
+8 hours a night, and its rationale says it is the only one not drawn from your
+own history rather than appending a median that would dress a constant up as a
+measurement.
+
+Where there is not enough history the template still appears, with no number and
+the reason. A template that opens with an invented round figure is one people
+dismiss; a template that admits it cannot tell you is one they trust the next
+time it can.
+
+### Still not done
+
+- **The weekly report as an artifact** — a file waiting on Monday morning,
+  headline first. The review panel exists; the thing you open at a fixed moment
+  does not.
+- **W3 focus sessions**, **W4 notices**, **W5 the off-plan nudge**.
+- **Workbook import (M13)**.
+- **Planned entertainment windows**, the other half of M11.

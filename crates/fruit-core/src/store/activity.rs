@@ -31,6 +31,8 @@ pub const TITLE_PATTERNS: &str = "activity.excludedTitlePatterns";
 pub const RETENTION_DAYS: &str = "activity.retentionDays";
 /// The short-observation floor, in seconds. See `day::apply_min_span`.
 pub const MIN_SPAN_SEC: &str = "activity.minSpanSec";
+/// Confirmed work in a run shorter than this counts as fragmented.
+pub const FRAGMENT_SEC: &str = "reports.fragmentSec";
 pub const LAST_PURGE: &str = "activity.lastPurgeAt";
 
 /// The contract between the shell's sampler and this module: a sample means
@@ -107,6 +109,15 @@ impl Store {
             _ => super::day::DEFAULT_MIN_SPAN_SEC,
         }
         .clamp(0, 3600)
+    }
+
+    /// The run length below which confirmed work counts as fragmented.
+    pub(crate) fn fragment_threshold_sec(&self) -> i64 {
+        match self.get_setting(FRAGMENT_SEC) {
+            Ok(Some(Value::Number(n))) => n.as_i64().unwrap_or(super::day::DEFAULT_FRAGMENT_SEC),
+            _ => super::day::DEFAULT_FRAGMENT_SEC,
+        }
+        .clamp(60, 3600)
     }
 
     fn next_purge_at(&self, retention_days: i64) -> Result<Option<Millis>> {

@@ -21,9 +21,11 @@ import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
 import type {
+  Fragmentation,
   GoalDirection,
   GoalProgress,
   GoalState,
+  GoalTemplate,
   MonthDay,
   MonthView,
   WeekReview,
@@ -500,12 +502,20 @@ function Goals() {
       </div>
 
       {adding && (
-        <GoalForm
-          onSaved={() => {
-            setAdding(false);
-            void load();
-          }}
-        />
+        <>
+          <Templates
+            onSaved={() => {
+              setAdding(false);
+              void load();
+            }}
+          />
+          <GoalForm
+            onSaved={() => {
+              setAdding(false);
+              void load();
+            }}
+          />
+        </>
       )}
 
       {review.goals.length === 0 ? (
@@ -531,6 +541,42 @@ function Goals() {
           ))}
         </div>
       )}
+      <FragmentationPanel now={review.fragmentation} before={review.previousFragmentation} />
+
+      {review.calibration.length > 0 && (
+        <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+          {review.calibration.map((c) => (
+            <div key={c.goalId} className="row">
+              <span className="grow caption">{c.summary}</span>
+              {/* Offered, never applied. You may have a good reason the last
+                  three weeks were atypical, and an app that quietly lowers your
+                  ambitions is worse than one that says nothing. */}
+              <button
+                className="btn micro"
+                onClick={async () => {
+                  const ok = await run(
+                    () =>
+                      ipc.setGoal(
+                        {
+                          subjectKind: c.subjectKind,
+                          subjectId: c.subjectId,
+                          direction: c.direction,
+                          targetSec: c.suggestedSec,
+                        },
+                        fmt.today(),
+                      ),
+                    "Couldn't change that goal.",
+                  );
+                  if (ok) void load();
+                }}
+              >
+                Use {fmt.duration(c.suggestedSec)}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {review.unreconciledDays > 0 && (
         <p className="caption">
           {review.unreconciledDays} day{review.unreconciledDays === 1 ? "" : "s"} this week
@@ -672,6 +718,133 @@ function GoalForm({ onSaved }: { onSaved: () => void }) {
       <button className="btn btn-primary" onClick={() => void save()}>
         Save goal
       </button>
+    </div>
+  );
+}
+
+/**
+ * How broken up the week's work was — the components, and **not** a score.
+ *
+ * Three numbers, each checkable against the Day view that produced it. A
+ * weighted 0–100 would be the one figure in this app nobody could verify, and
+ * the standing complaint about focus scores is exactly that their inputs are
+ * hidden.
+ *
+ * Each is shown against last week, because direction of travel is the whole
+ * reading: one week's longest stretch in isolation says nothing.
+ */
+function FragmentationPanel({ now, before }: { now: Fragmentation; before: Fragmentation }) {
+  if (now.stretches === 0) return null;
+
+  const rows = [
+    {
+      label: "Longest unbroken stretch",
+      value: fmt.duration(now.longestStretchSec),
+      was: before.longestStretchSec,
+      is: now.longestStretchSec,
+      // Longer is better here; for the two below, fewer is.
+      better: 1,
+      note: "on one task",
+    },
+    {
+      label: "Unplanned switches",
+      value: String(now.unplannedSwitches),
+      was: before.unplannedSwitches,
+      is: now.unplannedSwitches,
+      better: -1,
+      note: `${now.plannedSwitches} more landed on a block boundary — those are the plan working`,
+    },
+    {
+      label: "Time in short runs",
+      value: fmt.duration(now.fragmentedSec),
+      was: before.fragmentedSec,
+      is: now.fragmentedSec,
+      better: -1,
+      note: `runs under ${fmt.duration(now.fragmentThresholdSec)}`,
+    },
+  ];
+
+  return (
+    <div className="stack" style={{ gap: 6, marginTop: 12 }}>
+      <h4 className="micro">How broken up the week was</h4>
+      {rows.map((r) => {
+        const delta = r.is - r.was;
+        const word = delta === 0 ? "same as last week" : delta * r.better > 0 ? "better" : "worse";
+        return (
+          <div key={r.label} className="row">
+            <span className="grow">
+              {r.label} <span className="caption">· {r.note}</span>
+            </span>
+            <span className="data">{r.value}</span>
+            {/* Never colour alone: the word carries it. */}
+            <span className="tag micro">{word}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Goal templates — the numbers come from your own weeks.
+ *
+ * A blank goal form asks for a figure nobody has, and the figure people invent
+ * is a round one they do not believe. Each template says where its number came
+ * from; where there is not enough history it says that instead of guessing,
+ * which is the difference between a suggestion and a wish.
+ */
+function Templates({ onSaved }: { onSaved: () => void }) {
+  const run = useApp((s) => s.run);
+  const [templates, setTemplates] = useState<GoalTemplate[]>([]);
+
+  useEffect(() => {
+    void ipc
+      .getGoalTemplates(fmt.today(), fmt.tz())
+      .then(setTemplates)
+      .catch(() => setTemplates([]));
+  }, []);
+
+  if (templates.length === 0) return null;
+
+  return (
+    <div className="stack" style={{ gap: 6, marginBottom: 8 }}>
+      {templates.map((t) => (
+        <div key={t.key} className="row">
+          <span className="grow">
+            <b>{t.name}</b>{" "}
+            <span className="caption">
+              {t.direction === "atLeast" ? "at least" : "at most"}{" "}
+              {t.targetSec === null ? "—" : fmt.duration(t.targetSec)} · {t.rationale}
+            </span>
+          </span>
+          <button
+            className="btn micro"
+            // A template with no number cannot be applied, and says why rather
+            // than offering a dead button with no explanation.
+            disabled={t.targetSec === null}
+            onClick={async () => {
+              if (t.targetSec === null) return;
+              const ok = await run(
+                () =>
+                  ipc.setGoal(
+                    {
+                      subjectKind: t.subjectKind,
+                      subjectId: t.subjectId,
+                      direction: t.direction,
+                      targetSec: t.targetSec!,
+                      appliesDays: t.appliesDays,
+                    },
+                    fmt.today(),
+                  ),
+                "Couldn't use that template.",
+              );
+              if (ok) onSaved();
+            }}
+          >
+            Use
+          </button>
+        </div>
+      ))}
     </div>
   );
 }

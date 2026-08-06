@@ -43,8 +43,8 @@ pub use activity::{
     PAUSED as ACTIVITY_PAUSED, SAMPLE_INTERVAL_MS,
 };
 pub use day::{
-    apply_min_span, dedupe_browser_overlap, resolve_day, ObservedSpan, Segment, SegmentOwner,
-    DEFAULT_MIN_SPAN_SEC,
+    add_fragmentation, apply_min_span, dedupe_browser_overlap, fragmentation, resolve_day,
+    ObservedSpan, Segment, SegmentOwner, DEFAULT_FRAGMENT_SEC, DEFAULT_MIN_SPAN_SEC,
 };
 pub use domain_rules::{
     DomainTotal, DOMAINS_ENABLED as ACTIVITY_DOMAINS_ENABLED,

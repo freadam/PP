@@ -264,6 +264,53 @@ export interface GoalProgress {
   summary: string;
 }
 
+/**
+ * How broken up the work was — the components, deliberately **not** a score.
+ *
+ * A weighted 0–100 would be the one number in this app nobody could verify.
+ * And `plannedSwitches` is something an app that only watches window focus
+ * structurally cannot produce: a switch on a block boundary is you executing
+ * your intention, not an interruption.
+ */
+export interface Fragmentation {
+  longestStretchSec: number;
+  stretches: number;
+  plannedSwitches: number;
+  unplannedSwitches: number;
+  fragmentedSec: number;
+  /** Rides along so the figure is never readable without its rule. */
+  fragmentThresholdSec: number;
+}
+
+/** Offered, never applied. Trailing median, n ≥ 5. */
+export interface GoalCalibration {
+  goalId: string;
+  /** So applying the suggestion is `setGoal` on the same quantity. */
+  subjectKind: GoalSubject;
+  subjectId: string;
+  direction: GoalDirection;
+  subjectName: string;
+  targetSec: number;
+  medianSec: number;
+  weeks: number;
+  weeksMet: number;
+  suggestedSec: number;
+  summary: string;
+}
+
+/** A goal Fruit will suggest, with the number it picked and where it came from. */
+export interface GoalTemplate {
+  key: string;
+  name: string;
+  subjectKind: GoalSubject;
+  subjectId: string;
+  direction: GoalDirection;
+  /** `null` when there is not enough history to pick honestly. */
+  targetSec: number | null;
+  appliesDays: number;
+  rationale: string;
+}
+
 export interface WeekReview {
   week: string;
   from: LocalDate;
@@ -275,6 +322,9 @@ export interface WeekReview {
   elapsedEmptySec: number;
   unreconciledDays: number;
   goals: GoalProgress[];
+  fragmentation: Fragmentation;
+  previousFragmentation: Fragmentation;
+  calibration: GoalCalibration[];
 }
 
 export interface DomainTotal {
@@ -890,6 +940,7 @@ export interface DayView {
   isReconciled: boolean;
   isToday: boolean;
   now: Millis;
+  fragmentation: Fragmentation;
 }
 
 // ─── the month (Plan Rev 3 §8.5, wireframe screen 3) ───────────────────
