@@ -70,6 +70,9 @@ import type {
   ActivityStatus,
   BlockRow,
   BlockIntent,
+  WeekReport,
+  WeekReportDue,
+  WeekReportResult,
   IcsImportSummary,
   NewBlock,
   RrulePreset,
@@ -442,3 +445,29 @@ export const exportExcel = (
 
 export const suggestExcelPath = (fileName: string) =>
   call<string>("suggest_excel_path", { fileName });
+
+/* ─── the Monday-morning report (W9) ───────────────────────────────────── */
+
+/**
+ * Is a report waiting? `null` means there is nothing to say about last week —
+ * a legitimate answer, and the one an empty week gets. Never about the week in
+ * progress: a report on a week that is still happening is one that will be
+ * wrong by Friday.
+ */
+export const dueWeekReport = (tz: string) =>
+  call<WeekReportDue | null>("due_week_report", { tz });
+
+export const getWeekReport = (date: LocalDate, tz: string) =>
+  call<WeekReport>("get_week_report", { date, tz });
+
+/** Writes the file. `path` omitted lands it in Downloads, named by ISO week. */
+export const exportWeekReport = (date: LocalDate, tz: string, path?: string) =>
+  call<WeekReportResult>("export_week_report", { date, tz, path: path ?? null });
+
+export const markWeekReportSeen = (week: string) =>
+  call<void>("mark_week_report_seen", { week });
+
+/** Shows a written file in the OS file manager. Reveal, never open: launching
+ *  whatever the machine associates with `.xlsx` is a bigger assumption than
+ *  putting the folder in front of someone. */
+export const revealPath = (path: string) => call<void>("reveal_path", { path });

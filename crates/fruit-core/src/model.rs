@@ -1130,6 +1130,93 @@ pub struct WeekReview {
     pub calibration: Vec<GoalCalibration>,
 }
 
+// ─── the Monday-morning report (W9) ────────────────────────────────────
+
+/// Everything the weekly report says, in the order it says it.
+///
+/// The card in the app and the workbook on disk are both rendered from this, so
+/// what Fruit tells you is waiting and what the file contains cannot disagree.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekReport {
+    /// The top of the page, and the only part most readings get to.
+    pub headline: WeekHeadline,
+    pub review: WeekReview,
+    /// Where the plan and the week disagreed most, and on which day.
+    pub divergence: Option<WeekDivergence>,
+    /// W8's ranked list, trimmed to what fits a skim.
+    pub unlabelled: Vec<UnlabelledRow>,
+}
+
+/// *"The most important information is right at the top — the Work hours from
+/// last week and the breakdown into categories."* This struct is that sentence
+/// and nothing else, deliberately: anything that creeps in here pushes the two
+/// figures the reader came for below the fold.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekHeadline {
+    pub work_sec: i64,
+    pub categories: Vec<WeekCategory>,
+    /// The week has ended. False means the report is about a week still
+    /// happening, and it must not call itself "last week".
+    pub is_complete: bool,
+}
+
+/// One row of the breakdown. `share` is carried rather than left to the
+/// renderer because the rows partition the week, and a percentage computed
+/// against the wrong denominator is the classic way that stops being true.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekCategory {
+    pub name: String,
+    pub seconds: i64,
+    pub share: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DivergenceKind {
+    /// A day whose tracked work ran past what was plotted for it.
+    Overrun,
+    /// Entertainment outside any window that was plotted for it.
+    UnplannedEntertainment,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekDivergence {
+    pub local_date: String,
+    pub kind: DivergenceKind,
+    pub seconds: i64,
+    /// Pre-formatted, because the sentence differs by kind and deriving it in
+    /// the renderer would be a second implementation of the same rule.
+    pub detail: String,
+}
+
+/// A report waiting to be read. `None` from `due_week_report` means there is
+/// nothing to say, which is a legitimate answer and not an error.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekReportDue {
+    /// ISO week, `YYYY-Www`.
+    pub week: String,
+    pub from: String,
+    pub to: String,
+    pub headline: WeekHeadline,
+    /// Where the file went, if one has been written and is still there. `None`
+    /// means the card can offer to write it.
+    pub written_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekReportResult {
+    pub path: String,
+    pub week: String,
+    pub headline: String,
+    pub sheets: Vec<String>,
+}
+
 /// A goal Fruit is prepared to suggest, with the number it picked and where it
 /// came from.
 ///

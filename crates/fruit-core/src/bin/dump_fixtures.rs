@@ -478,6 +478,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         json!(store.get_week_review(&today, &tz)?),
     );
     out.insert("get_goals".into(), json!(store.get_goals(false)?));
+    // W9's report, and the card that offers it. The card fixture is recorded
+    // for *last* week deliberately: `due_week_report` is only ever about a week
+    // that has finished, and a fixture of this week would show the preview a
+    // card the real app would never draw.
+    out.insert(
+        "get_week_report".into(),
+        json!(store.week_report(&today, &tz)?),
+    );
+    out.insert(
+        "due_week_report".into(),
+        json!(store.due_week_report(&tz)?),
+    );
     out.insert(
         "get_goal_templates".into(),
         json!(store.get_goal_templates(&today, &tz)?),

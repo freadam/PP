@@ -1039,6 +1039,63 @@ export interface MonthView {
 
 // ─── Excel export (Plan Rev 3 §10, wireframe screen 5) ─────────────────
 
+// ─── the Monday-morning report (W9) ────────────────────────────────────
+
+/** Everything the weekly report says, in the order it says it. */
+export interface WeekReport {
+  headline: WeekHeadline;
+  review: WeekReview;
+  divergence: WeekDivergence | null;
+  unlabelled: UnlabelledRow[];
+}
+
+/**
+ * *"The most important information is right at the top — the Work hours from
+ * last week and the breakdown into categories."* This is that sentence and
+ * nothing else; anything that creeps in here pushes the two figures the reader
+ * came for below the fold.
+ */
+export interface WeekHeadline {
+  workSec: number;
+  categories: WeekCategory[];
+  /** The week has ended. False means it must not call itself "last week". */
+  isComplete: boolean;
+}
+
+export interface WeekCategory {
+  name: string;
+  seconds: number;
+  /** Carried rather than computed here: the rows partition the week, and a
+   *  percentage against the wrong denominator is how that stops being true. */
+  share: number;
+}
+
+export type DivergenceKind = "overrun" | "unplannedEntertainment";
+
+export interface WeekDivergence {
+  localDate: LocalDate;
+  kind: DivergenceKind;
+  seconds: number;
+  detail: string;
+}
+
+/** A report waiting to be read. `null` means there is nothing to say. */
+export interface WeekReportDue {
+  week: string;
+  from: LocalDate;
+  to: LocalDate;
+  headline: WeekHeadline;
+  /** Where the file went, if one exists. `null` means it can be written. */
+  writtenTo: string | null;
+}
+
+export interface WeekReportResult {
+  path: string;
+  week: string;
+  headline: string;
+  sheets: string[];
+}
+
 export interface ExcelOptions {
   includeObserved: boolean;
   includeUnaccounted: boolean;

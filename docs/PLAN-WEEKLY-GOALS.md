@@ -531,7 +531,7 @@ Sequenced by what unblocks what, and by the plan's own phase order — Phase 6
 | 2 | ~~**W1 goals + W2 pace**~~ | 1 | **Built** (migration 0008). Closes the budget half of M11 — an entertainment budget is this with `direction = atMost`. |
 | 3 | ~~**W7 categories + W8 uncategorised surface**~~ | — | **Built.** Migration 0007, plus a short-observation floor and the fix for the sampler and the connector both billing the same hour. |
 | 4 | ~~**W6 fragmentation**~~ | 1 | **Built.** No new capture — derived from `resolve_day`. |
-| 5 | ◐ **W9 weekly review + report** | 2, 3, 4 | **Calibration built.** The report *artifact* — a file read at a fixed moment — is not. |
+| 5 | ~~**W9 weekly review + report**~~ | 2, 3, 4 | **Built.** The review panel, and the artifact: a two-sheet `.xlsx` whose shares are formulas, and a card that appears on its own once a week has finished and waits until it has been read. Not a PDF and not an email — an offline app has no mailer, and inventing one would be the first outbound connection in a product badged OFFLINE. |
 | 6 | ~~**W3 focus sessions**~~ | — | **Built.** The intended length is a plotted block; extending moves the reminder and not the plan. |
 | 7 | ~~**W4 notices + W5 off-plan nudge**~~ | 3 | **Built.** Three switches, one Settings group, all off by default. |
 | 8 | ~~**W10 templates**~~ | 2 | **Built.** Numbers from your own weeks; a template with no history says so. |

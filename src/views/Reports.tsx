@@ -33,6 +33,7 @@ import type {
 import { METRIC } from "../lib/types";
 import { DriftBar } from "../components/DriftRail";
 import { Empty } from "../components/chrome";
+import { WeekReportPanel } from "../components/WeekReportCard";
 
 type Horizon = "week" | "month";
 
@@ -352,6 +353,9 @@ function WeekReports() {
 
   return (
     <>
+      {/* The report first, then the goals it is a report on. W9 asks for the
+          headline at the top and means it: everything below this is depth. */}
+      <WeekReportPanel date={fmt.today()} />
       <Goals />
       <section className="panel">
         <h3>Calibration</h3>

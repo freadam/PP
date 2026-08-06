@@ -627,6 +627,67 @@ fn export_excel(
     with(&state, |s| s.write_excel(&month, &tz, &path, &options))
 }
 
+/// The Monday-morning report (W9). `None` means there is nothing to say about
+/// last week, which is a legitimate answer.
+#[tauri::command]
+fn due_week_report(state: State<'_, AppState>, tz: String) -> Res<Option<WeekReportDue>> {
+    with(&state, |s| s.due_week_report(&tz))
+}
+
+#[tauri::command]
+fn get_week_report(state: State<'_, AppState>, date: String, tz: String) -> Res<WeekReport> {
+    with(&state, |s| s.week_report(&date, &tz))
+}
+
+/// Writes the week's report and remembers where it went, so the card can offer
+/// to open the file next time rather than writing a second copy.
+#[tauri::command]
+fn export_week_report(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    date: String,
+    tz: String,
+    path: Option<PathBuf>,
+) -> Res<WeekReportResult> {
+    let path = match path {
+        Some(p) => downloads_path(&app, p),
+        None => {
+            let week = with(&state, |s| {
+                Ok(s.week_report(&date, &tz)?.review.week)
+            })?;
+            downloads_path(&app, PathBuf::from(format!("fruit-{week}.xlsx")))
+        }
+    };
+    with(&state, |s| s.write_week_report(&date, &tz, &path))
+}
+
+/// The card has been read. It stops appearing for this week and every week
+/// before it.
+#[tauri::command]
+fn mark_week_report_seen(state: State<'_, AppState>, week: String) -> Res<()> {
+    with(&state, |s| s.mark_week_report_seen(&week))
+}
+
+/// Shows a file in the OS file manager.
+///
+/// Reveal rather than open: the report is a spreadsheet, and launching whatever
+/// the machine has associated with `.xlsx` is a bigger assumption than putting
+/// the folder in front of someone. It is also the only permission the app asks
+/// for here — `opener:allow-reveal-item-in-dir`, and nothing that opens URLs.
+#[tauri::command]
+fn reveal_path(app: AppHandle, path: String) -> Res<()> {
+    use tauri_plugin_opener::OpenerExt;
+    if !std::path::Path::new(&path).exists() {
+        return Err(AppError::invalid(
+            "That file isn't there any more. Write the report again.",
+        ));
+    }
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| AppError::invalid(format!("Couldn't show that file: {e}")))?;
+    Ok(())
+}
+
 /// Where the workbook will land, shown before anyone commits to writing it.
 #[tauri::command]
 fn suggest_excel_path(app: AppHandle, file_name: String) -> Res<String> {
@@ -1014,6 +1075,11 @@ pub fn run() {
             preview_excel,
             export_excel,
             suggest_excel_path,
+            due_week_report,
+            get_week_report,
+            export_week_report,
+            mark_week_report_seen,
+            reveal_path,
             get_life_areas,
             create_life_area,
             update_life_area,

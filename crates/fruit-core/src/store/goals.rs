@@ -570,7 +570,7 @@ fn summarise(
 
 /// `2h 15m`, `45m`, `0m`. Matches the renderer's own duration format so the
 /// sentence and the figure beside it never read differently.
-fn hm(sec: i64) -> String {
+pub(crate) fn hm(sec: i64) -> String {
     let sec = sec.max(0);
     let (h, m) = (sec / 3600, (sec % 3600) / 60);
     if h > 0 {

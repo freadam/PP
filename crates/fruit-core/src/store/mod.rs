@@ -38,6 +38,7 @@ mod seed;
 mod tasks;
 mod timer;
 mod week;
+mod week_report;
 
 pub use activity::{
     ENABLED as ACTIVITY_ENABLED, MIN_SPAN_SEC as ACTIVITY_MIN_SPAN_SEC,

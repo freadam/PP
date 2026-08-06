@@ -23,6 +23,7 @@ import { ExcelExport } from "./views/ExcelExport";
 import { Focus } from "./views/Focus";
 import { ReconcileSheet } from "./views/Reconcile";
 import { BlockDialogs } from "./components/BlockDialogs";
+import { MondayCard } from "./components/WeekReportCard";
 import type { Notice, TimerState } from "./lib/types";
 import { BREAK_DETAIL_COLUMN, useViewportWidth } from "./lib/useViewport";
 
@@ -138,6 +139,9 @@ export default function App() {
       <BlockDialogs />
       <RecoveryModal />
       <IdleBanner />
+      {/* Not a response to anything the user just did: a week has finished and
+          has not been looked at. It waits until it has been read (W9). */}
+      <MondayCard />
       <Toasts />
       <PreviewNotice />
     </div>
