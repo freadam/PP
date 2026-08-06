@@ -33,6 +33,7 @@ import type {
   DayView,
   LifeAreaRow,
   LifeEntryRow,
+  RrulePreset,
   SlotOwner,
   SlotState,
 } from "../lib/types";
@@ -610,6 +611,7 @@ function IntervalDetail({
               <div className="fake-input note">{entry.note}</div>
             </div>
           )}
+          {entry && <RepeatLife entry={entry} onDone={reload} />}
         </>
       )}
 
@@ -642,6 +644,125 @@ function IntervalDetail({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Making a life entry repeat, and unmaking it (M9).
+ *
+ * Sleep is the case this exists for: the largest block of anyone's week, the
+ * one that is genuinely the same every night, and — before this — the one that
+ * had to be typed in daily.
+ *
+ * The presets come from Rust, the same code that parses them, so the picker can
+ * never offer a rule the engine would refuse. Removing asks for a scope rather
+ * than guessing: "just tonight" and "three months of sleep" are different
+ * enough that inferring which was meant is a data-loss bug with a friendly name.
+ */
+function RepeatLife({ entry, onDone }: { entry: LifeEntryRow; onDone: () => Promise<void> }) {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const [presets, setPresets] = useState<RrulePreset[]>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    void ipc
+      .getRrulePresets()
+      .then(setPresets)
+      .catch(() => setPresets([]));
+  }, []);
+
+  if (entry.seriesId) {
+    return (
+      <div className="field">
+        <label>Repeats</label>
+        <div className="row">
+          <span className="grow caption">
+            One of a repeating set. Each night is a real entry — edit or remove any of them on
+            its own.
+          </span>
+        </div>
+        <div className="row">
+          {(
+            [
+              ["instance", "Just this one"],
+              ["future", "This and later"],
+              ["all", "All of them"],
+            ] as const
+          ).map(([scope, label]) => (
+            <button
+              key={scope}
+              className="btn"
+              onClick={async () => {
+                const token = await run(
+                  () => ipc.deleteLifeSeries(entry.id, scope),
+                  "Couldn't remove that.",
+                );
+                if (token) {
+                  toast(token.label, {
+                    action: {
+                      label: "Undo",
+                      run: async () => {
+                        await ipc.restore(token).catch(() => {});
+                        await onDone();
+                      },
+                    },
+                  });
+                  await onDone();
+                }
+              }}
+            >
+              Remove · {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="field">
+      <label>Repeats</label>
+      {!open ? (
+        <button className="btn" onClick={() => setOpen(true)}>
+          Make this repeat
+        </button>
+      ) : presets.length === 0 ? (
+        <p className="caption">Repeat presets aren't available in browser preview.</p>
+      ) : (
+        <div className="stack" style={{ gap: 4 }}>
+          {presets.map((p) => (
+            <button
+              key={p.rrule}
+              className="btn"
+              onClick={async () => {
+                const rows = await run(
+                  () => ipc.repeatLifeEntry(entry.id, p.rrule),
+                  "Couldn't make that repeat.",
+                );
+                setOpen(false);
+                if (rows) {
+                  // Say how many: a rule that silently produces nothing — a
+                  // monthly 31st, say — would otherwise look like it worked.
+                  toast(`${p.description} — ${rows.length - 1} more over the next 90 days.`);
+                  await onDone();
+                }
+              }}
+            >
+              <span className="grow" style={{ textAlign: "left" }}>
+                {p.label}
+              </span>
+              <span className="micro" style={{ color: "var(--muted)" }}>
+                {p.description}
+              </span>
+            </button>
+          ))}
+          <button className="btn" onClick={() => setOpen(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

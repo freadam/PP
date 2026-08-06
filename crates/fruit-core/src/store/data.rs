@@ -480,7 +480,18 @@ fn insert_row(
     let mut values: Vec<rusqlite::types::Value> = Vec::new();
 
     for column in columns {
-        let Some(raw) = obj.get(column) else { continue };
+        // `note.markdown` became `note.body` in migration 0011. An export
+        // written before that carries the old key, and skipping it would drop
+        // every note on restore — silently, because the row still inserts on
+        // its `task_id`. Restoring a backup must not lose what the backup held.
+        let raw = match obj.get(column) {
+            Some(v) => v,
+            None if table == "note" && column == "body" => match obj.get("markdown") {
+                Some(v) => v,
+                None => continue,
+            },
+            None => continue,
+        };
         let mut value = json_to_sqlite(raw);
         if !remap.is_empty() && id_like.contains(&column.as_str()) {
             if let rusqlite::types::Value::Text(s) = &value {

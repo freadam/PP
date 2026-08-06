@@ -27,6 +27,8 @@ use crate::ids::{new_id, validate_id};
 use crate::model::*;
 use crate::time::{local_date, month_bounds, zone, Millis};
 
+use super::recurrence::SeriesScope;
+
 /// The workbook's categories. Seeded on first run so an imported month has
 /// somewhere to land, and marked built-in so they cannot be deleted out from
 /// under an import.
@@ -224,7 +226,8 @@ impl Store {
     // ─── entries ───────────────────────────────────────────────────────
 
     pub(crate) const ENTRY_COLS: &'static str = "e.id, e.life_area_id, a.name, a.colour, a.kind, \
-         e.label, e.started_at, e.ended_at, e.local_date, e.tz, e.is_private, e.note";
+         e.label, e.started_at, e.ended_at, e.local_date, e.tz, e.is_private, e.note, \
+         e.series_id, e.rrule";
 
     pub(crate) fn map_entry(r: &Row) -> rusqlite::Result<LifeEntryRow> {
         let kind: String = r.get(4)?;
@@ -241,6 +244,8 @@ impl Store {
             tz: r.get(9)?,
             is_private: r.get::<_, i64>(10)? == 1,
             note: r.get(11)?,
+            series_id: r.get(12)?,
+            rrule: r.get(13)?,
         })
     }
 
@@ -489,5 +494,404 @@ impl Store {
         // the interval the moment the day is totalled.
         self.delete_session(session_id)?;
         Ok(entry)
+    }
+}
+
+// ─── repeating life entries (M9, migration 0012) ───────────────────────
+//
+// The same engine the planner uses for blocks, and deliberately so: two
+// recurrence implementations would disagree about DST within a year, and the
+// one people notice is always the one that moved their sleep.
+
+impl Store {
+    /// Makes an existing entry repeat, and materialises its instances.
+    ///
+    /// The gesture is "this happens every night", not "throw this away and make
+    /// a repeating one" — the entry already exists and may already be part of a
+    /// reviewed day, so the seed is the entry you selected, in place.
+    pub fn repeat_life_entry(&mut self, id: &str, rule_text: &str) -> Result<Vec<LifeEntryRow>> {
+        validate_id(id, "life entry")?;
+        let rule = crate::rrule::Rrule::parse(rule_text)?;
+        let seed = self.life_entry(id)?;
+        if seed.series_id.is_some() {
+            // Changing a live rule means deciding what happens to instances the
+            // user may already have edited. Refusing is honest; silently
+            // rewriting the future would not be.
+            return Err(AppError::invalid(
+                "This already repeats. Remove the repeat first, then set a new one.",
+            ));
+        }
+
+        let series_id = new_id();
+        let now = self.now();
+        self.conn.execute(
+            "UPDATE life_entry SET series_id = ?2, rrule = ?3, updated_at = ?4 WHERE id = ?1",
+            params![id, series_id, rule_text, now],
+        )?;
+
+        let zone_ = zone(&seed.tz)?;
+        let start = crate::time::parse_date(&seed.local_date)?;
+        let horizon = local_date(now, &zone_);
+        let horizon = crate::time::parse_date(&horizon)?
+            + chrono::Duration::days(super::recurrence::HORIZON_DAYS);
+        let seed = self.life_entry(id)?;
+        let created = self.materialise_life(&series_id, &seed, &rule, start, horizon)?;
+
+        let mut out = vec![self.life_entry(id)?];
+        out.extend(created);
+        Ok(out)
+    }
+
+    /// Tops a series up to the horizon. Idempotent — an instance that already
+    /// exists on a date is left alone, so calling this on every day load is
+    /// safe and cheap.
+    fn materialise_life(
+        &mut self,
+        series_id: &str,
+        seed: &LifeEntryRow,
+        rule: &crate::rrule::Rrule,
+        from: chrono::NaiveDate,
+        horizon: chrono::NaiveDate,
+    ) -> Result<Vec<LifeEntryRow>> {
+        let zone_ = zone(&seed.tz)?;
+        // The seed's *local wall clock*, not its instant: an 23:00 bedtime stays
+        // at 23:00 across a DST boundary instead of sliding to 22:00.
+        let seed_local = crate::time::to_local(seed.started_at, &zone_);
+        let time = chrono::NaiveDateTime::from(seed_local.naive_local()).time();
+        let length = seed.ended_at - seed.started_at;
+
+        let existing: Vec<String> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT local_date FROM life_entry WHERE series_id = ?1 AND deleted_at IS NULL",
+            )?;
+            let rows = stmt.query_map([series_id], |r| r.get(0))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
+
+        let now = self.now();
+        let mut created = Vec::new();
+        let tx = self.conn.transaction()?;
+        for date in rule.dates(from, horizon) {
+            let local_date = crate::time::format_date(date);
+            if existing.contains(&local_date) {
+                continue;
+            }
+            let started_at = crate::time::resolve_local(date.and_time(time), &zone_);
+            let id = new_id();
+            // Unlike a block, this may cross midnight — a night's sleep is the
+            // whole reason the feature exists. It is still stamped with the
+            // local date it *starts* on, which is how every other query finds it.
+            tx.execute(
+                "INSERT INTO life_entry
+                   (id, life_area_id, label, started_at, ended_at, local_date, tz,
+                    is_private, note, series_id, device_id, created_at, updated_at)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?12)",
+                params![
+                    id,
+                    seed.life_area_id,
+                    seed.label,
+                    started_at,
+                    started_at + length,
+                    local_date,
+                    seed.tz,
+                    seed.is_private as i64,
+                    seed.note,
+                    series_id,
+                    self.device_id,
+                    now
+                ],
+            )?;
+            created.push(id);
+        }
+        tx.commit()?;
+        created.iter().map(|id| self.life_entry(id)).collect()
+    }
+
+    /// Called before a day or week load: extends any series whose last instance
+    /// falls short of the range being viewed.
+    pub fn extend_life_series_to(&mut self, through: &str) -> Result<usize> {
+        let target = crate::time::parse_date(through)?;
+        let series: Vec<(String, String)> = {
+            let mut stmt = self.conn.prepare(
+                "SELECT DISTINCT series_id, rrule FROM life_entry
+                  WHERE series_id IS NOT NULL AND rrule IS NOT NULL AND deleted_at IS NULL",
+            )?;
+            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect::<std::result::Result<_, _>>()?
+        };
+
+        let mut added = 0;
+        for (series_id, rule_text) in series {
+            let Ok(rule) = crate::rrule::Rrule::parse(&rule_text) else {
+                continue;
+            };
+            let last: Option<String> = self
+                .conn
+                .query_row(
+                    "SELECT MAX(local_date) FROM life_entry
+                      WHERE series_id = ?1 AND deleted_at IS NULL",
+                    [&series_id],
+                    |r| r.get(0),
+                )
+                .unwrap_or(None);
+            let Some(last) = last else { continue };
+            if crate::time::parse_date(&last)? >= target {
+                continue;
+            }
+            let seed = self.life_series_seed(&series_id)?;
+            added += self
+                .materialise_life(&series_id, &seed, &rule, crate::time::parse_date(&last)?, target)?
+                .len();
+        }
+        Ok(added)
+    }
+
+    fn life_series_seed(&self, series_id: &str) -> Result<LifeEntryRow> {
+        self.conn
+            .query_row(
+                &format!(
+                    "SELECT {} FROM life_entry e
+                       JOIN life_area a ON a.id = e.life_area_id
+                      WHERE e.series_id = ?1 AND e.deleted_at IS NULL
+                      ORDER BY e.started_at LIMIT 1",
+                    Self::ENTRY_COLS
+                ),
+                [series_id],
+                Self::map_entry,
+            )
+            .map_err(|_| AppError::NotFound("series"))
+    }
+
+    /// Removing part or all of a repeating entry.
+    ///
+    /// The scope is explicit for the same reason it is on a block: deleting
+    /// "just tonight" and deleting three months of sleep are different enough
+    /// that inferring which was meant is not a convenience, it is a data-loss
+    /// bug with a friendly name.
+    pub fn delete_life_series(&mut self, id: &str, scope: SeriesScope) -> Result<UndoToken> {
+        validate_id(id, "life entry")?;
+        let entry = self.life_entry(id)?;
+        let Some(series_id) = entry.series_id.clone() else {
+            return self.delete_life_entry(id);
+        };
+
+        let now = self.now();
+        let (sql, label) = match scope {
+            SeriesScope::Instance => return self.delete_life_entry(id),
+            SeriesScope::Future => (
+                "UPDATE life_entry SET deleted_at = ?3, updated_at = ?3
+                  WHERE series_id = ?1 AND started_at >= ?2 AND deleted_at IS NULL",
+                "Removed this and later",
+            ),
+            SeriesScope::All => (
+                "UPDATE life_entry SET deleted_at = ?3, updated_at = ?3
+                  WHERE series_id = ?1 AND ?2 = ?2 AND deleted_at IS NULL",
+                "Removed the whole repeat",
+            ),
+        };
+        self.conn.execute(sql, params![series_id, entry.started_at, now])?;
+
+        Ok(UndoToken {
+            entity: "lifeSeries".into(),
+            id: series_id,
+            label: label.into(),
+            at: now,
+        })
+    }
+
+    /// Restores a whole life series, for the undo token above.
+    pub fn restore_life_series(&mut self, series_id: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE life_entry SET deleted_at = NULL, updated_at = ?2 WHERE series_id = ?1",
+            params![series_id, self.now()],
+        )?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod series_tests {
+    use super::*;
+    use crate::clock::TestClock;
+    use std::sync::Arc;
+
+    /// Monday 2026-08-03, 09:00 UTC.
+    const MONDAY: i64 = 1_785_747_600_000;
+    const TZ: &str = "UTC";
+
+    fn store() -> Store {
+        Store::in_memory_with_clock(Arc::new(TestClock::new(MONDAY))).unwrap()
+    }
+
+    fn sleep_area(s: &Store) -> String {
+        s.get_life_areas(TZ, false)
+            .unwrap()
+            .into_iter()
+            .find(|a| a.name == "Sleep/Rest")
+            .unwrap()
+            .id
+    }
+
+    /// A night's sleep: 23:00 on one day to 06:30 the next. The case the whole
+    /// feature exists for, and the one a block could not express — a block may
+    /// not cross midnight; a life entry must be able to.
+    fn a_night(s: &mut Store) -> LifeEntryRow {
+        let midnight = MONDAY - 9 * 3_600_000;
+        s.add_life_entry(NewLifeEntry {
+            life_area_id: sleep_area(s),
+            label: Some("Sleep".into()),
+            started_at: midnight + 23 * 3_600_000,
+            ended_at: midnight + (24 + 6) * 3_600_000 + 30 * 60_000,
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn a_nightly_entry_becomes_real_rows_every_night() {
+        let mut s = store();
+        let seed = a_night(&mut s);
+        let created = s.repeat_life_entry(&seed.id, "FREQ=DAILY;COUNT=5").unwrap();
+        assert_eq!(created.len(), 5, "the seed plus four more");
+
+        let series = created[0].series_id.clone().expect("the seed carries it");
+        assert!(created.iter().all(|e| e.series_id.as_deref() == Some(&series)));
+
+        // Every one is a real row with its own id, which is the whole reason
+        // they are materialised: a virtual instance cannot be edited or deleted.
+        let tuesday = s.life_entries_on("2026-08-04", TZ).unwrap();
+        assert!(
+            tuesday.iter().any(|e| e.label.as_deref() == Some("Sleep")),
+            "Tuesday has a night of its own"
+        );
+        assert_eq!(
+            created[1].ended_at - created[1].started_at,
+            created[0].ended_at - created[0].started_at,
+            "and the same length"
+        );
+    }
+
+    /// It crosses midnight, and the day it crosses into still sees it. A
+    /// morning that lost its night would read as six unaccounted hours.
+    #[test]
+    fn a_repeating_night_is_visible_from_the_morning_it_covers() {
+        let mut s = store();
+        let seed = a_night(&mut s);
+        s.repeat_life_entry(&seed.id, "FREQ=DAILY;COUNT=3").unwrap();
+
+        let wednesday_morning = s.life_entries_on("2026-08-05", TZ).unwrap();
+        assert!(
+            wednesday_morning
+                .iter()
+                .any(|e| e.local_date == "2026-08-04" && e.label.as_deref() == Some("Sleep")),
+            "Tuesday night is on Wednesday's day view"
+        );
+    }
+
+    /// Changing a live rule means deciding what happens to instances the user
+    /// may already have edited. Refusing is honest.
+    #[test]
+    fn something_that_already_repeats_will_not_take_a_second_rule() {
+        let mut s = store();
+        let seed = a_night(&mut s);
+        s.repeat_life_entry(&seed.id, "FREQ=DAILY;COUNT=3").unwrap();
+        assert!(s.repeat_life_entry(&seed.id, "FREQ=WEEKLY").is_err());
+    }
+
+    /// "Just tonight" and "three months of sleep" are different enough that
+    /// inferring which was meant is a data-loss bug with a friendly name.
+    #[test]
+    fn the_scope_of_a_deletion_is_asked_rather_than_inferred() {
+        let mut s = store();
+        let seed = a_night(&mut s);
+        let created = s.repeat_life_entry(&seed.id, "FREQ=DAILY;COUNT=5").unwrap();
+        let third = created[2].clone();
+
+        // One night.
+        s.delete_life_series(&third.id, SeriesScope::Instance).unwrap();
+        assert!(s
+            .life_entries_on(&third.local_date, TZ)
+            .unwrap()
+            .iter()
+            .all(|e| e.id != third.id));
+
+        // This one and later.
+        let token = s
+            .delete_life_series(&created[1].id, SeriesScope::Future)
+            .unwrap();
+        assert!(s.life_entries_on(&created[3].local_date, TZ).unwrap().is_empty());
+        // The first night is untouched — "later" means later.
+        assert!(!s.life_entries_on(&created[0].local_date, TZ).unwrap().is_empty());
+
+        // And the undo puts the whole series back, because that is the token
+        // the deletion handed out.
+        s.restore(&token).unwrap();
+        assert!(!s.life_entries_on(&created[3].local_date, TZ).unwrap().is_empty());
+    }
+
+    /// The horizon is topped up when a day past it is asked for, and asking
+    /// twice does not double anything.
+    #[test]
+    fn the_horizon_extends_and_extending_twice_changes_nothing() {
+        let mut s = store();
+        let seed = a_night(&mut s);
+        s.repeat_life_entry(&seed.id, "FREQ=DAILY").unwrap();
+
+        let far = "2026-12-01";
+        let added = s.extend_life_series_to(far).unwrap();
+        assert!(added > 0, "the horizon moved");
+        assert_eq!(
+            s.extend_life_series_to(far).unwrap(),
+            0,
+            "and asking again adds nothing"
+        );
+        assert!(!s.life_entries_on("2026-11-30", TZ).unwrap().is_empty());
+    }
+
+    /// A 23:00 bedtime stays at 23:00 across a DST boundary rather than sliding
+    /// to 22:00 — the local wall clock repeats, not the instant.
+    #[test]
+    fn a_bedtime_keeps_its_wall_clock_across_a_dst_boundary() {
+        const LONDON: &str = "Europe/London";
+        let mut s = Store::in_memory_with_clock(Arc::new(TestClock::new(
+            // 2026-10-20, comfortably before the UK clocks go back on the 25th.
+            1_792_000_000_000,
+        )))
+        .unwrap();
+        let area = sleep_area(&s);
+        let start = crate::time::resolve_local(
+            crate::time::parse_date("2026-10-20")
+                .unwrap()
+                .and_hms_opt(23, 0, 0)
+                .unwrap(),
+            &zone(LONDON).unwrap(),
+        );
+        let seed = s
+            .add_life_entry(NewLifeEntry {
+                life_area_id: area,
+                label: Some("Sleep".into()),
+                started_at: start,
+                ended_at: start + 7 * 3_600_000,
+                tz: LONDON.into(),
+                is_private: false,
+                note: None,
+                replace_existing: false,
+            })
+            .unwrap();
+
+        let created = s.repeat_life_entry(&seed.id, "FREQ=DAILY;COUNT=10").unwrap();
+        let after = created
+            .iter()
+            .find(|e| e.local_date == "2026-10-26")
+            .expect("the night after the clocks change");
+        let local = crate::time::to_local(after.started_at, &zone(LONDON).unwrap());
+        assert_eq!(
+            chrono::Timelike::hour(&local),
+            23,
+            "still 23:00 local, not 22:00"
+        );
     }
 }

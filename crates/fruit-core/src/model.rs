@@ -1634,6 +1634,12 @@ pub struct LifeEntryRow {
     /// Accounted for, but nothing recorded about it.
     pub is_private: bool,
     pub note: Option<String>,
+    /// Set on every instance of a repeating entry (migration 0012). Sleep is
+    /// the case this exists for: the largest block of anyone's week, and the
+    /// one that is genuinely the same every night.
+    pub series_id: Option<String>,
+    /// The rule itself, carried by the seed instance.
+    pub rrule: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

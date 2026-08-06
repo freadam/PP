@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import { Markdown } from "../components/Markdown";
+import { Note } from "../components/Note";
 import type { SessionRow } from "../lib/types";
 
 export function TaskDetail({ mode }: { mode: "column" | "sheet" }) {
@@ -227,12 +227,18 @@ function Fields() {
   );
 }
 
+/** What "compact" means, mirrored from `NOTE_MAX_CHARS` in the core. The core
+ *  is the authority — this only decides when to start showing the count. */
+const NOTE_MAX = 2000;
+
 function NoteTab() {
   const buffer = useApp((s) => s.noteBuffer);
   const setBuffer = useApp((s) => s.setNoteBuffer);
   const flush = useApp((s) => s.flushNote);
   const detail = useApp((s) => s.detail)!;
   const [preview, setPreview] = useState(false);
+  const used = [...buffer].length;
+  const over = used > NOTE_MAX;
 
   const makeSubtask = async (line: string) => {
     const { run, refresh } = useApp.getState();
@@ -250,17 +256,25 @@ function NoteTab() {
         <span className="label" style={{ color: "var(--muted)" }}>
           Note
         </span>
+        {/* The count appears once it is close to mattering. Shown before the
+            save, not after it: a limit you only meet at the moment you lose
+            work is not a limit, it is a trap. */}
+        {(over || used > NOTE_MAX * 0.8) && (
+          <span className="data micro" style={{ color: over ? "var(--over)" : "var(--muted)" }}>
+            {used} / {NOTE_MAX} characters{over ? " — too long to save" : ""}
+          </span>
+        )}
         <button className="btn" aria-pressed={preview} onClick={() => setPreview(!preview)}>
-          {preview ? "Edit" : "Preview"}
+          {preview ? "Edit" : "Read"}
         </button>
       </div>
       {preview ? (
-        <Markdown source={buffer} />
+        <Note source={buffer} />
       ) : (
         <textarea
           value={buffer}
           aria-label="Note"
-          placeholder="Markdown. Cmd+Enter turns the current line into a subtask."
+          placeholder="A note, in plain text. Cmd+Enter turns the current line into a subtask."
           onChange={(e) => setBuffer(e.target.value)}
           onBlur={() => void flush()}
           onKeyDown={(e) => {

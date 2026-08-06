@@ -232,9 +232,38 @@ fn unschedule_series(
 }
 
 /// Keeps series materialised as far as the planner is being asked to show.
+///
+/// Both kinds: blocks and repeating life entries share a horizon, because the
+/// week the planner is drawing is the same week the Day view will be asked
+/// about, and a sleep entry missing from it would read as an unaccounted night.
 #[tauri::command]
 fn extend_series_to(state: State<'_, AppState>, through: String) -> Res<usize> {
-    with(&state, |s| s.extend_series_to(&through))
+    with(&state, |s| {
+        Ok(s.extend_series_to(&through)? + s.extend_life_series_to(&through)?)
+    })
+}
+
+/// Makes an existing life entry repeat. Sleep is the case this exists for.
+#[tauri::command]
+fn repeat_life_entry(
+    state: State<'_, AppState>,
+    id: String,
+    rrule: String,
+) -> Res<Vec<LifeEntryRow>> {
+    with(&state, |s| s.repeat_life_entry(&id, &rrule))
+}
+
+/// Removing part or all of a repeating entry. The scope is explicit for the
+/// same reason it is on a block: "just tonight" and "three months of sleep" are
+/// different enough that inferring which was meant is a data-loss bug with a
+/// friendly name.
+#[tauri::command]
+fn delete_life_series(
+    state: State<'_, AppState>,
+    id: String,
+    scope: SeriesScope,
+) -> Res<UndoToken> {
+    with(&state, |s| s.delete_life_series(&id, scope))
 }
 
 /// Turns a block that already exists into the seed of a series, in place —
@@ -905,8 +934,8 @@ fn delete_session(state: State<'_, AppState>, id: String) -> Res<UndoToken> {
 }
 
 #[tauri::command]
-fn save_note(state: State<'_, AppState>, task_id: String, markdown: String) -> Res<()> {
-    with(&state, |s| s.save_note(&task_id, &markdown))
+fn save_note(state: State<'_, AppState>, task_id: String, body: String) -> Res<()> {
+    with(&state, |s| s.save_note(&task_id, &body))
 }
 
 #[tauri::command]
@@ -1156,6 +1185,8 @@ pub fn run() {
             schedule_recurring,
             unschedule_series,
             extend_series_to,
+            repeat_life_entry,
+            delete_life_series,
             repeat_block,
             describe_rrule,
             get_rrule_presets,

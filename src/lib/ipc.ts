@@ -3,7 +3,7 @@
  *
  * Every call is a typed, intent-based command. There are no SQL strings here,
  * and the capability file lists exactly the commands below — a strictly smaller
- * surface than a webview holding `sql:allow-execute` next to a markdown renderer.
+ * surface than a webview holding `sql:allow-execute` next to a text renderer.
  *
  * Outside a Tauri window (`npm run dev` in a browser) this falls back to a
  * **fixture** produced by the real Rust code — see `src/dev/fixtures.json` and
@@ -253,8 +253,9 @@ export const updateSession = (
 
 export const deleteSession = (id: string) => call<UndoToken>("delete_session", { id });
 
-export const saveNote = (taskId: string, markdown: string) =>
-  call<void>("save_note", { taskId, markdown });
+/** Plain text, capped at 2000 characters in the core (§2, M4). */
+export const saveNote = (taskId: string, body: string) =>
+  call<void>("save_note", { taskId, body });
 
 export const applyReconcile = (date: LocalDate, actions: ReconcileAction[], tz: string) =>
   call<DayReview>("apply_reconcile", { date, actions, tz });
@@ -281,6 +282,16 @@ export const unscheduleSeries = (id: string, scope: SeriesScope) =>
   call<UndoToken>("unschedule_series", { id, scope });
 
 /** Keeps series materialised as far as the planner is being asked to show. */
+/** Makes a life entry repeat. Sleep is the case this exists for. */
+export const repeatLifeEntry = (id: string, rrule: string) =>
+  call<LifeEntryRow[]>("repeat_life_entry", { id, rrule });
+
+/** Removing part or all of a repeating entry. The scope is asked, never
+ *  inferred — "just tonight" and "three months of sleep" are different enough
+ *  that guessing is a data-loss bug with a friendly name. */
+export const deleteLifeSeries = (id: string, scope: SeriesScope) =>
+  call<UndoToken>("delete_life_series", { id, scope });
+
 export const extendSeriesTo = (through: LocalDate) =>
   call<number>("extend_series_to", { through });
 

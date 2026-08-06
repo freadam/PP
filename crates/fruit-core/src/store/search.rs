@@ -72,9 +72,9 @@ impl Store {
         drop(stmt);
 
         let mut stmt = self.conn.prepare(
-            "SELECT n.task_id, t.title, substr(n.markdown, 1, 120)
+            "SELECT n.task_id, t.title, substr(n.body, 1, 120)
                FROM note n JOIN task t ON t.id = n.task_id
-              WHERE t.deleted_at IS NULL AND n.markdown LIKE ?1 COLLATE NOCASE LIMIT ?2",
+              WHERE t.deleted_at IS NULL AND n.body LIKE ?1 COLLATE NOCASE LIMIT ?2",
         )?;
         let rows = stmt.query_map(params![needle, limit], |r| {
             Ok((

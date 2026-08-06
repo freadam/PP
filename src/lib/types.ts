@@ -832,6 +832,11 @@ export interface LifeEntryRow {
   /** Accounted for, but nothing recorded about it. */
   isPrivate: boolean;
   note: string | null;
+  /** Set on every instance of a repeating entry (migration 0012). Each one is
+   *  a real row, so any single night can be edited or removed on its own. */
+  seriesId: string | null;
+  /** The rule itself, carried by the seed instance. */
+  rrule: string | null;
 }
 
 export interface NewLifeEntry {

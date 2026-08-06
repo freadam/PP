@@ -12,6 +12,14 @@ use crate::time::{check_plausible, local_date, parse_date, zone};
 /// §6.5: subtask depth ≤ 3. Deeper nesting is a UI problem, not a feature.
 const MAX_DEPTH: usize = 3;
 const MAX_TITLE: usize = 500;
+
+/// What "compact" means, in characters (§2, M4).
+///
+/// About three hundred words: room for the context a task needs and the two
+/// links you will want on Thursday, and not room for a meeting's minutes. The
+/// number is a judgement, and it is *public* so the UI can show how much is
+/// left rather than surprising someone at the moment they save.
+pub const NOTE_MAX_CHARS: usize = 2_000;
 /// How much of the completed tail the project page carries. Enough to see what
 /// the week cost, short of loading a year of history into a list view.
 const DONE_TAIL_LIMIT: u32 = 100;
@@ -586,7 +594,7 @@ impl Store {
         let (note, note_updated_at): (String, Option<i64>) = self
             .conn
             .query_row(
-                "SELECT markdown, updated_at FROM note WHERE task_id = ?1",
+                "SELECT body, updated_at FROM note WHERE task_id = ?1",
                 [id],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
@@ -622,17 +630,27 @@ impl Store {
     /// Debounced in the renderer (500ms, 3s maxWait) and force-flushed on blur,
     /// view change and close (§6.9) — taken literally, "auto-saving" would mean
     /// a database write per keystroke.
-    pub fn save_note(&mut self, task_id: &str, markdown: &str) -> Result<()> {
+    ///
+    /// **Plain text, and compact** (§2, M4). The cap is what makes "compact"
+    /// mean something: a note with a 1MB ceiling is a document store with a
+    /// smaller text box, and the moment a task note can hold a document, the
+    /// product has a notes system in it.
+    pub fn save_note(&mut self, task_id: &str, body: &str) -> Result<()> {
         validate_id(task_id, "task")?;
-        if markdown.len() > 1_000_000 {
-            return Err(AppError::invalid("Notes are limited to 1MB."));
+        // Characters, not bytes. A byte cap silently gives an English note
+        // three times the room of an Amharic one.
+        let length = body.chars().count();
+        if length > NOTE_MAX_CHARS {
+            return Err(AppError::invalid(format!(
+                "A note holds {NOTE_MAX_CHARS} characters and this one is {length}.                  It's a note, not a document — cut it down, or make the detail a subtask."
+            )));
         }
         let now = self.now();
         let n = self.conn.execute(
-            "INSERT INTO note (task_id, markdown, updated_at) VALUES (?1, ?2, ?3)
-             ON CONFLICT(task_id) DO UPDATE SET markdown = excluded.markdown,
+            "INSERT INTO note (task_id, body, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(task_id) DO UPDATE SET body = excluded.body,
                                                 updated_at = excluded.updated_at",
-            params![task_id, markdown, now],
+            params![task_id, body, now],
         )?;
         if n == 0 {
             return Err(AppError::NotFound("task"));
@@ -652,5 +670,118 @@ impl Store {
             })
         })?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+}
+
+#[cfg(test)]
+mod note_tests {
+    use super::*;
+    use crate::clock::TestClock;
+    use std::sync::Arc;
+
+    fn store() -> Store {
+        Store::in_memory_with_clock(Arc::new(TestClock::new(1_785_747_600_000))).unwrap()
+    }
+
+    fn task(s: &mut Store) -> String {
+        s.create_task(NewTask {
+            title: "A task".into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .id
+    }
+
+    /// The note is what you typed. Nothing about it is markup, and the store
+    /// does not care what characters are in it — the reduction is that the
+    /// *renderer* stopped interpreting them, not that they became illegal.
+    #[test]
+    fn a_note_is_stored_and_returned_verbatim() {
+        let mut s = store();
+        let id = task(&mut s);
+        let text = "**not bold** · # not a heading\n- not a list";
+        s.save_note(&id, text).unwrap();
+        assert_eq!(s.get_task_detail(&id).unwrap().note, text);
+    }
+
+    /// What makes "compact" mean something. A 1MB ceiling is a document store
+    /// with a smaller text box.
+    #[test]
+    fn a_note_longer_than_the_cap_is_refused_and_says_the_numbers() {
+        let mut s = store();
+        let id = task(&mut s);
+        s.save_note(&id, &"x".repeat(NOTE_MAX_CHARS)).unwrap();
+
+        let err = s.save_note(&id, &"x".repeat(NOTE_MAX_CHARS + 1)).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains(&NOTE_MAX_CHARS.to_string()), "got {message}");
+        assert!(message.contains(&(NOTE_MAX_CHARS + 1).to_string()), "got {message}");
+
+        // And the refusal changed nothing.
+        assert_eq!(
+            s.get_task_detail(&id).unwrap().note.chars().count(),
+            NOTE_MAX_CHARS
+        );
+    }
+
+    /// Characters, not bytes: a byte cap silently gives an English note three
+    /// times the room of an Amharic one.
+    #[test]
+    fn the_cap_counts_characters_rather_than_bytes() {
+        let mut s = store();
+        let id = task(&mut s);
+        // Each of these is three bytes and one character.
+        let amharic = "ሀ".repeat(NOTE_MAX_CHARS);
+        assert!(amharic.len() > NOTE_MAX_CHARS, "three bytes apiece");
+        s.save_note(&id, &amharic).expect("a full note in any script");
+    }
+
+    /// An export written before migration 0011 carries `markdown`, not `body`.
+    /// Skipping it would drop every note on restore — silently, because the row
+    /// still inserts on its `task_id`. Restoring a backup must not lose what
+    /// the backup held.
+    #[test]
+    fn a_backup_written_before_the_rename_still_restores_its_notes() {
+        let mut s = store();
+        let id = task(&mut s);
+        s.save_note(&id, "written under the old name").unwrap();
+
+        // A real export, rewritten into the shape 0011 replaced — which is
+        // what an old backup on someone's disk actually looks like.
+        let mut doc = s.export_json("UTC").unwrap();
+        for note in doc["notes"].as_array_mut().unwrap() {
+            let body = note.as_object_mut().unwrap().remove("body").unwrap();
+            note.as_object_mut().unwrap().insert("markdown".into(), body);
+        }
+        assert!(doc["notes"][0].get("body").is_none(), "the new key is gone");
+
+        s.import_json(&doc, ImportMode::Replace).unwrap();
+        assert_eq!(
+            s.get_task_detail(&id).unwrap().note,
+            "written under the old name"
+        );
+    }
+
+    /// A note written under the old 1MB ceiling still opens. Refusing to show
+    /// somebody their own data because the rule changed would be the worst of
+    /// both rules — it can be cut down, it cannot be made longer.
+    #[test]
+    fn a_note_written_before_the_cap_can_still_be_read_and_shortened() {
+        let mut s = store();
+        let id = task(&mut s);
+        let long = "y".repeat(NOTE_MAX_CHARS * 3);
+        s.conn
+            .execute(
+                "INSERT INTO note (task_id, body, updated_at) VALUES (?1, ?2, 1)",
+                rusqlite::params![id, long],
+            )
+            .unwrap();
+
+        assert_eq!(
+            s.get_task_detail(&id).unwrap().note.chars().count(),
+            NOTE_MAX_CHARS * 3,
+            "it opens"
+        );
+        s.save_note(&id, "cut down").expect("and it can be cut down");
     }
 }

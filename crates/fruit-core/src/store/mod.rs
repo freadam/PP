@@ -172,6 +172,7 @@ impl Store {
             "project" => "project",
             "block" => "scheduled_block",
             "series" => return self.restore_series(&token.id),
+            "lifeSeries" => return self.restore_life_series(&token.id),
             "life_entry" => return self.restore_life_entry(&token.id),
             "life_area" => return self.restore_life_area(&token.id),
             "session" => return self.restore_session(&token.id),

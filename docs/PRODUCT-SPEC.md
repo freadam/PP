@@ -503,7 +503,7 @@ in bold; each is reversible.
 | **Off-plan nudge** (a notice, never a block) | **Built** — W5. Fires only during plotted time, and is silenceable for the session. |
 | Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
 | Excel **import** | **Built** (M13) — detection, then a mapping nobody can skip, then a signed per-day variance, then a commit that refuses while anything is unmapped or unresolved. Still unproven against the client's own workbook, which is open question 6 below. |
-| Task notes | Built as **Markdown**; the plan requires compact plain text |
+| Task notes | **Plain text**, capped at 2000 characters (migration 0011). The renderer is gone; the column is called `body`, because one called `markdown` is a standing invitation to put the parser back. |
 
 ### A sequencing correction to the plan
 

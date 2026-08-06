@@ -1,0 +1,30 @@
+-- 0011_note_is_plain_text.sql — the note stops pretending to be a document (M4).
+--
+-- §1 puts "no personal-notes system, wiki, Markdown editor" out of scope, and
+-- §2 asks for "one compact plain-text note" per task. What shipped was a small
+-- Markdown renderer in a column called `markdown`, with a 1MB cap — which is
+-- not a compact note, it is a document store with a smaller text box.
+--
+-- ROADMAP.md names this exact drift as a live risk: *"The existing Markdown
+-- note renderer is a live instance — it needs reducing to plain text."* This is
+-- the reduction.
+--
+-- ── Why rename the column and not just the renderer ───────────────────
+-- A column called `markdown` in a product that forbids Markdown is a standing
+-- invitation to put the renderer back. Someone reads the schema in six months,
+-- concludes the field is meant to hold markup, and re-adds a parser to display
+-- it "properly". The name is the documentation that survives.
+--
+-- ── What this does not do ─────────────────────────────────────────────
+-- It does not touch a single byte of anyone's note. A note containing
+-- `**bold**` still contains `**bold**`; it now renders as those nine
+-- characters, which is what they always were. Nothing is lost and nothing is
+-- rewritten — only the interpretation changes, and the text is right there to
+-- be re-read.
+--
+-- The length cap lives in Rust rather than in a CHECK here, because adding a
+-- CHECK to an existing table means rebuilding it, and because a note written
+-- under the old 1MB ceiling must still be *readable*. It cannot be made longer;
+-- it can always be cut down. Refusing to open somebody's data because it is now
+-- too long would be the worst of both rules.
+ALTER TABLE note RENAME COLUMN markdown TO body;
