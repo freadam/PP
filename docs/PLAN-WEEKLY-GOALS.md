@@ -728,6 +728,49 @@ when the extension is loaded, and `allowed_origins` must name it. The id's shape
 is checked (32 letters, `a`–`p`) so a bad paste says so instead of producing a
 host that silently never connects.
 
+### Correction: what "a rule cannot rewrite history" actually protects
+
+The first version applied a rule **only to observation recorded after it**. The
+symptom was immediate and damning: you label something on the "not labelled yet"
+list and it stays there, because today's spans were already written with a NULL
+label. Labelling appeared to do nothing.
+
+The principle was right and the scope was wrong. A rule must not change a span
+that **already carries a verdict** — relabelling a domain in September cannot be
+allowed to change what August said you were doing, because months get reviewed,
+reconciled and exported. But an **unlabelled** span has no verdict to protect.
+Filling it in is answering a question that was left open, not overwriting an
+answer. Nothing is lost, no reconciled day changes its story.
+
+So `set_activity_rule` now backfills spans whose `category_id` is NULL, of any
+date, and reports how many — a rule that quietly moves figures on screen is
+worse than one that says *"including 3 already recorded."*
+
+Two edges worth stating:
+
+- **An app rule does not backfill a browser tab.** A span carrying a domain is a
+  question about the *site*, and answering it with the browser's own label is the
+  precedence failure the connector exists to fix — retroactively, which is worse.
+- **The reconciler's copy changed with it.** It used to promise "from now on, not
+  retrospectively", which is no longer true and was never the useful promise.
+  What it says now is the one that holds: *what you decided on a day you have
+  closed is untouched.* There is an acceptance test asserting exactly that — the
+  life entry still owns its hour and the day's totals do not move.
+
+### When the extension is not connected
+
+Without it Fruit sees `chrome.exe` and no more; the browser's *window* is what
+the OS reports, and the *tab* is what needs an extension. Someone looking at
+"chrome.exe · 8 stretches" has no way to know that from the screen, and reads it
+as the feature being broken.
+
+The unlabelled panel now says so where the row is, names the three ways forward —
+expand and label the stretches individually, set the sites up in advance in
+Settings, or connect the extension — and warns that labelling the browser row
+labels *all* browsing at once. It keys on a span actually carrying a domain
+rather than on the switch being on, because the switch being on and the extension
+delivering are different things.
+
 ### Not done
 
 - The Day view's detail panel does not yet offer relabelling; the Activity

@@ -674,7 +674,11 @@ function LabelSettings() {
       // Echo what was stored, not what was typed: `https://www.Instagram.com/x`
       // becomes `instagram.com`, and seeing that is how someone learns the rule
       // covers every page and every subdomain.
-      toast(`${saved.matchValue} → ${saved.categoryName}. Applies from now on.`);
+      toast(
+        saved.backfilled > 0
+          ? `${saved.matchValue} → ${saved.categoryName}, including ${saved.backfilled} already recorded.`
+          : `${saved.matchValue} → ${saved.categoryName}. Applies from now on.`,
+      );
       setValue("");
       void load();
     }
@@ -809,8 +813,9 @@ function LabelSettings() {
           </div>
         )}
         <p className="caption">
-          Changing a rule applies from now on. Time already recorded keeps the label it was
-          given, so a rule you change today cannot rewrite a week you have already reviewed.
+          A rule fills in every stretch that had <i>no</i> label yet, whatever its date —
+          filling a blank is not rewriting an answer. Anything already carrying a label
+          keeps it, so a rule you change today cannot rewrite a week you have reviewed.
         </p>
       </Field>
     </Section>

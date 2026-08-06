@@ -95,6 +95,7 @@ fn map_rule(r: &Row) -> rusqlite::Result<ActivityRuleRow> {
         category_name: r.get(4)?,
         category_colour: r.get(5)?,
         is_builtin: r.get::<_, i64>(6)? == 1,
+        backfilled: 0,
     })
 }
 
@@ -324,16 +325,65 @@ impl Store {
                updated_at = excluded.updated_at",
             params![new_id(), kind.as_str(), value, category_id, self.device_id, now],
         )?;
-        self.conn
-            .query_row(
-                "SELECT r.id, r.match_kind, r.match_value, r.category_id, c.name, c.colour, r.is_builtin
-                   FROM activity_rule r
-                   JOIN observation_category c ON c.id = r.category_id
-                  WHERE r.match_kind = ?1 AND r.match_value = ?2",
-                params![kind.as_str(), value],
-                map_rule,
-            )
-            .map_err(Into::into)
+        let backfilled = self.fill_unlabelled(kind, &value, category_id)?;
+        let mut row: ActivityRuleRow = self.conn.query_row(
+            "SELECT r.id, r.match_kind, r.match_value, r.category_id, c.name, c.colour, r.is_builtin
+               FROM activity_rule r
+               JOIN observation_category c ON c.id = r.category_id
+              WHERE r.match_kind = ?1 AND r.match_value = ?2",
+            params![kind.as_str(), value],
+            map_rule,
+        )?;
+        row.backfilled = backfilled;
+        Ok(row)
+    }
+
+    /// Applies a new rule to observation that has **no label yet**.
+    ///
+    /// This is narrower than it first looks, and the narrowness is the point.
+    ///
+    /// The rule everything else here obeys is that a verdict is stamped at write
+    /// time and a later rule cannot rewrite it — otherwise relabelling a domain
+    /// in September silently changes what August said you were doing, and a month
+    /// someone has reviewed and exported stops meaning anything.
+    ///
+    /// An **unlabelled** span has no verdict to protect. Filling it in is not
+    /// rewriting history; it is answering a question that was left open. Nothing
+    /// is overwritten, no reconciled day changes its story, and — the reason this
+    /// exists — labelling something on the "not labelled yet" list makes it
+    /// leave the list, which is the only behaviour a person would predict.
+    ///
+    /// `category` is written alongside `category_id` so the three-way roll-up
+    /// every older report reads stays in step.
+    fn fill_unlabelled(
+        &self,
+        kind: MatchKind,
+        value: &str,
+        category_id: &str,
+    ) -> Result<i64> {
+        let counts_as: String = self.conn.query_row(
+            "SELECT counts_as FROM observation_category WHERE id = ?1",
+            [category_id],
+            |r| r.get(0),
+        )?;
+        let n = match kind {
+            MatchKind::Domain => self.conn.execute(
+                "UPDATE activity_span SET category_id = ?2, category = ?3
+                  WHERE category_id IS NULL AND domain = ?1",
+                params![value, category_id, counts_as],
+            )?,
+            // App rules must not claim a browser tab. A span carrying a domain
+            // is a question about the *site*, and answering it with the
+            // browser's own label is the precedence failure the connector was
+            // built to fix — applied retroactively, which is worse.
+            MatchKind::App => self.conn.execute(
+                "UPDATE activity_span SET category_id = ?2, category = ?3
+                  WHERE category_id IS NULL AND domain IS NULL
+                    AND LOWER(app_id) = ?1",
+                params![value, category_id, counts_as],
+            )?,
+        };
+        Ok(n as i64)
     }
 
     pub fn delete_activity_rule(&mut self, id: &str) -> Result<()> {
@@ -680,27 +730,83 @@ mod tests {
         );
     }
 
-    /// Same argument as `activity_span.category` since 0006: a label made today
-    /// classifies tomorrow, and cannot rewrite a week already reviewed.
+    /// The narrow, correct version of "a rule cannot rewrite history".
+    ///
+    /// A rule fills in observation that has **no label yet**, whatever its date.
+    /// That is not rewriting: nothing is overwritten, no reconciled day changes
+    /// its story, and — the reason this matters — labelling something on the
+    /// "not labelled yet" list makes it leave the list, which is the only
+    /// behaviour anyone would predict.
     #[test]
-    fn a_new_rule_never_relabels_what_is_already_recorded() {
+    fn a_rule_fills_in_what_had_no_label_and_says_how_much() {
         let (mut s, clock) = store();
         observe(&mut s, &clock, "chrome.exe", Some("news.example"), 30);
         assert!(totals(&s).is_empty(), "unlabelled, and honestly so");
+        assert_eq!(s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap().len(), 1);
 
-        s.set_activity_rule(MatchKind::Domain, "news.example", &named(&s, "Distraction"))
+        let rule = s
+            .set_activity_rule(MatchKind::Domain, "news.example", &named(&s, "Distraction"))
             .unwrap();
+        assert_eq!(rule.backfilled, 1, "the app has to be able to say so");
+        assert_eq!(totals(&s), [("Distraction".to_string(), 30 * 60)]);
         assert!(
-            totals(&s).is_empty(),
+            s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap().is_empty(),
+            "labelling it left it on the list of things needing a label"
+        );
+    }
+
+    /// And the half that is genuinely protected: a span that already carries a
+    /// verdict keeps it. Relabelling a domain in September must not change what
+    /// August said you were doing, or a month someone reviewed and exported
+    /// stops meaning anything.
+    #[test]
+    fn a_new_rule_never_moves_a_label_that_is_already_there() {
+        let (mut s, clock) = store();
+        observe(&mut s, &clock, "chrome.exe", Some("youtube.com"), 30);
+        assert_eq!(totals(&s), [("Distraction".to_string(), 30 * 60)]);
+
+        let rule = s
+            .set_activity_rule(MatchKind::Domain, "youtube.com", &named(&s, "Study"))
+            .unwrap();
+        assert_eq!(rule.backfilled, 0, "there was nothing unlabelled to fill");
+        assert_eq!(
+            totals(&s),
+            [("Distraction".to_string(), 30 * 60)],
             "the rule reached backwards into a day already lived"
         );
 
-        // A gap, so this is a new visit rather than a continuation. A stretch
-        // that was already running keeps the label it started with — the same
-        // write-time rule, applied to the span instead of to the day.
+        // Forwards, it is Study.
         clock.advance(10 * 60_000);
-        observe(&mut s, &clock, "chrome.exe", Some("news.example"), 10);
-        assert_eq!(totals(&s), [("Distraction".to_string(), 10 * 60)]);
+        observe(&mut s, &clock, "chrome.exe", Some("youtube.com"), 10);
+        assert_eq!(
+            totals(&s),
+            [
+                ("Study".to_string(), 10 * 60),
+                ("Distraction".to_string(), 30 * 60)
+            ]
+        );
+    }
+
+    /// An app rule must not claim a browser tab, retroactively least of all.
+    /// A span carrying a domain is a question about the *site*, and answering it
+    /// with the browser's own label is the precedence failure the connector was
+    /// built to fix.
+    #[test]
+    fn labelling_the_browser_does_not_backfill_its_tabs() {
+        let (mut s, clock) = store();
+        observe(&mut s, &clock, "chrome.exe", Some("news.example"), 30);
+        clock.advance(10 * 60_000);
+        observe(&mut s, &clock, "chrome.exe", None, 20);
+
+        let rule = s
+            .set_activity_rule(MatchKind::App, "chrome.exe", &named(&s, "Work"))
+            .unwrap();
+        assert_eq!(rule.backfilled, 1, "the app-only stretch, and not the tab");
+        assert_eq!(totals(&s), [("Work".to_string(), 20 * 60)]);
+
+        let left = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        assert_eq!(left.len(), 1);
+        assert_eq!(left[0].match_value, "news.example");
     }
 
     /// The surface the whole feature is usable from. An empty taxonomy plus a

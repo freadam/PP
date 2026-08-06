@@ -318,8 +318,8 @@ export function ReconcileSheet() {
                           <span className="data">{ruleDomain}</span>
                         </span>
                         <span className="caption">
-                          From now on, not retrospectively — days you have already closed keep
-                          the record you left them with.
+                          Also fills in any stretch of it that has no label yet. What you
+                          decided on a day you have closed is untouched.
                         </span>
                       </span>
                     </label>

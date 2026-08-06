@@ -139,6 +139,12 @@ export function Activity() {
             rows={unlabelled}
             cats={cats}
             titlesOn={status.settings.titlesEnabled}
+            // Domains switched on is necessary but not sufficient: the extension
+            // has to be delivering. A span that actually carries a site is the
+            // only proof of that, so it is what the notice keys on.
+            connected={
+              status.settings.domainsEnabled && (day?.spans.some((s) => s.domain) ?? false)
+            }
             onDone={reload}
           />
           <Correlations day={day} />
@@ -395,20 +401,37 @@ function ByCategory({ cats }: { cats: ObservationCategory[] }) {
  * keep what they were given — a rule that reached backwards would rewrite days
  * already reconciled.
  */
+/**
+ * Browsers, by executable name. Used only to explain an absence.
+ *
+ * If Chrome is in this list with no site under it, the connector is not
+ * delivering — and "chrome.exe · 8 stretches" with no way to tell them apart is
+ * the symptom. Saying so beats letting someone conclude the feature is broken.
+ */
+const BROWSERS = ["chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "chromium", "safari"];
+
+function isBrowser(appId: string): boolean {
+  const name = appId.toLowerCase().replace(/\.(exe|app)$/, "");
+  return BROWSERS.includes(name);
+}
+
 function Unlabelled({
   rows,
   cats,
   titlesOn,
+  connected,
   onDone,
 }: {
   rows: UnlabelledRow[];
   cats: ObservationCategory[];
   titlesOn: boolean;
+  connected: boolean;
   onDone: () => void;
 }) {
   const run = useApp((s) => s.run);
   const toast = useApp((s) => s.toast);
   const [open, setOpen] = useState<string | null>(null);
+  const browserRows = rows.filter((r) => r.matchKind === "app" && isBrowser(r.matchValue));
   if (rows.length === 0) return null;
 
   /** One interval, no rule — the YouTube-lecture case. */
@@ -421,13 +444,19 @@ function Unlabelled({
   };
 
   const label = async (row: UnlabelledRow, categoryId: string) => {
-    const ok = await run(
+    const saved = await run(
       () => ipc.setActivityRule(row.matchKind, row.matchValue, categoryId),
       "Couldn't save that label.",
     );
-    if (ok) {
-      const name = cats.find((c) => c.id === categoryId)?.name ?? "labelled";
-      toast(`${row.matchValue} → ${name}. Applies from now on.`);
+    if (saved) {
+      // A rule fills in everything that had no label yet, so the row leaves this
+      // list — and the toast says how much moved rather than letting figures
+      // change quietly.
+      toast(
+        saved.backfilled > 0
+          ? `${row.matchValue} → ${saved.categoryName}, including ${saved.backfilled} already recorded.`
+          : `${row.matchValue} → ${saved.categoryName}. Applies from now on.`,
+      );
       onDone();
     }
   };
@@ -436,9 +465,23 @@ function Unlabelled({
     <section className="panel">
       <h2>Not labelled yet</h2>
       <p className="caption">
-        Ranked by how much of the day each took. Labelling one writes a rule, so it applies
-        from now on — today&rsquo;s record keeps what it was given.
+        Ranked by how much of the day each took. Labelling one writes a rule and fills in
+        every stretch of it that had no label — so it leaves this list. Anything already
+        carrying a label keeps it.
       </p>
+      {browserRows.length > 0 && !connected && (
+        <p className="caption">
+          <b>
+            {browserRows.map((r) => r.matchValue).join(", ")} appears as one application, not
+            as the sites inside it.
+          </b>{" "}
+          Fruit can only see which window is in front; which <i>tab</i> takes the browser
+          extension, and it is not connected yet. Until it is, labelling{" "}
+          {browserRows[0]!.matchValue} labels <i>all</i> browsing at once — expand it and
+          label the stretches individually instead, or set the sites up in advance under
+          Settings → Labels. Settings → Activity → <b>Browser extension</b> connects it.
+        </p>
+      )}
       <div className="stack" style={{ gap: 8 }}>
         {rows.map((row) => {
           const key = `${row.matchKind}:${row.matchValue}`;
@@ -472,8 +515,9 @@ function Unlabelled({
                 <div className="stack" style={{ gap: 4, paddingLeft: 24 }}>
                   {row.occurrences > 1 && (
                     <p className="caption">
-                      The buttons above make a <b>rule</b> for every future visit. The ones
-                      below label <b>that visit only</b>.
+                      The buttons above make a <b>rule</b>: every visit to this, past ones
+                      that have no label yet and future ones alike. The buttons below label{" "}
+                      <b>that visit only</b>.
                     </p>
                   )}
                   {row.stretches.map((st) => (

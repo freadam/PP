@@ -2597,12 +2597,38 @@ fn a_rule_made_while_reconciling_classifies_forwards_and_never_backwards() {
     let tomorrow = store.domain_totals("2025-07-31", TZ).unwrap();
     assert_eq!(tomorrow[0].category_name.as_deref(), Some("Distraction"));
 
-    // Backwards: yesterday is exactly as it was left. The hour was reconciled
-    // as life time by hand, and the observation underneath it still carries the
-    // verdict it was written with — which was none.
+    // Backwards: yesterday's *account* is exactly as it was left.
+    //
+    // This is the promise worth holding, and it is narrower than "nothing
+    // changes". The hour was reconciled as life time by hand, and it still is:
+    // the life entry owns it, the day still totals the same, and nothing the
+    // user decided has moved. The observation underneath — which had no label at
+    // all — has acquired one, because that is what a rule is for, and filling a
+    // blank is not rewriting an answer.
+    let yesterday = store.get_day("2025-07-30", TZ, None).unwrap();
+    assert_eq!(
+        yesterday.totals.confirmed_life_sec, 3600,
+        "the hour someone recorded as life time stopped being life time"
+    );
+    assert_eq!(
+        yesterday.totals.observed_only_sec, 0,
+        "the reconciled hour is still owned by the life entry, not the observation"
+    );
+
+    // And a span that *did* carry a verdict keeps it. This is the half a later
+    // rule must never touch — relabelling a domain in September cannot change
+    // what August said you were doing.
+    store
+        .set_activity_rule(
+            fruit_core::model::MatchKind::Domain,
+            "news.example.com",
+            fruit_core::model::category::STUDY,
+        )
+        .unwrap();
     let yesterday = store.domain_totals("2025-07-30", TZ).unwrap();
     assert_eq!(
-        yesterday[0].category_name, None,
+        yesterday[0].category_name.as_deref(),
+        Some("Distraction"),
         "the rule reached backwards and reclassified a day already closed"
     );
 }

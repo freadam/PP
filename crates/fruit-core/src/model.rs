@@ -827,6 +827,14 @@ pub struct ActivityRuleRow {
     /// theirs, and the Settings list says so rather than silently replacing it
     /// on the next update.
     pub is_builtin: bool,
+    /// How many already-recorded but **unlabelled** stretches this rule just
+    /// filled in. Only meaningful on the row returned by `set_activity_rule`;
+    /// zero when listing.
+    ///
+    /// Reported so the app can say "also labelled 3 earlier stretches" — a rule
+    /// that quietly changes what is on screen is worse than one that says so.
+    #[serde(default)]
+    pub backfilled: i64,
 }
 
 /// One continuous stretch of observation, as a thing a person can point at.

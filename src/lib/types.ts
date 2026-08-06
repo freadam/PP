@@ -168,6 +168,12 @@ export interface ActivityRule {
   categoryColour: string;
   /** Shipped with the app. Editing one makes it yours. */
   isBuiltin: boolean;
+  /**
+   * How many already-recorded but unlabelled stretches this rule just filled
+   * in. Only meaningful on the row returned by `setActivityRule`; 0 when
+   * listing.
+   */
+  backfilled: number;
 }
 
 /**
