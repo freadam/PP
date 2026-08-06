@@ -152,3 +152,24 @@ export function estimateOptions(current: number | null): EstimateOption[] {
     { value: "rollover", label: "Rollover" },
   ];
 }
+
+/**
+ * A keyboard hint, spelled the way the platform spells it.
+ *
+ * The commands registry writes `⌘K` because that reads clearly in source. The
+ * MVP ships on **Windows only** (§5.1), where a `⌘` on a button is not a
+ * stylistic choice — it is a key the user does not have. So the glyph is
+ * rewritten at the point it is shown, in one place, rather than every command
+ * carrying two spellings.
+ *
+ * `⇧` and `⌥` are left alone: Shift is Shift, and Alt is close enough that
+ * spelling it out costs more room than it buys.
+ */
+export function keys(hint: string): string {
+  return isApple() ? hint : hint.replace(/⌘/g, "Ctrl ");
+}
+
+function isApple(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
+}

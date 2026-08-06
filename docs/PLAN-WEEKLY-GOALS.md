@@ -92,7 +92,7 @@ Recorded so it is not rebuilt. The review praises several behaviours Fruit has.
 |---|---|
 | *"I often change how a block of work is categorized after it has been tracked… select a block on the calendar and change its project, client, or task"* | The Day view detail panel: contribution, reassignment, and work → life conversion. |
 | *"Change how linkedin.com should be tracked going forward **or only for this specific session**"* | Exactly the reconciler's prospective-rule checkbox — decide this interval, or decide the domain. Built with the connector. |
-| *"You can access all settings via a command shortcut (CMD + K)"* | The palette, on `⌘K`/`⌘F`. It still has **no visible affordance**, which `WIREFRAME-GAP.md` already flags. |
+| *"You can access all settings via a command shortcut (CMD + K)"* | The palette, on `⌘K`/`⌘F`, and now a **Commands** button in the topbar that says so. A shortcut with no visible affordance is a feature only the person who built it uses. |
 | Calendar integration for meeting time | `.ics` import, local file only — no CalDAV and no account, by design. Meetings are then `contribution = 'attend'`. |
 | Categorised time totals per day/week/month | The month dashboard, and `domain_totals` since the connector. |
 

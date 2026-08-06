@@ -12,6 +12,7 @@ import { useApp } from "../store/app";
 import { COMMANDS } from "../lib/commands";
 import type { Command } from "../lib/commands";
 import * as ipc from "../lib/ipc";
+import * as fmt from "../lib/format";
 import type { SearchHit } from "../lib/types";
 
 interface Row {
@@ -149,7 +150,7 @@ export function CommandPalette() {
               >
                 <Highlighted text={row.title} range={row.match} />
                 {row.subtitle && <span className="caption">{row.subtitle}</span>}
-                {row.hint && <span className="hint kbd">{row.hint}</span>}
+                {row.hint && <span className="hint kbd">{fmt.keys(row.hint)}</span>}
               </button>
             ))
           )}
@@ -204,7 +205,7 @@ export function ShortcutSheet() {
                 {rows.map((c) => (
                   <div key={c.id} className="row spread" style={{ padding: "2px 0" }}>
                     <span>{c.title}</span>
-                    <span className="kbd">{c.keys}</span>
+                    <span className="kbd">{fmt.keys(c.keys!)}</span>
                   </div>
                 ))}
               </section>

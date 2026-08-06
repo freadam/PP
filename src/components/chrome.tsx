@@ -213,10 +213,20 @@ export function TopBar() {
       </span>
 
       <RecordingIndicator />
+      {/* The palette has always worked on ⌘K; it has never said so anywhere.
+          A shortcut with no visible affordance is a feature only the person who
+          built it uses (wireframe, `WIREFRAME-GAP.md`). One button. */}
+      <button
+        className="btn"
+        onClick={() => setOverlay("palette")}
+        title="Every action in Fruit, by name"
+      >
+        Commands <span className="kbd">{fmt.keys("⌘K")}</span>
+      </button>
       {unreconciled.length > 0 && (
         <button className="btn" onClick={() => setOverlay("reconcile")}>
           <span className="dot" style={{ background: "var(--track)" }} />
-          Reconcile <span className="kbd">⌘R</span>
+          Reconcile <span className="kbd">{fmt.keys("⌘R")}</span>
         </button>
       )}
       <button className="btn" onClick={() => setOverlay("focus")}>

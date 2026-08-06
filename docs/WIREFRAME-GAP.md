@@ -20,7 +20,7 @@ remains is ordinary work.
 |---|---|---|
 | Nav: Day · Planner · Projects · Activity · Reports · Settings | ✅ | Day is first and default. The rail now shows **icon over label** at 76px — six destinations is too many to learn from icons alone. "Tasks" is relabelled **Projects** to match. |
 | Topbar: brand, OFFLINE, Recording / Activity-paused, Reconcile (n), timer, Focus | ✅ | The Recording pill already reports `paused` as its own state. |
-| `Ctrl K` button in the topbar | ❌ | The palette exists on `⌘K`/`⌘F` but has no visible affordance. One button. |
+| `Ctrl K` button in the topbar | ✅ | **Commands**, beside Reconcile. The hint is spelled for the platform in one place (`fmt.keys`) — the MVP is Windows-only, where a `⌘` on a button is not a stylistic choice but a key the user does not have. |
 | Reconcile shows a **count** | ✅ | `unreconciled.length` was already there. |
 
 ## 1. Day — **built**
@@ -123,14 +123,20 @@ All three gating components are now built:
 **Nothing left on this list is blocked on a capability that does not exist.**
 What remains is work:
 
-- **Workbook import** (M13) — the export's inverse. A reader and a mapping
-  preview; no new capability.
-- **Split** — still the missing verb, on the Day view and in the reconciler.
-- **Entertainment budgets and planned windows** — the reduction half of the
-  primary outcome. The measurement half now exists.
+- ~~**Workbook import** (M13)~~ — **built.** Detection, then a mapping nobody
+  can skip, then a signed per-day variance, then a commit that refuses while
+  anything is unmapped or unresolved. Unproven against the client's own
+  workbook, which is open question 6 rather than a gap in the code.
+- ~~**Split**~~ — **built**, and this line was stale: the verb has been in
+  `reconcile.rs` and offered by the sheet for some time. The original shrinks to
+  what was planned and the overrun gets its own block after the tracked time
+  ended.
+- ~~**Entertainment budgets and planned windows**~~ — **built.** Budgets came
+  with weekly goals (migration 0008); windows are migration 0009, and the
+  planned-versus-unplanned split now reconciles to the intervals underneath it.
+- ~~**`Ctrl K` button in the topbar**~~ — **built.**
 - **Per-project and per-area Day filters**, and Day-view editing beyond fill:
-  merge, repeat, multi-select.
-- **`Ctrl K` button in the topbar** — the palette works, it just has no visible
-  affordance.
+  merge, multi-select. (Repeat landed with M9, on life entries.)
 
-Recommended order: workbook import, then entertainment budgets, then Split.
+That leaves the Day-view filters and multi-select, which is the only item on
+this page that is neither built nor waiting on the client.
