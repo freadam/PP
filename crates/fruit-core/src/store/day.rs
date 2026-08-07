@@ -303,6 +303,8 @@ impl Store {
             by_area: Vec::new(),
             by_project: Vec::new(),
             by_app: Vec::new(),
+            by_contribution: Vec::new(),
+            by_domain: Vec::new(),
         };
 
         let mut areas: HashMap<String, (String, String, AreaKind, i64)> = HashMap::new();
@@ -310,6 +312,10 @@ impl Store {
         // Where entertainment actually happened, so it can be checked against
         // where it was *meant* to happen.
         let mut ent_intervals: Vec<(Millis, Millis)> = Vec::new();
+        // Work by involvement. Keyed on the option itself, so "no mode
+        // recorded" is a row rather than a silently dropped one — §5.8 makes
+        // that distinct from non-work time, which has no such field at all.
+        let mut contributions: HashMap<Option<Contribution>, i64> = HashMap::new();
 
         for seg in segments {
             let sec = (seg.to - seg.from) / 1000;
@@ -345,9 +351,11 @@ impl Store {
                 SlotOwner::Work {
                     project_id,
                     project_colour,
+                    contribution,
                     ..
                 } => {
                     t.confirmed_work_sec += sec;
+                    *contributions.entry(*contribution).or_insert(0) += sec;
                     let name = match project_id {
                         Some(id) => self
                             .conn
@@ -404,6 +412,46 @@ impl Store {
             })
             .collect();
         t.by_project.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.name.cmp(&b.name)));
+
+        t.by_contribution = {
+            let mut v: Vec<ContributionTotal> = contributions
+                .into_iter()
+                .map(|(contribution, seconds)| ContributionTotal {
+                    contribution,
+                    seconds,
+                })
+                .collect();
+            // Longest first, then by the enum's own order, so two reads of the
+            // same day cannot come back differently ordered from a hash seed.
+            v.sort_by(|a, b| {
+                b.seconds.cmp(&a.seconds).then_with(|| {
+                    a.contribution
+                        .map(|c| c.as_str())
+                        .cmp(&b.contribution.map(|c| c.as_str()))
+                })
+            });
+            v
+        };
+
+        // Domains come from the spans, like apps do, and for the same reason:
+        // a site seen during a confirmed session still answers "what was on
+        // screen". It is evidence, and it is not a second duration.
+        t.by_domain = {
+            let mut by: HashMap<String, i64> = HashMap::new();
+            for s in spans.iter().filter(|s| !s.is_idle) {
+                let Some(domain) = s.domain.clone() else { continue };
+                let clipped = s.ended_at.min(to) - s.started_at.max(from);
+                if clipped > 0 {
+                    *by.entry(domain).or_insert(0) += clipped / 1000;
+                }
+            }
+            let mut v: Vec<DomainSeconds> = by
+                .into_iter()
+                .map(|(domain, seconds)| DomainSeconds { domain, seconds })
+                .collect();
+            v.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.domain.cmp(&b.domain)));
+            v
+        };
 
         // App totals come from the spans themselves, not from segments: an app
         // seen during a confirmed session still counts toward "where was the

@@ -380,6 +380,16 @@ export interface ActivitySpanRow {
   categoryId: string | null;
 }
 
+export interface ContributionTotal {
+  contribution: Contribution | null;
+  seconds: number;
+}
+
+export interface DomainSeconds {
+  domain: string;
+  seconds: number;
+}
+
 export interface AppTotal {
   appId: string;
   seconds: number;
@@ -971,6 +981,13 @@ export interface DayTotals {
   /** Overlaps the layers above on purpose — a different question. */
   pcSec: number;
   byArea: AreaTotal[];
+  /** Confirmed work split by involvement. Work records only — `lifeEntry` has
+   *  no contribution column, so the guarantee is structural. `contribution:
+   *  null` means never asked; `"none"` means asked and answered "no mode". */
+  byContribution: ContributionTotal[];
+  /** Observed browser time per domain — the source of the YouTube/Twitch
+   *  figures §4.8 asks the export to carry. */
+  byDomain: DomainSeconds[];
   byProject: DayProjectTotal[];
   byApp: AppTotal[];
 }

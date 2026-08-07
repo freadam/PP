@@ -81,58 +81,60 @@ tallest cell.
 
 ---
 
-## A1 · The Excel export is missing seven of its specified contents
+## ~~A1 · The Excel export is missing seven of its specified contents~~ — **built**
 
-**What the spec asks for.** §4.8 enumerates the export's contents.
+**Was:** the month matrix, day columns, a four-measure summary (Work ·
+Unaccounted · Observed only · Private), a life-area block, and a source-mapping
+sheet. Seven of the twelve contents §4.8 enumerates were absent.
 
-**What exists** (`crates/fruit-core/src/store/excel.rs`): the month matrix, day
-columns, a four-measure summary (Work · Unaccounted · Observed only · Private),
-a life-area target-vs-actual block, and a source-mapping sheet.
+**Now**, all seven: weekly totals, work by project and by task, work by
+contribution, core, entertainment split into planned and unplanned, and
+YouTube/Twitch.
 
-**Missing:**
+Three things came out of building it:
 
-| §4.8 requires | Present |
-|---|---|
-| weekly totals | ✗ nothing groups by week |
-| work by project/task | ✗ |
-| work by contribution | ✗ |
-| core totals | ✗ |
-| planned-entertainment totals | ✗ |
-| unplanned-entertainment totals | ✗ |
-| YouTube/Twitch totals | ✗ |
+- **Provenance is a column now.** §4.8 requires totals to be formulas over the
+  sheet, and most are — a week is a contiguous run of day columns, and a work
+  slot carries its task's title, so both stay real `COUNTIF`s. Some genuinely
+  cannot be: a slot label cannot say whether an hour of entertainment fell
+  inside a window you plotted, or whether a session was one you attended rather
+  than owned. Those come from the record, and each row says which it is rather
+  than leaving the reader to work it out. A figure you cannot trace is a figure
+  you cannot check.
+- **Formulas carry cached results.** Found by dumping the written file rather
+  than by reading the code: `calamine` — which is what *Fruit's own importer*
+  uses — never evaluates a formula, so every total read back as zero. Excel
+  recomputes and discards the cache; a library reads the cache. A file whose
+  numbers depend on which program opens it is not an export.
+- **A cache that disagrees with its formula is worse than none.** The first
+  version cached the record's exact seconds in cells whose formula is a
+  `COUNTIF`, so a task read 2.47 where Excel would recompute 3. Caches are now
+  counted from the same cells the formula counts.
+  `cached_results_are_what_the_formula_will_recompute` is the guard.
 
-**Why it matters.** M12 is currently marked ✅ and should not be. The export is
-the client's primary exchange format and the artefact the product will be judged
-by — and the specific missing rows include planned-versus-unplanned
-entertainment, which is *the outcome the product exists to move*.
-
-**Size.** Moderate, and entirely presentational: every figure already exists.
-`entertainment_in_window_sec` (migration 0009) gives the planned/unplanned
-split, `get_domain_totals` gives YouTube and Twitch, `by_project` and `by_area`
-are already on `DayTotals`, and `contribution` is on every `time_session`. The
-work is adding blocks to the summary sheet and a weekly grouping — as formulas,
-not pasted numbers, per §4.8's rule that totals must recompute in Excel.
+Also `escape_criteria`: a `"` in a task title would end a `COUNTIF` criteria
+early and produce a formula Excel refuses to open — a file that looks written
+and cannot be opened.
 
 ---
 
-## A2 · Contribution is captured everywhere and reported nowhere
+## ~~A2 · Contribution is captured everywhere and reported nowhere~~ — **built**
 
-**What the spec asks for.** §3.5 "Work contribution summaries — which never
-apply to personal time", and §4.8 lists contribution in the export.
+Closed with A1, as predicted — it lands in the same summary sheet.
 
-**What exists.** The column on `time_session`; a dropdown on the Day view that
-sets it; a deliberate structural guarantee that `life_entry` has no such column,
-so "never on personal time" cannot be violated.
+`DayTotals` gained `by_contribution`, aggregated across the month the same way
+`by_app` already was, so the month gets it by summing days rather than by a
+second query that could disagree.
 
-**What does not.** Any aggregation at all. Searching the repository for
-`by_contribution` / `byContribution` returns nothing.
+Two distinctions the block preserves:
 
-**Why it matters.** A field that asks for a judgement and returns nothing is a
-field people stop filling in. Either report it or remove it; the present state
-is the worst of the two.
-
-**Size.** Small once A1 is under way — it is one more grouping over data already
-loaded, and it lands in the same summary sheet.
+- **`Contribution::None` and "not set" are different rows.** The first is *work
+  recorded with no mode*, which §5.8 explicitly separates from the second,
+  *never asked*. Collapsing them would answer a question nobody asked.
+- **Life can never appear.** `life_entry` has no contribution column, so
+  "contribution never applies to personal time" holds however the export is
+  written. `the_contribution_block_reports_work_and_only_work` asserts the
+  split accounts for all confirmed work and nothing else.
 
 ---
 

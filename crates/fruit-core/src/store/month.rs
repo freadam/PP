@@ -77,11 +77,16 @@ impl Store {
             by_area: Vec::new(),
             by_project: Vec::new(),
             by_app: Vec::new(),
+            by_contribution: Vec::new(),
+            by_domain: Vec::new(),
         };
         let mut areas: std::collections::HashMap<String, AreaTotal> = Default::default();
         let mut projects: std::collections::HashMap<Option<String>, ProjectTotal> =
             Default::default();
         let mut apps: std::collections::HashMap<String, i64> = Default::default();
+        let mut contributions: std::collections::HashMap<Option<Contribution>, i64> =
+            Default::default();
+        let mut domains: std::collections::HashMap<String, i64> = Default::default();
         let mut unreconciled = 0;
         // Only days that have actually happened count toward "accounted".
         // Measuring against the whole month would report a fresh August as 6%
@@ -129,6 +134,12 @@ impl Store {
             }
             for a in &d.by_app {
                 *apps.entry(a.app_id.clone()).or_insert(0) += a.seconds;
+            }
+            for c in &d.by_contribution {
+                *contributions.entry(c.contribution).or_insert(0) += c.seconds;
+            }
+            for dm in &d.by_domain {
+                *domains.entry(dm.domain.clone()).or_insert(0) += dm.seconds;
             }
             // A day that has not finished cannot be un-reconciled — nobody was
             // ever going to review tomorrow.
@@ -200,6 +211,26 @@ impl Store {
                 .map(|(app_id, seconds)| AppTotal { app_id, seconds })
                 .collect();
             v.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.app_id.cmp(&b.app_id)));
+            v
+        };
+        totals.by_contribution = {
+            let mut v: Vec<ContributionTotal> = contributions
+                .into_iter()
+                .map(|(contribution, seconds)| ContributionTotal { contribution, seconds })
+                .collect();
+            v.sort_by(|a, b| {
+                b.seconds
+                    .cmp(&a.seconds)
+                    .then_with(|| a.contribution.cmp(&b.contribution))
+            });
+            v
+        };
+        totals.by_domain = {
+            let mut v: Vec<DomainSeconds> = domains
+                .into_iter()
+                .map(|(domain, seconds)| DomainSeconds { domain, seconds })
+                .collect();
+            v.sort_by(|a, b| b.seconds.cmp(&a.seconds).then_with(|| a.domain.cmp(&b.domain)));
             v
         };
 

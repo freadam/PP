@@ -960,6 +960,29 @@ pub struct AppTotal {
     pub seconds: i64,
 }
 
+/// Confirmed work, split by how you were involved (§3.5, §4.8).
+///
+/// `None` is a real row, not a missing one: it means *work with no contribution
+/// mode recorded*, which §5.8 distinguishes from non-work time. Non-work has no
+/// contribution field at all, so it can never appear here — the split is
+/// structural rather than filtered.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContributionTotal {
+    pub contribution: Option<Contribution>,
+    pub seconds: i64,
+}
+
+/// Observed browser time per domain. The month's version of `domain_totals`,
+/// carried on the day so the month gets it by summing rather than by running a
+/// second query that could disagree.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainSeconds {
+    pub domain: String,
+    pub seconds: i64,
+}
+
 /// One plotted block against what was actually on screen underneath it.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1704,7 +1727,9 @@ pub struct LifeEntryPatch {
 /// deliberately no counterpart on `life_entry`, so "contribution never applies
 /// to personal time" is a fact about the schema rather than a rule the UI is
 /// trusted to remember.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+// `Hash` so it can key the per-contribution totals; `Ord` so those totals sort
+// the same way twice rather than in whatever order a hash seed produced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Contribution {
     None,
@@ -1938,6 +1963,11 @@ pub struct DayTotals {
     pub by_area: Vec<AreaTotal>,
     pub by_project: Vec<ProjectTotal>,
     pub by_app: Vec<AppTotal>,
+    /// Confirmed work by involvement. Work records only, structurally.
+    pub by_contribution: Vec<ContributionTotal>,
+    /// Observed browser time by domain — the source of the YouTube/Twitch
+    /// figures §4.8 asks the export to carry.
+    pub by_domain: Vec<DomainSeconds>,
 }
 
 /// How broken up a day's work was — the components, deliberately **not** a
