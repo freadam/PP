@@ -156,11 +156,28 @@ impl Store {
 
     /// Preferred timezone: the setting if the user pinned one, otherwise the
     /// zone the shell reports. Blocks always store the zone they were made in.
+    ///
+    /// **Every candidate is validated before it is returned.** This used to
+    /// hand back whatever string it was given, which meant one bad value — a
+    /// UTC offset like `"+00:00"` from a caller that could not find a real zone
+    /// name, or a hand-edited setting — propagated into `zone()` and failed
+    /// there instead. The failure surfaced as a first run with no seeded
+    /// project and a warning in a log nobody reads.
+    ///
+    /// `"UTC"` is the floor because it always parses. It is the wrong zone for
+    /// most people and it is stated in the About screen, but an app running in
+    /// the wrong zone can be corrected in Settings, whereas an app that refuses
+    /// to start cannot be corrected at all.
     pub fn tz_or(&self, fallback: &str) -> String {
-        match self.get_setting("general.tz") {
-            Ok(Some(serde_json::Value::String(s))) => s,
-            _ => fallback.to_string(),
+        if let Ok(Some(serde_json::Value::String(pinned))) = self.get_setting("general.tz") {
+            if crate::time::zone(&pinned).is_ok() {
+                return pinned;
+            }
         }
+        if crate::time::zone(fallback).is_ok() {
+            return fallback.to_string();
+        }
+        "UTC".to_string()
     }
 
     // ─── soft delete / undo (§4.6, §6.1 rule 6) ────────────────────────

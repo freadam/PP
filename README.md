@@ -49,9 +49,34 @@ npm run app          # the real thing: Tauri window + SQLite on disk
 
 ```bash
 npm run dev          # browser preview, reading recorded DTOs (see below)
-cargo test           # 103 tests, incl. the §8 acceptance criteria
+cargo test           # 276 tests, incl. the §8 acceptance criteria
 node scripts/check-ui.mjs      # I1, I3–I7, U10 against `npm run preview`
 ```
+
+### Building the desktop app on Linux
+
+Tauri links against the system webview, so the shell needs four development
+packages that a headless container does not have by default. Without them
+`cargo build` inside `src-tauri/` fails at the *link* step, which reads like a
+code error and is not one:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+                        libayatana-appindicator3-dev librsvg2-dev
+```
+
+To run it with no display attached — useful for checking that a real first run
+migrates, seeds and starts, which no unit test covers:
+
+```bash
+sudo apt-get install -y xvfb
+WEBKIT_DISABLE_COMPOSITING_MODE=1 xvfb-run -a ./src-tauri/target/debug/fruit
+```
+
+The `libEGL … DRI3` warnings on that path are the absent GPU and are expected.
+The database lands in `~/.local/share/app.fruit.planner/fruit.db`; delete that
+directory to test a genuine first run again.
 
 ### Browser preview
 
@@ -129,19 +154,22 @@ OFFLINE badge in the top bar is a statement of fact, not a status indicator.
 
 | Part | Status |
 |---|---|
-| `fruit-core` | Complete and tested — 103 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
+| `fruit-core` | Complete and tested — 276 tests green, incl. F1–F7, U4/U6/U7/U8/U11, D1–D3, D5–D12 |
 | Renderer | Complete for P0 + P1 + P2; verified in a headless browser (I1, I3–I7, U10) across every view |
-| `src-tauri` | Compiles and runs on **Windows** (x64, MSVC). Not built on macOS or Linux yet. See below. |
+| `src-tauri` | Compiles, links and **runs** on Windows (x64, MSVC) and on Linux (webkit2gtk 4.1). `cargo clippy` clean. Not built on macOS. |
 | Activity (§3.5) | Built. Off by default. Sampling implemented on Windows; macOS and X11 are stubs that say so, Wayland says why it can't. |
 | Recurring blocks, `.ics` import | Built. An RFC 5545 subset — `DAILY`/`WEEKLY`/`MONTHLY` with `INTERVAL`, `BYDAY`, `BYMONTHDAY`, `COUNT`, `UNTIL`. |
 
-`src-tauri` cannot be compiled in the container this repo was developed in —
-linking needs a system webview and there is none — so it is the one part not
-covered by the automated checks above. It has since been built and run on
-Windows 10/11 with the MSVC toolchain. macOS and Linux are still unbuilt; the
-platform-specific code is confined to `src-tauri/src/idle.rs` and
-`src-tauri/src/frontmost.rs`, which are the first places to look if either
-fails.
+`src-tauri` used to be uncompilable in the container this repo was developed in,
+because linking needs a system webview. Installing the four packages listed
+above fixes that, and it is worth doing: launching the built binary once found a
+first-run bug that no test in this repository could have caught, because every
+test passes a timezone name and the *application* was passing a UTC offset. See
+`an_unparseable_timezone_never_escapes_tz_or` in the acceptance suite.
+
+macOS is still unbuilt. The platform-specific code is confined to
+`src-tauri/src/idle.rs` and `src-tauri/src/frontmost.rs`, which are the first
+places to look if it fails.
 
 ### Windows: "Access is denied (os error 5)" when building
 

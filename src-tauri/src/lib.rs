@@ -1115,8 +1115,7 @@ pub fn run() {
                 }
             };
 
-            let tz = chrono::Local::now().offset().to_string();
-            let tz = store.tz_or(&system_tz().unwrap_or(tz));
+            let tz = store.tz_or(&system_tz());
 
             // First run seeds a project containing one already-drifted block
             // (§3.9, U8), so the signature rail is on screen immediately.
@@ -1360,8 +1359,7 @@ fn spawn_activity_loop(app: AppHandle) {
         // is a property of the core with a test rather than a hope about this
         // loop. Collected under the lock, emitted after it — a notification is
         // never worth holding the database for.
-        let tz = chrono::Local::now().offset().to_string();
-        let tz = store.tz_or(&system_tz().unwrap_or(tz));
+        let tz = store.tz_or(&system_tz());
         let notices = match store.due_notices(&tz) {
             Ok(n) => n,
             Err(err) => {
@@ -1418,8 +1416,37 @@ fn downloads_path(app: &AppHandle, path: PathBuf) -> PathBuf {
         .join(&path)
 }
 
-fn system_tz() -> Option<String> {
-    std::env::var("TZ").ok().filter(|s| !s.is_empty())
+/// The IANA zone name this machine is in — `"Europe/London"`, not `"+01:00"`.
+///
+/// **The distinction is the whole point.** Every date in this database is a
+/// *local* date, and every stored row carries the zone name it was written in,
+/// so that a block plotted for 09:00 is still 09:00 after the clocks change. A
+/// UTC offset cannot do that job: `+01:00` is London in July and Berlin in
+/// January, and it silently becomes wrong twice a year.
+///
+/// Three sources, in order of how much they know:
+///
+/// 1. **`TZ`** — set explicitly, so it beats detection. Unix convention; on
+///    Windows it is essentially never set, which is what made the old fallback
+///    a real bug rather than a theoretical one.
+/// 2. **`iana_time_zone::get_timezone()`** — asks the operating system. On
+///    Windows this reads the registry and maps the Windows zone name onto its
+///    IANA equivalent, which is exactly the translation the old code skipped.
+/// 3. **`"UTC"`** — a name that always parses. Wrong for most people, but a
+///    working app with the wrong zone beats an app whose first run fails.
+///
+/// The previous implementation fell back to `chrono::Local::now().offset()`,
+/// which renders as `"+00:00"`. `zone()` cannot parse that, so on any machine
+/// without `TZ` set — that is, every ordinary Windows machine — the first-run
+/// seed failed and the user got an empty app. Found by running the binary; no
+/// unit test would have caught it, because every test passes a zone name.
+fn system_tz() -> String {
+    if let Ok(name) = std::env::var("TZ") {
+        if !name.is_empty() {
+            return name;
+        }
+    }
+    iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string())
 }
 
 /// One second is the only interval in the app, it runs **only while a timer is

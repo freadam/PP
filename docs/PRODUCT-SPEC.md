@@ -135,6 +135,17 @@ the product is organised around.
   empty — the states must survive a greyscale screenshot.
 - Current-day and current-time marker.
 - Editing: drag, keyboard, split, merge, fill, repeat, multi-select.
+- **Filling an interval records either kind of confirmed time**: a life area, or
+  **work on a project/task**. Both are confirmed records, both appear in the same
+  Actual column, and the Day view is where a gap is noticed — so both have to be
+  reachable from the gap. Work done away from this PC is the ordinary case, not
+  the exception: another machine, an offline meeting, a task done on paper. The
+  observer cannot see any of it, which is precisely why the manual path must be
+  as short as the automatic one.
+- **Start and end are typed, not only nudged.** A stepper that moves in fixed
+  increments is fine for trimming what the app already guessed; it is the wrong
+  control for entering a two-hour meeting that ran 14:20 to 16:05. Both are
+  offered: type the times, or nudge them.
 - Selected-day totals: work, each life area, sleep/rest, entertainment, PC use,
   and gaps.
 - Filters: project, life area, work contribution, entertainment, confidence
@@ -143,12 +154,19 @@ the product is organised around.
 
 ### 3.2 Planner — secondary
 
-The existing 24-hour planning grid, at **3-day, 7-day and month** spans. Blocks
-are intentions; actual sessions draw a drift rail against them. Drag and resize
-with 15-minute snap and full keyboard equivalents. Fixed and repeating blocks.
-Planned-but-unstarted and unplanned-but-tracked both stay visible.
+The existing 24-hour planning grid, at **1-day, 3-day, 7-day and month** spans.
+Blocks are intentions; actual sessions draw a drift rail against them. Drag and
+resize with 15-minute snap and full keyboard equivalents. Fixed and repeating
+blocks. Planned-but-unstarted and unplanned-but-tracked both stay visible.
 
-*(The 1-day span is dropped: the Day view replaces it and does more.)*
+*(**Revised after use.** This document previously dropped the 1-day span on the
+reasoning that "the Day view replaces it and does more". Using the built app
+showed that reasoning to be wrong, and the distinction is worth writing down:
+the Day view is a **ledger** — a fixed 24-hour table you read down and correct,
+one row per slot. The Planner's 1-day span is a **canvas** — you drag a block
+onto it, resize it, push it later. Those are different jobs, and the Day view
+does not in fact do the second one. Removing the span would take away the only
+place a single day can be laid out by hand. It stays.)*
 
 ### 3.3 Projects and tasks
 
@@ -485,7 +503,7 @@ in bold; each is reversible.
 |---|---|
 | Core, schema, migrations, timers, recovery, backups | **Built** — Phase 2 complete |
 | Plan/record separation, drift, reconcile, calibration | **Built** |
-| Planner (1/3/7-day) | **Built**; needs the month span, and the 1-day span retires |
+| Planner (1/3/7-day/month) | **Built**, all four spans. The 1-day span is **kept** — see §3.2; it is a canvas, and the Day view is a ledger. |
 | Projects, tasks, subtasks, estimates, backlog | **Built** |
 | Recurring blocks, `.ics` import | **Built** |
 | Activity: app observation, idle, exclusions, retention | **Built** |

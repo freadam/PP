@@ -2775,3 +2775,124 @@ fn reconciling_an_empty_hour_fills_it() {
     assert_eq!(after.private_sec, 3600);
     assert_eq!(after.confirmed_life_sec, 2 * 3600, "private is its own bucket");
 }
+
+// ─── found by running the binary ───────────────────────────────────────
+//
+// Everything below was found by launching the built application rather than by
+// reading it. They are recorded here, in the acceptance suite, because each one
+// is a promise the product makes on the very first screen a user sees — and
+// because a bug that only appears on a real first run is exactly the kind the
+// rest of this suite is blind to.
+
+/// A timezone the app cannot parse must never reach the rest of the app.
+///
+/// The shipped fallback was `chrono::Local::now().offset().to_string()`, which
+/// renders as `"+00:00"`. That is a *UTC offset*, not an IANA zone name, and
+/// `zone()` rightly refuses it. On any machine without `TZ` set — which is
+/// every ordinary Windows machine, since `TZ` is a Unix convention — the first
+/// run therefore failed at its first line.
+///
+/// The floor is `"UTC"` rather than an error: an app running in the wrong zone
+/// can be corrected in Settings, an app that will not start cannot.
+#[test]
+fn an_unparseable_timezone_never_escapes_tz_or() {
+    let (store, _clock) = store_at(at(2026, 8, 3, 9, 0));
+
+    // A UTC offset is not a zone name. This is the exact string that shipped.
+    assert_eq!(store.tz_or("+00:00"), "UTC");
+    assert_eq!(store.tz_or("+03:00"), "UTC");
+    assert_eq!(store.tz_or(""), "UTC");
+    assert_eq!(store.tz_or("Mars/Olympus"), "UTC");
+
+    // A real zone name is passed through untouched.
+    assert_eq!(store.tz_or("Europe/London"), "Europe/London");
+    assert_eq!(store.tz_or("Africa/Addis_Ababa"), "Africa/Addis_Ababa");
+}
+
+/// A pinned setting is not trusted either — it is a string in a database that a
+/// person or a bad import could have written.
+#[test]
+fn a_pinned_timezone_is_validated_like_any_other() {
+    let (store, _clock) = store_at(at(2026, 8, 3, 9, 0));
+
+    store
+        .set_setting("general.tz", &serde_json::json!("Europe/Berlin"))
+        .unwrap();
+    assert_eq!(store.tz_or("Europe/London"), "Europe/Berlin", "pinned wins");
+
+    store
+        .set_setting("general.tz", &serde_json::json!("+02:00"))
+        .unwrap();
+    assert_eq!(
+        store.tz_or("Europe/London"),
+        "Europe/London",
+        "a broken pin falls through to the caller's zone rather than failing"
+    );
+
+    store
+        .set_setting("general.tz", &serde_json::json!("+02:00"))
+        .unwrap();
+    assert_eq!(
+        store.tz_or("+01:00"),
+        "UTC",
+        "and with nothing usable anywhere, UTC"
+    );
+}
+
+/// The first run must produce the demonstration project in every zone the app
+/// can end up in — including the one it falls back to.
+#[test]
+fn the_first_run_seed_succeeds_in_every_zone_it_can_reach() {
+    for tz in ["UTC", "Europe/London", "Africa/Addis_Ababa", "Pacific/Kiritimati"] {
+        let (mut store, _clock) = store_at(at(2026, 8, 3, 9, 0));
+        store
+            .seed_first_run(tz)
+            .unwrap_or_else(|e| panic!("seed failed in {tz}: {e:?}"));
+
+        let backlog = store.get_backlog(BacklogFilter::default(), tz).unwrap();
+        assert!(
+            !backlog.tasks.is_empty(),
+            "a first run in {tz} produced no tasks at all"
+        );
+    }
+}
+
+/// The seed runs at whatever time the app happens to be opened, including the
+/// small hours, where "09:00 today" is still in the future.
+#[test]
+fn the_first_run_seed_succeeds_at_any_hour() {
+    for hour in [0, 1, 6, 9, 13, 23] {
+        let (mut store, _clock) = store_at(at(2026, 8, 3, hour, 30));
+        store
+            .seed_first_run("Europe/London")
+            .unwrap_or_else(|e| panic!("seed failed at {hour}:30 — {e:?}"));
+    }
+}
+
+/// The note the seed writes is the first prose a user reads. Since M4 removed
+/// the Markdown renderer, anything left in Markdown syntax renders as its own
+/// punctuation — hashes and asterisks on the welcome screen.
+#[test]
+fn the_welcome_note_contains_no_markup() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 9, 0));
+    store.seed_first_run("Europe/London").unwrap();
+
+    let notes: Vec<String> = store
+        .get_backlog(BacklogFilter::default(), "Europe/London")
+        .unwrap()
+        .tasks
+        .iter()
+        .map(|t| store.get_task_detail(&t.id).unwrap().note)
+        .filter(|n| !n.is_empty())
+        .collect();
+
+    assert!(!notes.is_empty(), "the seed writes at least one note");
+    for note in notes {
+        for markup in ["**", "# ", "`"] {
+            assert!(
+                !note.contains(markup),
+                "seeded note still contains {markup:?}, which now renders literally:\n{note}"
+            );
+        }
+    }
+}

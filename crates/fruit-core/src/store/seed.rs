@@ -63,15 +63,23 @@ impl Store {
             tags: guide.tags.clone(),
             ..Default::default()
         })?;
+        // Plain text, because the note *is* plain text (M4, migration 0011).
+        // This was written as Markdown when a renderer existed to interpret it;
+        // once the renderer was removed it displayed its own hashes and
+        // asterisks to every new user, on the first screen they ever see.
         self.save_note(
             &guide_task.id,
-            "# Fruit in 60 seconds\n\n\
-             **Plot** what you mean to do — drag a task onto the planner, or press `S`.\n\n\
-             **Track** what you actually do — `Space` starts and stops the timer.\n\n\
-             **Reconcile** the difference — `Cmd+R` opens the day review. \
-             Every block carries two traces on its left edge: a dashed cyan one for \
-             the plot, a solid amber one for the track. The gap between them is the point.\n\n\
-             **Capture grammar:** `#project` `@tag` `~45m` `!!` `^tomorrow 9am`\n",
+            "Fruit in 60 seconds\n\
+             \n\
+             PLOT what you mean to do — drag a task onto the planner, or press S.\n\
+             \n\
+             TRACK what you actually do — Space starts and stops the timer.\n\
+             \n\
+             RECONCILE the difference — Ctrl R opens the day review. Every block\n\
+             carries two traces on its left edge: a dashed cyan one for the plot,\n\
+             a solid amber one for the track. The gap between them is the point.\n\
+             \n\
+             Capture grammar:  #project  @tag  ~45m  !!  ^tomorrow 9am\n",
         )?;
 
         // 2. A block earlier today with a pre-seeded overrun, and a fabricated
