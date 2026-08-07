@@ -323,7 +323,7 @@ impl Store {
     /// the ground back. Sessions are trimmed rather than deleted where they only
     /// partly overlap — losing an hour of tracked work to fix a ten-minute
     /// mistake is not a correction, it is a second mistake.
-    fn clear_interval(&mut self, from: Millis, to: Millis) -> Result<()> {
+    pub(crate) fn clear_interval(&mut self, from: Millis, to: Millis) -> Result<()> {
         let now = self.now();
         let tx = self.conn.transaction()?;
         tx.execute(

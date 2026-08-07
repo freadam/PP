@@ -1,6 +1,8 @@
 # Backlog
 
-Work that is known, agreed and not yet built. Two sources feed it:
+Work that is known and agreed. Items are struck through when built, with what
+building them turned up — a backlog that only ever shrinks silently teaches
+nobody anything. Two sources feed it:
 
 1. **An audit of `PRODUCT-SPEC.md` against the code** — features the
    specification asks for that turned out not to exist. These are numbered
@@ -20,57 +22,62 @@ gets written down with its reasoning, the way §3.2's 1-day span was.
 
 ---
 
-## U1 · Filling an interval cannot record work — only life
+## ~~U1 · Filling an interval cannot record work — only life~~ — **built**
 
-**Found by:** using the app.
+**Was:** `FillDialog` took a list of life areas and called `addLifeEntry`. There
+was no path from a gap on the Day view to a work record at all. Recording work
+by hand meant Task detail → Sessions → "Add a session by hand", so you had to
+know the task already and had to leave the screen where you noticed the gap.
 
-**What the spec asks for.** §3.1, now stated explicitly: filling an interval
-records either kind of confirmed time — a life area, or work on a project/task.
+**Now:** the dialog has a Life/Work switch. Work offers a filterable task list
+and a contribution dropdown, and writes a `time_session` through the same
+`add_session` the rest of the app uses.
 
-**What exists.** `FillDialog` in `src/views/Day.tsx` takes a list of life areas
-and calls `addLifeEntry`. There is no path from a gap on the Day view to a work
-record. Recording work by hand is possible, but only from Task detail → Sessions
-→ "Add a session by hand" — which means you must already know which task, and
-must leave the screen where you noticed the gap.
+Three things came out of building it that were not in the original note:
 
-**Why it matters, and why it is not a small convenience.** The whole premise of
-the product is that the observer does most of the recording and the human
-confirms it. That premise has a hole in it exactly where the observer cannot
-see: work done on a second machine, an offline meeting, a task done on paper or
-at a whiteboard. None of it produces an `activity_span`, so none of it is ever
-offered by the reconciler — it can only ever be entered by hand. Making the
-manual path longer than the automatic one puts the friction precisely where the
-app is already weakest, and unrecorded work is the failure that makes the
-monthly account untrustworthy.
+- **Contribution moved into the write.** It used to be settable only afterwards,
+  on a record that already existed. But the case manual entry exists for is very
+  often a meeting, and "I attended two hours" versus "I did two hours" is the
+  whole distinction contribution was added to draw — so `ManualSession` carries
+  it and the dialog offers it at the point of entry.
+- **`replace_existing` came too**, matching `NewLifeEntry`. Recording by hand is
+  usually filling a gap, but it is sometimes correcting an hour the app got
+  wrong, and the second case needs the old record gone or the day holds both. It
+  clears *before* the insert — clearing after would delete the row just written,
+  since that row is itself inside the interval. There is a test for exactly that.
+- **A zero-length session is now refused.** `ended_at == started_at` used to be
+  allowed and produced a row that is invisible on the Day view, counted nowhere,
+  and impossible to select in order to delete.
 
-**Size.** Moderate. The core already has `add_session`, so no new storage and no
-migration. The work is in the dialog: a mode switch between *life* and *work*, a
-task picker for the work side, and passing the chosen task through. Both write
-paths already exist and are tested.
+Private stays life-only: a work session names a task by definition, so
+"accounted for, nothing recorded about it" has nowhere to attach.
 
 ---
 
-## U2 · Start and end times cannot be typed, only nudged
+## ~~U2 · Start and end times cannot be typed, only nudged~~ — **built**
 
-**Found by:** using the app.
+**Was:** four buttons, start and end ±30m. A meeting that ran 14:20–16:05 could
+not be entered at all, because the steps were half-hours from wherever the
+dialog happened to open.
 
-**What exists.** `FillDialog` offers four buttons — start −30m/+30m, end
-−30m/+30m. There is no way to type a time.
+**Now:** a typed field per endpoint *beside* the steppers. The stepper is still
+the right control for trimming what the app guessed; it was only ever the wrong
+one for entering an interval from scratch.
 
-**Why it matters.** The stepper is the right control for *trimming* an interval
-the app already proposed, which is what it was built for. It is the wrong
-control for *entering* one from scratch: a meeting that ran 14:20 to 16:05 takes
-a dozen clicks and still cannot land on 14:20, because the steps are half-hours
-from wherever the dialog opened. Combined with U1, the two together are why
-recording offline work is currently unpleasant enough to skip — and a record
-that gets skipped is the one that breaks the counting invariant.
+Two bugs found by driving it in a browser rather than by reading it:
 
-**Size.** Small. Two `<input type="time">` fields beside the existing steppers,
-both writing the same state. The core's validation is unchanged.
+- **Clamping was quietly wrong.** Typing `14:20` into a 05:30–06:00 span first
+  produced `05:59` — the value clamped to "just before the end", which is a time
+  nobody asked for and reads as the app ignoring the keyboard. Typing a start
+  later than the end means *relocating* the interval, so it now moves and keeps
+  its length, which is what a calendar does.
+- **The End "+30m" fell outside the dialog.** Both endpoints shared one row,
+  which fitted before two time inputs joined it. The button was still tabbable
+  and never visible. One row per endpoint now.
 
-**Note.** U1 and U2 are one piece of work in practice. They are listed
-separately because they are separately true — either could be fixed without the
-other — but the dialog should be opened once and both done.
+A third, cosmetic: `.area-grid` sized its buttons for one- and two-word life
+areas, so task titles wrapped over the row beneath. Rows now size to their
+tallest cell.
 
 ---
 

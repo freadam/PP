@@ -81,6 +81,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         if tracked > 0 {
             store.add_session(ManualSession {
+                contribution: None,
+                replace_existing: false,
                 task_id: task.id.clone(),
                 block_id: Some(block.id.clone()),
                 started_at: block.starts_at,
@@ -109,6 +111,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         })?;
         store.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: t.id.clone(),
             block_id: None,
             started_at: day_start_ms(0, 13),
@@ -135,6 +139,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ..Default::default()
     })?;
     store.add_session(ManualSession {
+        contribution: None,
+        replace_existing: false,
         task_id: firefight.id.clone(),
         block_id: None,
         started_at: day_start_ms(0, 15),
@@ -256,6 +262,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 09:35 YouTube stretch below, so the row is demonstrated rather than
     // asserted.
     store.add_session(ManualSession {
+        contribution: None,
+        replace_existing: false,
         task_id: firefight.id.clone(),
         block_id: None,
         started_at: activity_base,
@@ -269,6 +277,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // without it the button is code nobody can see working.
     for (from, to) in [(150i64, 195i64), (199, 240)] {
         store.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: firefight.id.clone(),
             block_id: None,
             started_at: activity_base + from * 60_000,

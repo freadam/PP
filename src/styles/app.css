@@ -1802,6 +1802,23 @@ textarea::placeholder {
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: var(--s-4);
 }
+/* Life-area names are one or two words, so the grid never had to cope with a
+   long label. Task titles are sentences — "Delete this project when you're
+   done" — and they wrapped straight over the button below. Rows size to their
+   tallest cell and each button fills its row, so a wrapped title makes its
+   whole row taller instead of escaping. */
+.area-grid {
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+}
+.area-grid > .btn {
+  height: auto;
+  min-height: 28px;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.25;
+  padding-block: var(--s-4);
+}
 
 /* §5.8 — the day table has five columns and a detail panel. Below 1280px the
    panel would squeeze the grid past legibility, so it drops out and selection

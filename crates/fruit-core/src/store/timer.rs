@@ -609,8 +609,11 @@ impl Store {
         if let Some(b) = &input.block_id {
             validate_id(b, "block")?;
         }
-        if input.ended_at < input.started_at {
-            return Err(AppError::invalid("A session can't end before it starts."));
+        if input.ended_at <= input.started_at {
+            // Equal used to be allowed and produced a zero-length row: invisible
+            // on the Day view, counted nowhere, and impossible to select in
+            // order to delete. Nothing wants one.
+            return Err(AppError::invalid("A session has to end after it starts."));
         }
         let duration = (input.ended_at - input.started_at) / 1000;
         if duration > 24 * 3600 {
@@ -620,13 +623,20 @@ impl Store {
         }
         let now = self.now();
         crate::time::check_plausible(input.started_at, now)?;
+
+        // Before the insert, not after: clearing afterwards would delete the
+        // row that was just written, since it is itself inside the interval.
+        if input.replace_existing {
+            self.clear_interval(input.started_at, input.ended_at)?;
+        }
+
         let id = new_id();
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO time_session
                (id, task_id, block_id, started_at, ended_at, elapsed_sec, heartbeat_at,
-                source, is_confirmed, note, device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,NULL,'manual',1,?7,?8,?9,?9)",
+                source, is_confirmed, note, contribution, device_id, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,NULL,'manual',1,?7,?8,?9,?10,?10)",
             params![
                 id,
                 input.task_id,
@@ -635,6 +645,7 @@ impl Store {
                 input.ended_at,
                 duration,
                 input.note,
+                input.contribution.map(|c| c.as_str()),
                 self.device_id,
                 now
             ],

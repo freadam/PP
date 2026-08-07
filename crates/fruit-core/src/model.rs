@@ -411,6 +411,20 @@ pub struct ManualSession {
     pub started_at: Millis,
     pub ended_at: Millis,
     pub note: Option<String>,
+    /// How you were involved. Settable here rather than only afterwards,
+    /// because the case manual entry exists for is very often a meeting — and
+    /// "I attended two hours" and "I did two hours" are the distinction
+    /// contribution exists to draw.
+    #[serde(default)]
+    pub contribution: Option<Contribution>,
+    /// Clear any confirmed record already covering this interval.
+    ///
+    /// The same flag `NewLifeEntry` carries, for the same reason and with the
+    /// same default. Recording work by hand is usually filling a gap, but it is
+    /// sometimes correcting an hour the app got wrong, and the second case
+    /// needs the old record gone or the day would hold both.
+    #[serde(default)]
+    pub replace_existing: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

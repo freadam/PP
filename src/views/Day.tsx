@@ -1086,9 +1086,31 @@ function FillDialog({
   const run = useApp((s) => s.run);
   const reload = useApp((s) => s.loadDay);
   const toast = useApp((s) => s.toast);
+  const backlog = useApp((s) => s.backlog);
   const [start, setStart] = useState(from);
   const [end, setEnd] = useState(to);
   const [replace, setReplace] = useState(false);
+  /* Which kind of confirmed time this is. Life opens first because filling a
+     gap on the Day view is most often life — but work has to be here at all,
+     which it was not: the observer sees one machine, so an offline meeting or
+     an hour on a second computer produces no observation and can *only* be
+     entered by hand. Sending someone to Task detail to do it means leaving the
+     screen where they noticed the gap. */
+  const [kind, setKind] = useState<"life" | "work">("life");
+  const [taskId, setTaskId] = useState("");
+  const [taskFilter, setTaskFilter] = useState("");
+  const [contribution, setContribution] = useState<Contribution | "">("");
+
+  const tasks = useMemo(() => {
+    const all = backlog?.tasks ?? [];
+    const needle = taskFilter.trim().toLowerCase();
+    const matching = needle
+      ? all.filter((t) => t.title.toLowerCase().includes(needle))
+      : all;
+    // Capped, because this is a picker inside a dialog and not the backlog.
+    // The filter is how you reach anything past the cap.
+    return matching.slice(0, 40);
+  }, [backlog, taskFilter]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1121,9 +1143,60 @@ function FillDialog({
     }
   };
 
+  const recordWork = async () => {
+    if (!taskId) return;
+    const session = await run(
+      () =>
+        ipc.addSession({
+          taskId,
+          startedAt: start,
+          endedAt: end,
+          contribution: contribution || null,
+          replaceExisting: replace,
+        }),
+      "Couldn't record that.",
+    );
+    onClose();
+    if (session) {
+      toast(
+        `${fmt.clock(start)}–${fmt.clock(end)} recorded against ${session.taskTitle}.`,
+      );
+      await reload();
+    }
+  };
+
   const shift = (which: "start" | "end", minutes: number) => {
     if (which === "start") setStart((s) => Math.min(end - 5 * 60_000, s + minutes * 60_000));
     else setEnd((e) => Math.max(start + 5 * 60_000, e + minutes * 60_000));
+  };
+
+  /* Typing a time keeps the *date* of the interval and replaces only the clock,
+     so editing the end of a 23:40 → 00:20 span cannot silently move it a day.
+     An empty or half-typed value is ignored rather than treated as midnight —
+     `<input type="time">` fires on every keystroke, and the "1" of "14" is not
+     a request to jump to 01:00.
+
+     When the typed time would cross the other end, the interval **moves and
+     keeps its length** rather than the value being clamped. Clamping was the
+     first thing tried and it is quietly wrong: typing 14:20 into a 05:30–06:00
+     span produced 05:59, a time nobody asked for and which looks like the app
+     ignoring the keyboard. Someone typing a start later than the end is
+     relocating the interval, which is what a calendar does too. */
+  const setClock = (which: "start" | "end", value: string) => {
+    const [h, m] = value.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return;
+    const d = new Date(which === "start" ? start : end);
+    d.setHours(h!, m!, 0, 0);
+    const next = d.getTime();
+    const length = end - start;
+
+    if (which === "start") {
+      setStart(next);
+      if (next >= end) setEnd(next + length);
+    } else {
+      setEnd(next);
+      if (next <= start) setStart(next - length);
+    }
   };
 
   return (
@@ -1136,38 +1209,135 @@ function FillDialog({
           </strong>
         </div>
         <div className="sheet-body stack">
-          <div className="row">
-            <span className="caption" style={{ width: 44 }}>
-              Start
-            </span>
-            <button className="btn" onClick={() => shift("start", -30)}>
-              −30m
+          {/* Typed *and* nudged. The stepper is the right control for trimming
+              what the app already guessed; it is the wrong one for entering a
+              meeting that ran 14:20 to 16:05, which no number of half-hour
+              steps can reach. */}
+          {/* One row per endpoint. Both on one line fitted before the time
+              inputs existed; with them the End "+30m" was pushed outside the
+              dialog, where it could still be tabbed to but never seen. */}
+          {(
+            [
+              ["start", "Start", start] as const,
+              ["end", "End", end] as const,
+            ]
+          ).map(([which, label, value]) => (
+            <div className="row" key={which}>
+              <label className="caption" htmlFor={`fill-${which}`} style={{ width: 44 }}>
+                {label}
+              </label>
+              <input
+                id={`fill-${which}`}
+                type="time"
+                className="data"
+                value={fmt.clockValue(value)}
+                onChange={(e) => setClock(which, e.target.value)}
+              />
+              <span className="grow" />
+              <button
+                className="btn"
+                aria-label={`${label} 30 minutes earlier`}
+                onClick={() => shift(which, -30)}
+              >
+                −30m
+              </button>
+              <button
+                className="btn"
+                aria-label={`${label} 30 minutes later`}
+                onClick={() => shift(which, 30)}
+              >
+                +30m
+              </button>
+            </div>
+          ))}
+
+          {/* Both kinds of confirmed time are reachable from the gap, because
+              both kinds of time happen in one. */}
+          <div className="segmented" role="group" aria-label="What kind of time">
+            <button
+              className="btn"
+              aria-pressed={kind === "life"}
+              onClick={() => setKind("life")}
+            >
+              Life
             </button>
-            <button className="btn" onClick={() => shift("start", 30)}>
-              +30m
-            </button>
-            <span className="grow" />
-            <span className="caption" style={{ width: 34 }}>
-              End
-            </span>
-            <button className="btn" onClick={() => shift("end", -30)}>
-              −30m
-            </button>
-            <button className="btn" onClick={() => shift("end", 30)}>
-              +30m
+            <button
+              className="btn"
+              aria-pressed={kind === "work"}
+              onClick={() => setKind("work")}
+            >
+              Work
             </button>
           </div>
 
-          <div className="area-grid">
-            {areas.map((a) => (
-              <button key={a.id} className="btn" onClick={() => void fill(a.id)}>
-                <i className="swatch" style={{ background: a.colour }} aria-hidden="true" />
-                <span className="grow" style={{ textAlign: "left" }}>
-                  {a.name}
-                </span>
-              </button>
-            ))}
-          </div>
+          {kind === "life" ? (
+            <div className="area-grid">
+              {areas.map((a) => (
+                <button key={a.id} className="btn" onClick={() => void fill(a.id)}>
+                  <i className="swatch" style={{ background: a.colour }} aria-hidden="true" />
+                  <span className="grow" style={{ textAlign: "left" }}>
+                    {a.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 6 }}>
+              <input
+                aria-label="Find a task"
+                placeholder="Find a task…"
+                value={taskFilter}
+                onChange={(e) => setTaskFilter(e.target.value)}
+              />
+              <div className="area-grid" role="listbox" aria-label="Task">
+                {tasks.map((t) => (
+                  <button
+                    key={t.id}
+                    className="btn"
+                    role="option"
+                    aria-selected={taskId === t.id}
+                    data-chosen={taskId === t.id || undefined}
+                    onClick={() => setTaskId(t.id)}
+                  >
+                    <span className="grow" style={{ textAlign: "left" }}>
+                      {t.title}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {tasks.length === 0 && (
+                <p className="caption">
+                  {backlog
+                    ? "No task matches that. Clear the filter, or create the task first — a session has to belong to something."
+                    : "Tasks aren't available in browser preview."}
+                </p>
+              )}
+
+              <label className="row caption">
+                <span style={{ width: 96 }}>Contribution</span>
+                <select
+                  aria-label="Contribution"
+                  value={contribution}
+                  onChange={(e) => setContribution(e.target.value as Contribution | "")}
+                >
+                  <option value="">Not recorded</option>
+                  {CONTRIBUTIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label} — {c.hint}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* Said here rather than in a tooltip, because this is the field
+                  people fill in when the entry is a meeting, and a meeting is
+                  the commonest thing entered by hand. */}
+              <p className="caption">
+                Work away from this PC — a second machine, an offline meeting, a
+                task done on paper — is never observed, so this is the only way
+                it is ever recorded.
+              </p>
+            </div>
+          )}
 
           <label className="row caption">
             <input
@@ -1181,18 +1351,35 @@ function FillDialog({
           </label>
 
           <div className="row">
-            <button
-              className="btn"
-              onClick={() => void fill(areas[0]?.id ?? "", true)}
-              disabled={!areas.length}
-              title="Accounted for, so the reconciler stops asking — but nothing is recorded about it"
-            >
-              Private
-            </button>
+            {/* Private is a life state — "accounted for, nothing recorded about
+                it". There is no private work: a work session names a task by
+                definition, so the concept has nowhere to attach. */}
+            {kind === "life" && (
+              <button
+                className="btn"
+                onClick={() => void fill(areas[0]?.id ?? "", true)}
+                disabled={!areas.length}
+                title="Accounted for, so the reconciler stops asking — but nothing is recorded about it"
+              >
+                Private
+              </button>
+            )}
             <span className="grow" />
             <button className="btn" onClick={onClose}>
               Cancel <span className="kbd">Esc</span>
             </button>
+            {/* Life commits by picking an area — one click, which is the
+                ninety-second budget. Work needs a second step because a task
+                has to be chosen first, so it gets an explicit button. */}
+            {kind === "work" && (
+              <button
+                className="btn btn-primary"
+                disabled={!taskId}
+                onClick={() => void recordWork()}
+              >
+                Record {fmt.duration((end - start) / 1000)} of work
+              </button>
+            )}
           </div>
         </div>
       </div>

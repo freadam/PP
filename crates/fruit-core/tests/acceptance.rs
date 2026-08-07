@@ -334,6 +334,8 @@ fn f7_manual_sessions_are_flagged() {
     let t = task(&mut store, "Forgot to start the timer");
     let s = store
         .add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: t.id.clone(),
             block_id: None,
             started_at: at(2025, 7, 30, 14, 0),
@@ -346,6 +348,8 @@ fn f7_manual_sessions_are_flagged() {
     assert_eq!(store.get_task(&t.id).unwrap().tracked_sec, 90 * 60);
 
     let bad = store.add_session(ManualSession {
+        contribution: None,
+        replace_existing: false,
         task_id: t.id.clone(),
         block_id: None,
         started_at: at(2025, 7, 30, 15, 0),
@@ -2295,6 +2299,8 @@ fn month_load_stays_inside_its_budget() {
         life(&mut store, "Sleep/Rest", at(2025, 7, day, 0, 0), at(2025, 7, day, 7, 0));
         store
             .add_session(ManualSession {
+                contribution: None,
+                replace_existing: false,
                 task_id: t.id.clone(),
                 block_id: None,
                 started_at: at(2025, 7, day, 9, 0),
@@ -2665,6 +2671,8 @@ fn reconcile_covers_observed_only_and_empty_hours() {
     // …with confirmed work either side, so the evidence panel has neighbours.
     store
         .add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: t.id.clone(),
             block_id: None,
             started_at: at(2025, 7, 30, 10, 0),
@@ -2895,4 +2903,176 @@ fn the_welcome_note_contains_no_markup() {
             );
         }
     }
+}
+
+// ─── recording work that happened away from this PC (U1, U2) ───────────
+//
+// The observer sees one machine. Work on a second computer, an offline meeting
+// and a task done on paper produce no `activity_span` at all, so the reconciler
+// never offers them — they can *only* ever be entered by hand. That makes the
+// manual path load-bearing rather than a fallback, and these are its rules.
+
+/// A meeting entered by hand carries how you were involved, in one write.
+///
+/// Contribution used to be settable only *after* the fact, on a record that
+/// already existed. But the case manual entry exists for is very often a
+/// meeting, and "I attended two hours" versus "I did two hours" is the entire
+/// distinction contribution was added to draw.
+#[test]
+fn a_hand_entered_session_can_carry_its_contribution() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 18, 0));
+    let t = task(&mut store, "Design review");
+
+    let session = store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 14, 20),
+            ended_at: at(2026, 8, 3, 16, 5),
+            note: Some("Offline, in the meeting room".into()),
+            contribution: Some(Contribution::Attend),
+            replace_existing: false,
+        })
+        .unwrap();
+
+    assert_eq!(session.contribution, Some(Contribution::Attend));
+    assert_eq!(session.elapsed_sec, 105 * 60, "14:20 to 16:05 is 1h 45m");
+    // And it lands on the day as confirmed work, like any other session.
+    let totals = store.get_day("2026-08-03", TZ, None).unwrap().totals;
+    assert_eq!(totals.confirmed_work_sec, 105 * 60);
+}
+
+/// Times are arbitrary, not multiples of anything. A meeting that ran 14:20 to
+/// 16:05 is stored as 14:20 to 16:05.
+#[test]
+fn a_hand_entered_session_keeps_the_exact_minutes_given() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 18, 0));
+    let t = task(&mut store, "Standup");
+
+    let session = store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 9, 7),
+            ended_at: at(2026, 8, 3, 9, 23),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    assert_eq!(session.started_at, at(2026, 8, 3, 9, 7));
+    assert_eq!(session.ended_at, Some(at(2026, 8, 3, 9, 23)));
+    assert_eq!(session.elapsed_sec, 16 * 60);
+}
+
+/// Recording by hand is usually filling a gap, but it is sometimes correcting
+/// an hour the app got wrong — and the second case needs the old record gone,
+/// or the day holds both. The same flag `NewLifeEntry` has, defaulting the same
+/// way: off, because replacing destroys a confirmed record.
+#[test]
+fn a_hand_entered_session_can_replace_what_was_already_there() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 18, 0));
+    let wrong = task(&mut store, "Mis-tracked");
+    let right = task(&mut store, "What actually happened");
+
+    store
+        .add_session(ManualSession {
+            task_id: wrong.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 10, 0),
+            ended_at: at(2026, 8, 3, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    // Without the flag, both records exist and the hour is claimed twice.
+    store
+        .add_session(ManualSession {
+            task_id: right.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 10, 0),
+            ended_at: at(2026, 8, 3, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    assert_eq!(
+        store.get_task_detail(&wrong.id).unwrap().sessions.len()
+            + store.get_task_detail(&right.id).unwrap().sessions.len(),
+        2
+    );
+
+    // With it, the interval is cleared first and one record remains.
+    store
+        .add_session(ManualSession {
+            task_id: right.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 10, 0),
+            ended_at: at(2026, 8, 3, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: true,
+        })
+        .unwrap();
+    assert!(
+        store.get_task_detail(&wrong.id).unwrap().sessions.is_empty(),
+        "the mis-tracked hour was cleared"
+    );
+    assert_eq!(
+        store.get_task_detail(&right.id).unwrap().sessions.len(),
+        1,
+        "and exactly one record remains"
+    );
+
+    let totals = store.get_day("2026-08-03", TZ, None).unwrap().totals;
+    assert_eq!(totals.confirmed_work_sec, 3600, "one hour, claimed once");
+}
+
+/// Replacing clears the interval *before* the insert. Doing it after would
+/// delete the row just written, because that row is itself inside the interval.
+#[test]
+fn replacing_does_not_delete_the_record_it_just_wrote() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 18, 0));
+    let t = task(&mut store, "Offline work");
+
+    let session = store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 3, 13, 0),
+            ended_at: at(2026, 8, 3, 14, 0),
+            note: None,
+            contribution: None,
+            replace_existing: true,
+        })
+        .unwrap();
+
+    let survivors = store.get_task_detail(&t.id).unwrap().sessions;
+    assert_eq!(survivors.len(), 1, "the new session survived its own replace");
+    assert_eq!(survivors[0].id, session.id);
+}
+
+/// A zero-length session is invisible on the Day view, counted nowhere, and
+/// impossible to select in order to delete. Nothing wants one.
+#[test]
+fn a_session_that_ends_when_it_starts_is_refused() {
+    let (mut store, _clock) = store_at(at(2026, 8, 3, 18, 0));
+    let t = task(&mut store, "Nothing");
+    let same = at(2026, 8, 3, 10, 0);
+
+    assert!(store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: same,
+            ended_at: same,
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .is_err());
 }

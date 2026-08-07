@@ -690,6 +690,8 @@ impl Store {
                         continue;
                     };
                     self.add_session(ManualSession {
+                        contribution: None,
+                        replace_existing: false,
                         task_id: task_id.clone(),
                         block_id: None,
                         started_at: start,

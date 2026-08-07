@@ -270,6 +270,8 @@ mod tests {
 
     fn session(s: &mut Store, task_id: &str, from_min: i64, to_min: i64) -> String {
         s.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: task_id.to_string(),
             block_id: None,
             started_at: MONDAY + from_min * 60_000,
@@ -613,6 +615,8 @@ mod split_tests {
             .unwrap();
         let session = s
             .add_session(ManualSession {
+                contribution: None,
+                replace_existing: false,
                 task_id: task.id.clone(),
                 block_id: Some(block.id.clone()),
                 started_at: MONDAY,

@@ -442,6 +442,8 @@ mod tests {
             })
             .unwrap();
         s.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: t.id,
             block_id: None,
             started_at: from,

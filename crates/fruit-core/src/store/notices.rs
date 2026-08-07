@@ -331,6 +331,8 @@ mod tests {
 
     fn session(s: &mut Store, task_id: &str, from: i64, minutes: i64) -> String {
         s.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: task_id.into(),
             block_id: None,
             started_at: from,
@@ -415,6 +417,8 @@ mod tests {
 
         // Four hours is a second crossing, and worth saying again.
         s.add_session(ManualSession {
+            contribution: None,
+            replace_existing: false,
             task_id: t.clone(),
             block_id: None,
             started_at: NINE + 150 * 60_000,

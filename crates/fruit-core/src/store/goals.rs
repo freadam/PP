@@ -822,6 +822,8 @@ mod tests {
         for back in 1..=5i64 {
             let monday = MONDAY - back * 7 * 86_400_000;
             s.add_session(ManualSession {
+                contribution: None,
+                replace_existing: false,
                 task_id: t.id.clone(),
                 block_id: None,
                 started_at: monday,
@@ -877,6 +879,8 @@ mod tests {
         for back in 1..=5i64 {
             let monday = MONDAY - back * 7 * 86_400_000;
             s.add_session(ManualSession {
+                contribution: None,
+                replace_existing: false,
                 task_id: t.id.clone(),
                 block_id: None,
                 started_at: monday,

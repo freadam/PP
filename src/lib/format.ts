@@ -41,6 +41,20 @@ export function clock(at: Millis): string {
   });
 }
 
+/**
+ * `HH:MM` in 24-hour form, for an `<input type="time">`.
+ *
+ * Deliberately **not** `clock()`. That one respects the user's locale and may
+ * render "2:30 PM", which the input silently rejects — the element's value is
+ * defined as 24-hour regardless of how the browser chooses to display it. Using
+ * the display formatter here produces a control that looks right and never
+ * accepts what it shows.
+ */
+export function clockValue(at: Millis): string {
+  const d = new Date(at);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 export function clockRange(from: Millis, durationSec: number): string {
   return `${clock(from)}–${clock(from + durationSec * 1000)}`;
 }

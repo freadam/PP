@@ -239,12 +239,25 @@ export const resolveIdle = (kind: IdleActionKind) =>
 export const resolveRecovery = (id: string, kind: RecoveryActionKind) =>
   call<TimerState>("resolve_recovery", { id, a: { kind } });
 
+/**
+ * Records work by hand.
+ *
+ * Load-bearing rather than a fallback: the observer sees one machine, so work
+ * on a second computer, an offline meeting and a task done on paper produce no
+ * observation at all and can only ever arrive this way.
+ */
 export const addSession = (input: {
   taskId: string;
   blockId?: string | null;
   startedAt: Millis;
   endedAt: Millis;
   note?: string | null;
+  /** How you were involved — very often `attend`, since the case this exists
+   *  for is frequently a meeting. */
+  contribution?: Contribution | null;
+  /** Clear any confirmed record already covering the interval. Off by default:
+   *  replacing destroys a confirmed record. */
+  replaceExisting?: boolean;
 }) => call<SessionRow>("add_session", { input });
 
 export const updateSession = (

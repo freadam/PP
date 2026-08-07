@@ -246,6 +246,10 @@ impl Store {
                         None => self.import_task_for(&interval.label)?,
                     };
                     let row = self.add_session(ManualSession {
+                        contribution: None,
+                        // The import decides replacement per interval already,
+                        // before it gets here — see `clear_for_import`.
+                        replace_existing: false,
                         task_id,
                         block_id: None,
                         started_at: interval.from,
