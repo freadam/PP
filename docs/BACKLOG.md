@@ -153,10 +153,18 @@ Activity screen.
 
 ---
 
-## A4 · Projects cannot have a note
+## A4 · Projects cannot have a note, and have no monthly target
 
 **What the spec asks for.** §3.3: projects have "one compact plain-text note",
-the same as tasks.
+the same as tasks. §4.5's entity table lists a project's key fields as `name`,
+`colour`, `weekly_target_sec`, **`monthly_target_sec`**, **`note`**,
+`is_archived`.
+
+**What exists.** `CREATE TABLE project` has `weekly_target_sec` and neither of
+the other two. A `life_area` *does* have `monthly_target_sec`, which is what the
+month dashboard's target-vs-actual bars read — so projects are the only
+targetable thing in the app that cannot be measured against a month, on the one
+screen the plan makes the default reporting horizon.
 
 **What exists.** The `note` table's primary key is `task_id`, so it can
 physically only hold notes for tasks. This is not a missing screen; it is
@@ -245,6 +253,124 @@ gaps. Excel options live on the export screen instead of in Settings.
 
 **Size.** Small, and arguably fine as-is: the options are where they are used.
 Either move them or record the deviation deliberately.
+
+---
+
+## A10 · Entertainment rules match only apps and domains
+
+**What the spec asks for.** §4.7: *"The user can override any interval, domain,
+application, project, task or recurring pattern."*
+
+**What exists.** `MatchKind` has exactly two variants, `App` and `Domain`.
+Per-interval override exists too — that is what the reconciler's verbs do — so
+three of the six are covered.
+
+**Missing:** rules keyed on a **project**, on a **task**, or on a **recurring
+pattern**.
+
+**Why the three missing ones are not interchangeable with the two that exist.**
+A domain rule says "youtube.com is entertainment, always". A project rule says
+something a domain rule cannot: *"time on the Client X project is never
+entertainment, whatever site it happened on"* — research on YouTube for a
+client is the exact case a domain rule gets wrong, and the reviewer's own
+complaint about false positives is this case. A recurring-pattern rule says
+*"Friday 18:00–20:00 is entertainment"*, which is a statement about time rather
+than about software, and nothing in the current model can express it.
+
+**Size.** Moderate. The storage generalises — `activity_rule` already keys on
+`(match_kind, match_value)`, so `project`/`task` are two more variants and a
+lookup through the session that owns the interval. A recurring pattern is
+bigger: it needs a time-of-week matcher, which is closer to the `rrule` engine
+than to the rule table.
+
+---
+
+## A11 · The Day view renders seven of the ten specified slot states
+
+**What the spec asks for.** §4.3 enumerates ten states every Day slot can
+visibly be: *planned and completed as intended · planned with overrun · planned
+with underrun · planned but never started · unplanned confirmed activity ·
+observed but unconfirmed · idle/away · sleep/rest · intentionally
+private/untracked · empty/unaccounted*.
+
+**What exists.** `SlotState` has seven: `empty`, `plannedNotStarted`,
+`confirmedWork`, `confirmedLife`, `private`, `observedOnly`, `idle`.
+
+**The three that are not distinct, and how they differ in severity:**
+
+- **planned + completed / + overrun / + underrun** collapse into
+  `confirmedWork`. The information exists — `DriftState` carries exactly these
+  distinctions — but it lives on a *block*, and the Planner is where it is
+  drawn. A Day slot knows a block was planned there and knows work happened;
+  it does not say whether the two matched. Given the Day view is the primary
+  operational screen and drift is the product's signature reading, this is the
+  most substantive of the three.
+- **unplanned confirmed activity** is not distinguished from planned confirmed
+  activity: both are `confirmedWork`. The Planned column being empty beside a
+  filled Actual column carries it visually, which is arguably enough — but it
+  is carried by absence rather than stated.
+- **sleep/rest** collapses into `confirmedLife`. There is a Sleep summary card
+  and `sleepSec` in the totals, so the *figure* is broken out; the row is not.
+
+**Size.** Small to moderate, and mostly a decision rather than code: the data
+for all three already reaches the renderer. The question is whether the
+classification column gains states or the Planned column gains a drift mark,
+and that is a design call worth making deliberately rather than by whichever is
+easier to write.
+
+---
+
+## A12 · Five of the six performance budgets are unmeasured
+
+**What the spec asks for.** §5.6 sets six budgets: cold start < 1.5s, Day view
+< 100ms, month dashboard < 250ms, week load with 500 blocks < 100ms, idle CPU
+~0%, and no data loss after a forced close.
+
+**What exists.** One test: `month_load_stays_inside_its_budget`.
+
+**Missing:** the Day view, the week load, cold start, idle CPU, and the
+data-loss guarantee — which is criterion **D4** and already listed under Test
+gaps below.
+
+**Why it is worth more than it looks.** The Day view is the screen the product
+is organised around and the one the ninety-second reconciliation target runs
+on; it is also the screen that gained the most work this year — filters,
+multi-select, split, merge, the plan overlay. A budget nobody measures is a
+budget that degrades in increments nobody notices.
+
+**Size.** Small for the two core ones. The Day and week loads are pure
+`fruit-core` calls and can be timed exactly the way the month already is. Cold
+start and idle CPU need the packaged binary and belong with the Windows work.
+
+---
+
+## A13 · The counting invariant is not tested the way §4.2 says it is
+
+**What the spec asks for.** §4.2, describing the app's central promise: *"This
+is enforced in the core as a property test over random overlapping records, not
+asserted in the UI."*
+
+**What exists.** Two things, neither of which is that:
+
+- `a_day_accounts_for_every_second_exactly_once` — a real assertion that the
+  layers tile the day, over **hand-written fixed data**: one sleep entry, one
+  session, the rest empty. It would not catch a bug that only appears when a
+  life entry partly overlaps a session which partly overlaps an observation.
+- `d1_d7_d11_fuzz_leaves_the_database_consistent` — a *scripted* fuzz with a
+  deterministic RNG, which asserts foreign keys, cache agreement and the
+  one-running-session rule. It does **not** assert the counting invariant.
+
+**Why this is the most important item on this page.** §4.2 calls the invariant
+"the technical form of the product's promise", and notes that acceptance
+criteria 2, 4 and 8 all reduce to it. Overlap is exactly where it can break,
+and overlap is exactly what the current test does not generate. The claim in
+the specification is currently stronger than the evidence.
+
+**Size.** Small, and the machinery exists — `Lcg` is already in the test file.
+Generate a few hundred random life entries, sessions and observations on one
+day, resolve it, and assert the layers sum to the day's length every time. The
+fuzz that exists is the template; it needs one more assertion and a different
+generator.
 
 ---
 
