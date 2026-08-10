@@ -24,7 +24,7 @@ export function TaskDetail({ mode }: { mode: "column" | "sheet" }) {
     <>
       <div className="sheet-head">
         <TitleField />
-        <button aria-label="Close detail" onClick={close} style={{ color: "var(--muted)" }}>
+        <button className="btn btn-quiet btn-icon" aria-label="Close detail" onClick={close}>
           ✕
         </button>
         <span className="kbd">Esc</span>
@@ -378,7 +378,7 @@ function SessionRowView({ session }: { session: SessionRow }) {
           Confirm
         </button>
       )}
-      <button aria-label="Delete session" onClick={() => void remove()} style={{ color: "var(--muted)" }}>
+      <button className="btn btn-quiet btn-icon" aria-label="Delete session" onClick={() => void remove()}>
         ✕
       </button>
     </div>

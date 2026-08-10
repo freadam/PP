@@ -727,7 +727,7 @@ function IntervalDetail({
         <h2 className="title grow">
           {fmt.clock(segment.from)}–{fmt.clock(segment.to)}
         </h2>
-        <button aria-label="Close" onClick={onClose} style={{ color: "var(--muted)" }}>
+        <button className="btn btn-quiet btn-icon" aria-label="Close" onClick={onClose}>
           ✕
         </button>
       </div>
@@ -1350,37 +1350,41 @@ function FillDialog({
             Replace anything already recorded in this interval
           </label>
 
-          <div className="row">
-            {/* Private is a life state — "accounted for, nothing recorded about
-                it". There is no private work: a work session names a task by
-                definition, so the concept has nowhere to attach. */}
-            {kind === "life" && (
-              <button
-                className="btn"
-                onClick={() => void fill(areas[0]?.id ?? "", true)}
-                disabled={!areas.length}
-                title="Accounted for, so the reconciler stops asking — but nothing is recorded about it"
-              >
-                Private
-              </button>
-            )}
-            <span className="grow" />
-            <button className="btn" onClick={onClose}>
-              Cancel <span className="kbd">Esc</span>
+        </div>
+
+        {/* A dialog footer: top border, right-aligned actions, secondary
+            before primary. Previously this row sat inside the scrolling body,
+            so on a short window the commit button scrolled out of sight. */}
+        <div className="modal-foot">
+          {/* Private is a life state — "accounted for, nothing recorded about
+              it". There is no private work: a work session names a task by
+              definition, so the concept has nowhere to attach. */}
+          {kind === "life" && (
+            <button
+              className="btn"
+              onClick={() => void fill(areas[0]?.id ?? "", true)}
+              disabled={!areas.length}
+              title="Accounted for, so the reconciler stops asking — but nothing is recorded about it"
+            >
+              Private
             </button>
-            {/* Life commits by picking an area — one click, which is the
-                ninety-second budget. Work needs a second step because a task
-                has to be chosen first, so it gets an explicit button. */}
-            {kind === "work" && (
-              <button
-                className="btn btn-primary"
-                disabled={!taskId}
-                onClick={() => void recordWork()}
-              >
-                Record {fmt.duration((end - start) / 1000)} of work
-              </button>
-            )}
-          </div>
+          )}
+          <span className="grow" />
+          <button className="btn" onClick={onClose}>
+            Cancel <span className="kbd">Esc</span>
+          </button>
+          {/* Life commits by picking an area — one click, which is the
+              ninety-second budget. Work needs a second step because a task
+              has to be chosen first, so it gets an explicit button. */}
+          {kind === "work" && (
+            <button
+              className="btn btn-primary"
+              disabled={!taskId}
+              onClick={() => void recordWork()}
+            >
+              Record {fmt.duration((end - start) / 1000)} of work
+            </button>
+          )}
         </div>
       </div>
     </>

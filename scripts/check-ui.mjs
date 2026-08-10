@@ -154,9 +154,14 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
 // pixel of horizontal scroll, and neither is the default screen.
 const VIEWS = ["Day", "Planner", "Projects", "Activity", "Reports", "Settings"];
 
+// The widths are the canonical breakpoint map's edges, plus one either side of
+// the 1200px tier: the detail panel and the backlog appear exactly there, so
+// 1200 is the first width at which the widest layout has to fit and 1199 is the
+// last at which it must not be attempted.
 for (const [width, height, scale] of [
   [960, 640, 1],
   [1130, 720, 1],
+  [1200, 800, 1],
   [1280, 800, 1],
   [1490, 900, 1],
   [1440, 900, 1.25],

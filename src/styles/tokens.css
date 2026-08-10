@@ -1,138 +1,301 @@
 @import "tailwindcss";
 
 /* ══════════════════════════════════════════════════════════════════════
-   Fruit design system — §5
-   Fruit should not look like a productivity app. It should look like an
-   instrument: ruled lines, graduated scales, and the visible offset between
-   two traces. Every value below is from the spec; nothing is invented here,
-   and no component may introduce a literal colour (I1).
+   Fruit design system — ERPNext / Frappe Desk
+   ─────────────────────────────────────────────────────────────────────
+   Source: "DESIGN SYSTEM REFERENCE — ERPNext / Frappe Desk", inspection
+   dated 10 August 2026. Every value marked SITE ASSET in that document is
+   reproduced here verbatim; nothing in this file is sampled or eyeballed.
+
+   The system is *neutral-first*. Gray establishes hierarchy, borders, hover
+   fills, controls and primary actions. Chromatic colour is reserved for
+   status, alerts, links, charts and avatars. The visual hierarchy comes from
+   spacing, weight and gray value — not from decorative colour.
+
+   Three layers, in order:
+
+     1. PRIMITIVES  — the deployment's raw ramps. Private to this file.
+     2. SEMANTICS   — --surface, --paper, --line, --plot … what components ask
+                      for. Only these may be referenced outside this file, so
+                      the theme can be remapped without rewriting a component.
+     3. BASE        — element defaults and the shared utility classes.
+
+   Rule, from the source document: "Do not duplicate raw palette values inside
+   components; bind component variants to semantic roles." That is also what
+   check-ui.mjs I1 enforces — no literal colour may appear in a component.
    ══════════════════════════════════════════════════════════════════════ */
 
-/* ─── §5.3 Typography ────────────────────────────────────────────────────
+/* ─── Typography · SITE ASSET ────────────────────────────────────────────
+   "The deployment loads InterVariable first, then Inter and a broad
+   native/system fallback stack." One family for the whole product — the
+   previous three-family split (display / UI / mono) is gone, because this
+   system does not have one.
+
    Bundled locally as woff2. An offline-first app must never reference a font
-   CDN — it silently falls back to system faces on a machine with no network,
-   which is the exact machine this app is built for (I7).
-   The files are OFL and fetched by `npm run fonts`; see src/assets/fonts/README.md.
-   If they are absent the stacks below degrade to system faces rather than
+   CDN: it silently falls back to system faces on a machine with no network,
+   which is the exact machine this app is built for (I7). The files are OFL
+   and are dropped in before a release; see src/assets/fonts/README.md. Until
+   they are present the stack below degrades to system faces rather than
    reaching out to the network. */
 @font-face {
-  font-family: "Space Grotesk";
-  src: url("../assets/fonts/SpaceGrotesk-Medium.woff2") format("woff2");
-  font-weight: 500;
+  font-family: "InterVariable";
+  src: url("../assets/fonts/InterVariable.woff2") format("woff2-variations");
+  font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
-  font-family: "Space Grotesk";
-  src: url("../assets/fonts/SpaceGrotesk-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Instrument Sans";
-  src: url("../assets/fonts/InstrumentSans-Regular.woff2") format("woff2");
+  font-family: "Inter";
+  src: url("../assets/fonts/Inter-Regular.woff2") format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
-  font-family: "Instrument Sans";
-  src: url("../assets/fonts/InstrumentSans-Medium.woff2") format("woff2");
+  font-family: "Inter";
+  src: url("../assets/fonts/Inter-Medium.woff2") format("woff2");
   font-weight: 500;
   font-display: swap;
 }
 @font-face {
-  font-family: "Instrument Sans";
-  src: url("../assets/fonts/InstrumentSans-SemiBold.woff2") format("woff2");
+  font-family: "Inter";
+  src: url("../assets/fonts/Inter-SemiBold.woff2") format("woff2");
   font-weight: 600;
   font-display: swap;
 }
 @font-face {
-  font-family: "Commit Mono";
-  src: url("../assets/fonts/CommitMono-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Commit Mono";
-  src: url("../assets/fonts/CommitMono-Medium.woff2") format("woff2");
-  font-weight: 500;
+  font-family: "Inter";
+  src: url("../assets/fonts/Inter-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-display: swap;
 }
 
-/* ─── §5.2 Colour tokens · dark is primary ───────────────────────────── */
-:root,
-:root[data-theme="dark"] {
-  --ink: #0e1116; /* blue-black: neutral black reads dead under a cyan accent */
-  --surface: #151a21;
-  --raised: #1d242d;
-  --line: #262e39;
-  --rule: #1f2630;
-  --paper: #e3e7ec; /* not #FFF: pure white halates at 14px */
-  --muted: #8b95a3;
-  --faint: #5a6472;
+/* ══════════════════════════════════════════════════════════════════════
+   1. PRIMITIVES — the deployment's ramps, exactly as served
+   ══════════════════════════════════════════════════════════════════════ */
 
-  /* The drift axis. Cool is planned, warm is actual. There is deliberately
-     no red in the drift system at all — overrun is a continuation, not an alarm. */
-  --plot: #56c2d6;
-  --track: #e9a63c;
-  --over: #e2603c;
-  --done: #6ebe8c;
-  --danger: #d9455f; /* destructive only; crimson so it never reads as overrun */
-
-  --scrim: rgb(0 0 0 / 0.4);
-  --overlay-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
-  color-scheme: dark;
-}
-
-/* ─── Activity's categorical ramp (§3.5, P2) ─────────────────────────────
-   The drift axis above is *ordinal* — cool plan, warm actual — and reusing it
-   for "which app" would say a hue means overrun in one panel and Slack in the
-   next. So Activity gets its own closed set: eight hues at one lightness, no
-   ranking implied, and identical in both themes because the swatches sit on
-   their own filled bars rather than on the page. The mapping from an app name
-   to a hue is a hash in `Activity.tsx`; the colours themselves live here, so
-   `check-ui.mjs` I1 still holds — no component invents a colour. */
 :root {
-  --app-1: #3fa8bd;
-  --app-2: #c98a2e;
-  --app-3: #c9603f;
-  --app-4: #4fa374;
-  --app-5: #8b7fd4;
-  --app-6: #c2609b;
-  --app-7: #7fa440;
-  --app-8: #5b8fc4;
-  /* Ink on a filled app bar. Fixed, because the bars themselves are fixed. */
-  --app-ink: #0e1116;
+  /* Gray ramp · SITE ASSET. The whole hierarchy is built from these ten. */
+  --gray-50: #f8f8f8; /* page/list hover, subtle background */
+  --gray-100: #f3f3f3; /* default control and secondary-button fill */
+  --gray-200: #ededed; /* dividers and table borders */
+  --gray-300: #e2e2e2; /* input borders and hover surfaces */
+  --gray-400: #c7c7c7; /* stronger borders, scrollbars */
+  --gray-500: #999999; /* placeholders and tertiary iconography */
+  --gray-600: #7c7c7c; /* muted labels — 4.17:1, see --faint below */
+  --gray-700: #525252; /* secondary text */
+  --gray-800: #383838; /* primary body text / hover action */
+  --gray-900: #171717; /* headings and primary actions */
+
+  /* Semantic status pairs · SITE ASSET. Surface + text, contrast measured in
+     the source against the paired surface. Two of them are adjusted below,
+     and the adjustment is the source document's own recommendation. */
+  --blue-surface: #edf6fd;
+  --blue-text: #0070cc; /* 4.58:1 */
+  --green-surface: #e4f5e9;
+  --green-text: #16794c; /* 4.79:1 */
+  --yellow-surface: #fff7d3;
+  --yellow-text: #8c5600; /* source token #AB6E05 is 3.93:1 — its own
+                             remediation is "darken amber text to
+                             approximately #8C5600". Taken. */
+  --orange-surface: #fff1e7;
+  --orange-text: #bd3e0c; /* 4.92:1 */
+  --red-surface: #fff0f0;
+  --red-text: #b52a2a; /* 5.70:1 */
+  --purple-surface: #f9f0ff;
+  --purple-text: #6e399d; /* 6.92:1 */
+  --pink-surface: #fff7fc;
+  --pink-text: #9c2671; /* 6.81:1 */
+  --cyan-surface: #f5fbfc;
+  --cyan-text: #267a94; /* 4.68:1 */
+
+  /* Button fills · SITE ASSET, from the Desk bundle's variant table. */
+  --btn-secondary-fill: #7c7c7c;
+  --btn-secondary-hover: #696969;
+  --btn-danger-fill: #e03636;
+  --btn-danger-hover: #d02020;
+  --btn-danger-active: #c51e1e;
 }
 
-/* ─── §5.9 Light theme · semantic hues darken to hold 4.5:1 ──────────── */
-:root[data-theme="light"] {
-  --ink: #f5f6f8;
-  --surface: #ffffff;
-  --raised: #edeff3;
-  --line: #dadee5;
-  --rule: #e4e7ec;
-  --paper: #12161c;
-  --muted: #5b6572;
-  --faint: #96a0ae;
-  --plot: #0e7c90;
-  --track: #b4741a;
-  --over: #c2451f;
-  --done: #2f8b57;
-  --danger: #c22943;
+/* ══════════════════════════════════════════════════════════════════════
+   2. SEMANTICS — light is the default, because this system is light-first
+   ══════════════════════════════════════════════════════════════════════ */
 
-  --scrim: rgb(0 0 0 / 0.25);
-  --overlay-shadow: 0 8px 24px rgb(15 20 28 / 0.16);
+:root,
+:root[data-theme="light"] {
+  /* Surfaces, back to front. The canvas is white, not gray: the source's
+     dark-mapping table names surface-white as "Primary application canvas"
+     and gray-50 as "Subtle background / hover". Getting that the wrong way
+     round costs you the whole control layer — a gray-100 button on a gray-50
+     page is invisible, which is exactly what happened the first time. */
+  --ink: #ffffff; /* application canvas */
+  --surface: #ffffff; /* panels, cards, modals, chrome */
+  --subtle: var(--gray-50); /* hover, and quiet inset regions */
+  --raised: var(--gray-100); /* control fill, header bands */
+  --raised-hover: var(--gray-300); /* control hover, from the button table */
+  --raised-active: var(--gray-400); /* control pressed / toggled-on */
+  --sunken: var(--gray-200); /* pressed fill, empty track */
+  --hatch: var(--gray-100); /* the "nothing is known here" stripe */
+  --line: var(--gray-300); /* input and panel borders */
+  --rule: var(--gray-200); /* dividers and table borders */
+  --line-strong: var(--gray-400); /* emphasis borders, scrollbars */
+
+  /* Ink, in the source's three tiers: ink-gray-9 / 8 / 7. */
+  --strong: var(--gray-900); /* headings and the strongest text */
+  --paper: var(--gray-800); /* primary body text */
+  --muted: var(--gray-700); /* secondary text */
+  --faint: #6b6b6b; /* tertiary. NOT gray-600 (#7C7C7C): the source
+                       measures that at 4.17:1 on white and recommends
+                       "#6B6B6B or darker for 14 px labels/links". */
+  --placeholder: var(--gray-500);
+
+  /* ─── The drift axis ────────────────────────────────────────────────
+     Fruit's one piece of chromatic meaning: cool is what you planned, warm
+     is what actually happened, and the gap between them is the product.
+     Each hue is an ERPNext status token, chosen so the axis survives:
+       plot  ← blue/info        the plan, an informational claim
+       track ← yellow/caution   the record, "this is what it cost"
+       over  ← orange/attention overrun, medium severity, not an alarm
+       done  ← green/success    finished
+     Red stays out of the drift system entirely and is reserved for
+     destructive actions, exactly as before. Overrun is a continuation, not
+     a failure, and colouring it red would teach the user to fear the
+     column that exists to be trusted. */
+  --plot: var(--blue-text);
+  --plot-surface: var(--blue-surface);
+  --track: var(--yellow-text);
+  --track-surface: var(--yellow-surface);
+  /* Amber has two values because the source's own remediation only applies to
+     one of them: "darken amber *text*". A 3px trace or a progress fill is a
+     graphical object needing 3:1, not 4.5:1, and the deployment's actual
+     #AB6E05 clears that at 3.93:1 while reading as amber rather than as the
+     dark brown #8C5600 becomes at bar scale. Text keeps --track; fills,
+     traces and marks use --track-graphic. */
+  --track-graphic: #ab6e05;
+  --over: var(--orange-text);
+  --over-surface: var(--orange-surface);
+  --done: var(--green-text);
+  --done-surface: var(--green-surface);
+  --danger: var(--red-text);
+  --danger-surface: var(--red-surface);
+
+  /* Focus · the source specifies a 2px ring and gives #65B9FC. That token
+     is 2.3:1 on white and fails the source's own acceptance criterion
+     ("at least 3:1 focus contrast"), so light mode uses #007BE0 — which is
+     also from the deployment, being the focus border-colour in its own
+     form-field recipe. Dark mode keeps #65B9FC, where it is well clear. */
+  --focus-ring: #007be0;
+
+  /* Elevation · "Prefer borders/gray shifts for routine hierarchy; reserve
+     stronger shadows for menus and overlays." Three levels, no more. */
+  --scrim: rgb(0 0 0 / 0.35);
+  --shadow-modal: 0 5px 10px rgb(0 0 0 / 0.1);
+  --shadow-menu: 0 12px 24px rgb(23 23 23 / 0.14);
+  --overlay-shadow: var(--shadow-menu);
+
   color-scheme: light;
 }
 
-/* §5.2 Tailwind v4 mapping. Utilities resolve to the same variables, so a
+/* ─── Dark theme ─────────────────────────────────────────────────────────
+   The neutral column below is SITE ASSET — the source's own dark mapping
+   table (surface-white → #0F0F0F, surface-gray-1 → #232323, surface-gray-2
+   → #2B2B2B, surface-modal → #232323, ink-gray-6/8/9 → #999999/#D4D4D4/
+   #F8F8F8).
+
+   The chromatic column is NOT. The source states a dark theme exists in the
+   deployment CSS but was never rendered, and it publishes no dark values for
+   the status pairs. The hues below keep each family's identity and are
+   lifted until they clear 4.5:1 on #0F0F0F and on #232323 — an extension,
+   marked as one, to be replaced the moment a logged-in dark capture exists.
+   (Source §9: "A logged-in validation pass should update only the sections
+   labeled INFERRED where real UI differs.") */
+:root[data-theme="dark"] {
+  --ink: #0f0f0f;
+  --surface: #1a1a1a;
+  --subtle: #232323;
+  --raised: #2b2b2b;
+  --raised-hover: #3a3a3a;
+  --raised-active: #4a4a4a;
+  --sunken: #232323;
+  --hatch: #303030;
+  --line: #383838;
+  --rule: #2b2b2b;
+  --line-strong: #525252;
+
+  --strong: #f8f8f8;
+  --paper: #d4d4d4;
+  --muted: #999999;
+  --faint: #7c7c7c;
+  --placeholder: #7c7c7c;
+
+  --blue-text: #62b0f0;
+  --blue-surface: #14263a;
+  --green-text: #58c48d;
+  --green-surface: #12301f;
+  --yellow-text: #d9a441;
+  --yellow-surface: #322610;
+  --track-graphic: #d9a441;
+  --orange-text: #f0805a;
+  --orange-surface: #34190e;
+  --red-text: #f07d7d;
+  --red-surface: #351414;
+  --purple-text: #b492e0;
+  --purple-surface: #241a33;
+  --pink-text: #e094c6;
+  --pink-surface: #331728;
+  --cyan-text: #62bcd4;
+  --cyan-surface: #10282f;
+
+  --focus-ring: #65b9fc;
+
+  /* The one variant whose hover has to reverse direction: on a dark canvas a
+     grey button gets lighter when you point at it, not darker. */
+  --btn-secondary-hover: #909090;
+
+  --scrim: rgb(0 0 0 / 0.55);
+  --shadow-modal: 0 5px 10px rgb(0 0 0 / 0.4);
+  --shadow-menu: 0 12px 24px rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
+}
+
+/* ─── Activity's categorical ramp ────────────────────────────────────────
+   Eight hues for "which app was in front", not a ranking. Previously eight
+   invented colours; now the eight chromatic families the deployment already
+   ships, at their text lightness, so they sit legibly on their own filled
+   bars and adapt with the theme. The name→hue mapping is a stable hash in
+   Activity.tsx; only the colours live here, so I1 still holds. */
+:root {
+  /* Ordered on purpose: the three families the source labels "Category"
+     (cyan, purple, pink) come first, then the status families, and red is
+     last — so the commonest apps land on hues that carry no verdict, and a
+     solid red bar for "the editor you were in all afternoon" is the rarest
+     outcome rather than the first. */
+  --app-1: var(--cyan-text);
+  --app-2: var(--purple-text);
+  --app-3: var(--pink-text);
+  --app-4: var(--blue-text);
+  --app-5: var(--green-text);
+  --app-6: var(--yellow-text);
+  --app-7: var(--orange-text);
+  --app-8: var(--red-text);
+  /* Ink on a filled app bar. The bars are filled with text-weight colour,
+     so the label on top is the surface colour. */
+  --app-ink: #ffffff;
+}
+:root[data-theme="dark"] {
+  --app-ink: #0f0f0f;
+}
+
+/* Tailwind v4 mapping. Utilities resolve to the same variables, so a
    `text-muted` and a hand-written rule can never drift apart. */
 @theme {
   --color-ink: var(--ink);
   --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
   --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
   --color-line: var(--line);
   --color-rule: var(--rule);
+  --color-strong: var(--strong);
   --color-paper: var(--paper);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
@@ -143,59 +306,137 @@
   --color-danger: var(--danger);
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Metrics — spacing, shape, control size, layout, motion
+   ══════════════════════════════════════════════════════════════════════ */
+
 :root {
-  /* §5.4 Space — 4px base. Nothing between; if a layout needs 14px, the
-     layout is wrong. */
+  /* ─── Spacing · SITE ASSET: 5, 7, 15, 20, 30, 40 ──────────────────────
+     "Use 5/7 for compact controls; 15/20 for component padding; 30/40 for
+     page-level separation." The --s-* aliases below are what the component
+     sheet asks for; they resolve onto this scale, plus the two values the
+     source's own component recipes use constantly (8px control padding,
+     12px modal footer) and a 2px hairline offset. */
+  --ds-space-1: 5px;
+  --ds-space-2: 7px;
+  --ds-space-3: 15px;
+  --ds-space-4: 20px;
+  --ds-space-5: 30px;
+  --ds-space-6: 40px;
+
   --s-2: 2px;
-  --s-4: 4px;
-  --s-6: 6px;
-  --s-8: 8px;
-  --s-12: 12px;
-  --s-16: 16px;
-  --s-20: 20px;
-  --s-24: 24px;
-  --s-32: 32px;
-  --s-40: 40px;
-  --s-48: 48px;
+  --s-4: var(--ds-space-1); /* 5 */
+  --s-6: var(--ds-space-2); /* 7 */
+  --s-8: 8px; /* control padding, from the button recipe */
+  --s-12: 12px; /* modal footer, from the modal contract */
+  --s-16: var(--ds-space-3); /* 15 */
+  --s-20: var(--ds-space-4); /* 20 */
+  --s-24: var(--ds-space-4); /* 20 */
+  --s-32: var(--ds-space-5); /* 30 */
+  --s-40: var(--ds-space-6); /* 40 */
+  --s-48: 48px; /* the chrome unit, not a spacing step */
 
-  /* §5.4 Radius — tight, because plates are not cards. */
-  --r-plate: 2px;
-  --r-panel: 4px;
-  --r-sheet: 6px;
+  /* ─── Shape · SITE ASSET: 4, 8, 10, 12, 16, 20, 999 ───────────────────
+     "8px is the default control radius; 10–12px for cards/modals; 999px for
+     pills." The old system's 2/4/6px plate radii are gone. --r-bar exists
+     because a 14px-tall progress track at 8px radius is a lozenge, and the
+     source's own 4px step is the right one for it. */
+  --r-bar: 4px;
+  --r-plate: 8px; /* controls, rows, chips, plates */
+  --r-panel: 10px; /* Desk main section */
+  --r-sheet: 12px; /* cards, modals, drawers */
+  --r-pill: 999px;
 
-  /* §5.3 Type. All rem, so OS text scaling works (I5). */
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-ui: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-data: "Commit Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* ─── Control metrics · SITE ASSET ────────────────────────────────────
+     "28px buttons and inputs. Keep dense desktop rhythm; consider a larger
+     touch target wrapper on mobile." The coarse-pointer wrapper is at the
+     bottom of app.css and uses --control-h-touch. */
+  --control-h: 28px;
+  --control-h-touch: 44px;
+  --icon-btn: 28px;
+  --list-head-h: 30px;
+  --pill-h: 20px;
+  --pill-dot: 6px;
+  --checkbox: 14px;
+  --checkbox-touch: 18px; /* below 992px, per the source */
 
-  --t-display-xl: 4.5rem;
-  --t-display: 1.5rem;
-  --t-title: 1.125rem;
-  --t-body: 0.875rem;
-  --t-label: 0.8125rem;
-  --t-caption: 0.75rem;
-  --t-data: 0.8125rem;
-  --t-micro: 0.6875rem;
+  /* ─── Type · SITE ASSET ───────────────────────────────────────────────
+     One family. Regular weight is 420 — "a deliberate midpoint that reads
+     slightly sturdier than 400 at compact enterprise sizes". Sizes are rem
+     so OS text scaling still works (I5). */
+  --font-ui: "InterVariable", "Inter", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-ui);
+  /* The source specifies no monospace face. Durations and clock times still
+     need fixed-width figures (I4); Inter's `tnum` provides them, so the data
+     face is the UI face with tabular figures switched on. */
+  --font-data: var(--font-ui);
 
-  /* §5.5 Motion */
+  --w-regular: 420;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --w-bold: 700;
+
+  --t-micro: 0.6875rem; /* 11px — text-tiny */
+  --t-caption: 0.75rem; /* 12px — text-xs */
+  --t-label: 0.8125rem; /* 13px — text-sm */
+  --t-data: 0.8125rem; /* 13px — indicator/table figures */
+  --t-body: 0.875rem; /* 14px — text-base, the default */
+  --t-title: 1rem; /* 16px — text-lg */
+  --t-display: 1.25rem; /* 20px — text-2xl */
+  --t-display-xl: 4rem; /* 64px — top of the display scale */
+  --tracking-ui: 0.02em; /* the source's typical UI tracking */
+
+  /* ─── Motion · SITE ASSET ─────────────────────────────────────────────
+     Drawer 0.2s, modal 0.3s. Reduced motion is honoured globally below. */
   --m-fast: 120ms;
   --m-settle: 240ms;
-  --m-sheet: 180ms;
+  --m-drawer: 200ms;
+  --m-sheet: var(--m-drawer);
+  --m-modal: 300ms;
   --e-out: ease-out;
   --e-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* §5.8 Layout arithmetic, so the breakpoints are checkable */
+  /* ─── Layout · SITE ASSET ─────────────────────────────────────────────
+     Navbar 48, page head 48, primary sidebar 220, form sidebar 277,
+     page bottom margin 60. The rail is Fruit's own icon-over-label
+     navigation and keeps its 76px; the sidebar moves 260 → 220 to the
+     deployment's value, and the detail panel moves 360 → 277 to the
+     form-sidebar value it plays the same role as. */
   --rail-w: 76px;
-  --sidebar-w: 260px;
+  --sidebar-w: 220px;
   --sidebar-collapsed-w: 48px;
-  --detail-w: 360px;
+  --detail-w: 277px;
   --topbar-h: 48px;
+  --pagehead-h: 48px;
   --gutter-w: 48px;
-  --hour-h: 56px; /* Cmd +/− scales 32–120px, persisted */
+  --page-bottom: 60px;
+  --page-max-w: 900px;
+  --hour-h: 56px; /* Ctrl +/− scales 32–120px, persisted */
+
+  /* ─── Breakpoints · SITE ASSET: 576 / 768 / 992 / 1200 / 1440 ─────────
+     One canonical map, which is the source's explicit instruction after
+     noting the deployment ships adjacent values (567/576, 991/992). Custom
+     properties cannot be used inside a media query, so these are recorded
+     here for reference and written literally in app.css — one place, all
+     together, at the end of the sheet. */
+  --bp-sm: 576px;
+  --bp-md: 768px;
+  --bp-lg: 992px;
+  --bp-xl: 1200px;
+  --bp-2xl: 1440px;
+
+  /* Z-index ladder. 1300 for the overlay sidebar is the deployment's own. */
+  --z-sticky: 6;
+  --z-scrim: 1200;
+  --z-drawer: 1300;
+  --z-modal: 1310;
+  --z-toast: 1400;
+  --z-focus-mode: 1500;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   Base
+   3. BASE
    ══════════════════════════════════════════════════════════════════════ */
 
 * {
@@ -209,19 +450,30 @@ body,
   margin: 0;
 }
 
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--strong);
+}
+
 body {
   background: var(--ink);
   color: var(--paper);
   font-family: var(--font-ui);
   font-size: var(--t-body);
+  font-weight: var(--w-regular);
   line-height: 1.5;
+  letter-spacing: var(--tracking-ui);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
 /* Every number that changes in place gets tabular figures. Without it the
    timer visibly jitters once a second as glyph widths shift, and that one
-   detail is the difference between "polished" and "someone's side project" (I4). */
+   detail is the difference between "polished" and "someone's side project"
+   (I4). One family now, so this is a numeric-feature switch rather than a
+   family switch. */
 .data,
 .tabular,
 input[type="time"],
@@ -234,34 +486,37 @@ input[type="date"] {
 }
 
 .micro {
-  font-family: var(--font-data);
   font-size: var(--t-micro);
-  font-weight: 500;
+  font-weight: var(--w-medium);
   /* Hour labels and drift badges are numerals that change in place, so they
      get tabular figures for the same reason the timer does. */
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1.2;
 }
 
+/* Display scale: 20px/700/115%/.01em, the source's own text-2xl row. */
 .display {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: var(--w-bold);
   font-size: var(--t-display);
-  line-height: 1.2;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  color: var(--strong);
 }
 
 .title {
   font-size: var(--t-title);
-  font-weight: 600;
+  font-weight: var(--w-semibold);
   line-height: 1.35;
+  color: var(--strong);
 }
 
 .label {
   font-size: var(--t-label);
-  font-weight: 500;
+  font-weight: var(--w-medium);
   line-height: 1.4;
 }
 
@@ -271,22 +526,45 @@ input[type="date"] {
   color: var(--muted);
 }
 
-/* §4.7 — a visible focus indicator on every interactive element: a 2px `plot`
-   ring at 2px offset, never only a hover state. */
+/* A quiet column-label band, not a heavy table header — the source's own
+   description of the list header row. 30px, gray-100, 8px radius, 7px inline
+   padding, 12px/600 uppercase-free label. */
+.section-label {
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
+  letter-spacing: var(--tracking-ui);
+  color: var(--muted);
+  text-transform: none;
+}
+
+/* Focus · a 2px ring on every interactive element, never a hover state alone
+   (U10, and the source's High-priority accessibility finding).
+
+   The source's recipe is `outline: 0; box-shadow: 0 0 0 2px …`. This uses
+   `outline` instead, for one reason: half of Fruit's focusable controls live
+   inside scroll containers (the month grid, the activity timeline, the
+   spreadsheet preview, every table body), and a box-shadow ring is clipped
+   by `overflow: hidden` while an outline never is. Same 2px, same colour,
+   same contrast — it just cannot be cut in half by a scroll box. */
 :focus-visible {
-  outline: 2px solid var(--plot);
-  outline-offset: 2px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
   border-radius: var(--r-plate);
 }
 
-/* §5.4 Elevation — exactly two levels. Flat, and Overlay. There is no third,
-   no card shadow, and no hover lift. */
+/* Elevation. Routine hierarchy is carried by borders and gray shifts; these
+   two are for things that float above the page. */
 .overlay {
-  box-shadow: var(--overlay-shadow);
+  box-shadow: var(--shadow-menu);
+}
+.elevated {
+  box-shadow: var(--shadow-modal);
 }
 
-/* §4.7 — prefers-reduced-motion removes the pulsing dots, the drift settle,
-   the glow and the grain; state changes become instant (I6). */
+/* prefers-reduced-motion removes the rail settle, the drawer slide and the
+   modal rise; state changes become instant (I6). The source ships the same
+   override and lists "Reduced-motion users receive equivalent state feedback
+   without reliance on movement" as an acceptance criterion. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -298,7 +576,7 @@ input[type="date"] {
   }
 }
 
-/* First paint before React mounts (§3.10) — real chrome, not a spinner. */
+/* First paint before React mounts — real chrome, not a spinner. */
 .boot-shell {
   display: flex;
   height: 100%;
@@ -306,14 +584,15 @@ input[type="date"] {
 .boot-rail {
   width: var(--rail-w);
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
 }
 .boot-main {
   flex: 1;
   background: var(--ink);
 }
 
-/* Screen-reader-only text, for the accessible names in §4.7. */
+/* Screen-reader-only text, for the accessible names icon-only controls need
+   ("Require aria-label/title plus a tooltip; hide decorative SVGs"). */
 .sr-only {
   position: absolute;
   width: 1px;

@@ -101,7 +101,10 @@ export function Settings() {
       <Section title="General">
         <Field label="Theme">
           <div className="row">
-            {(["dark", "light", "system"] as const).map((t) => (
+            {/* Light first: this design system is light-first, and the
+                option list should open on the default rather than on the
+                alternative. */}
+            {(["light", "dark", "system"] as const).map((t) => (
               <button key={t} className="btn" aria-pressed={theme === t} onClick={() => setTheme(t)}>
                 {t}
               </button>

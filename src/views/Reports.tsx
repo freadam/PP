@@ -617,6 +617,18 @@ const GOAL_STATE: Record<GoalState, string> = {
   over: "over",
 };
 
+/* …and the semantic surface each word sits on. The pill carries a coloured
+   dot and a tinted surface, but the word above is what actually says the
+   state — the colour is a second channel, never the only one. Red is absent
+   on purpose: an exceeded cap is a fact to act on, not a destructive act. */
+const GOAL_TONE: Record<GoalState, string> = {
+  met: "status-success",
+  onPace: "status-info",
+  behind: "status-caution",
+  atRisk: "status-attention",
+  over: "status-attention",
+};
+
 function GoalRowView({ p, onEnd }: { p: GoalProgress; onEnd: () => void }) {
   // The bar is the *target*; the fill is what happened; the notch is where the
   // elapsed days say you would be. Three marks, so ahead-or-behind reads without
@@ -635,7 +647,7 @@ function GoalRowView({ p, onEnd }: { p: GoalProgress; onEnd: () => void }) {
             {p.applicableDays < 7 && <> · {p.applicableDays} days a week</>}
           </span>
         </span>
-        <span className="tag micro">{GOAL_STATE[p.state]}</span>
+        <span className={`status ${GOAL_TONE[p.state]}`}>{GOAL_STATE[p.state]}</span>
         <span className="data caption">{fmt.duration(p.actualSec)}</span>
         <button className="btn micro" aria-label={`End the ${p.goal.subjectName} goal`} onClick={onEnd}>
           End

@@ -309,19 +309,20 @@ function TaskRowView({ task }: { task: TaskRow }) {
       )}
 
       <button
+        className="btn btn-quiet btn-icon"
         aria-label={running ? "Stop timer" : "Start timer"}
         onClick={(e) => {
           e.stopPropagation();
           void toggleTimer(task.id);
         }}
-        style={{ color: running ? "var(--track)" : "var(--muted)" }}
+        style={running ? { color: "var(--track)" } : undefined}
       >
         {running ? "■" : "▶"}
       </button>
 
       {/* Delete lives in the overflow menu and on Backspace — never hover-only. */}
       <div style={{ position: "relative" }}>
-        <button aria-label="More actions" aria-expanded={menu} onClick={(e) => { e.stopPropagation(); setMenu(!menu); }} style={{ color: "var(--muted)" }}>
+        <button className="btn btn-quiet btn-icon" aria-label="More actions" aria-expanded={menu} onClick={(e) => { e.stopPropagation(); setMenu(!menu); }}>
           ⋯
         </button>
         {menu && (
@@ -330,7 +331,7 @@ function TaskRowView({ task }: { task: TaskRow }) {
             style={{
               position: "absolute",
               right: 0,
-              top: 20,
+              top: 32,
               zIndex: 20,
               background: "var(--surface)",
               border: "1px solid var(--line)",

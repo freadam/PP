@@ -136,11 +136,11 @@ export function TimerChip({ timer }: { timer: TimerState }) {
           is, and the plotted block deliberately does not grow. */}
       {running && timer.focusEndsAt !== null && <FocusRemaining endsAt={timer.focusEndsAt} />}
       <button
+        className="btn btn-quiet btn-icon"
         aria-label={running ? "Stop timer" : "Start timer"}
         onClick={() =>
           timer.runTaskId && void toggleTimer(timer.runTaskId, timer.session?.blockId)
         }
-        style={{ color: "var(--muted)" }}
       >
         {running ? "■" : "▶"}
       </button>
@@ -271,7 +271,7 @@ export function Toasts() {
               {t.action.label}
             </button>
           )}
-          <button aria-label="Dismiss" onClick={() => dismiss(t.id)} style={{ color: "var(--muted)" }}>
+          <button className="btn btn-quiet btn-icon" aria-label="Dismiss" onClick={() => dismiss(t.id)}>
             ✕
           </button>
           <span className="toast-progress" />
@@ -377,7 +377,7 @@ export function PreviewNotice() {
           Browser preview — reading recorded output from the Rust command layer. Writes need the
           desktop app (<code className="data">npm run app</code>).
         </span>
-        <button onClick={() => setDismissed(true)} aria-label="Dismiss">
+        <button className="btn btn-quiet btn-icon" onClick={() => setDismissed(true)} aria-label="Dismiss">
           ✕
         </button>
       </div>
@@ -410,6 +410,7 @@ function FocusRemaining({ endsAt }: { endsAt: number }) {
         {left >= 0 ? `${fmt.duration(left)} left` : `${fmt.duration(-left)} over`}
       </span>
       <button
+        className="btn btn-quiet"
         aria-label="Give this session another 15 minutes"
         title="Another 15 minutes. The plotted length does not change, so the overrun stays visible."
         onClick={async () => {

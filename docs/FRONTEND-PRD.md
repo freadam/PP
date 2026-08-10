@@ -5,6 +5,11 @@ to produce a new interface for Fruit without reading the Rust. It states what
 each screen is *for*, what data it can actually have, what the user does on it,
 and which decisions are load-bearing rather than aesthetic.
 
+**Design system.** Fruit uses the **ERPNext / Frappe Desk** system, transcribed
+in §3 from the deployment inspection dated 10 August 2026. That section is the
+authority on colour, type, spacing, shape, control metrics and breakpoints, and
+it is implemented in full — every screen in §6 is drawn against it.
+
 **Status.** The backend described here is built and tested (288 tests in
 `fruit-core`, all green). Every data contract below was read out of the shipped
 code, not designed on paper. Where a screen is missing something the
@@ -152,131 +157,276 @@ removes these attributions removes the reason to trust the numbers.
 
 ## 3. Design system
 
-Everything in this section exists in `src/styles/tokens.css` as CSS custom
-properties. **No component may introduce a literal colour** — there is an
-automated check (`check-ui.mjs`, criterion I1) that fails the build if one does.
+Fruit uses the **ERPNext / Frappe Desk** design system, transcribed from
+*"DESIGN SYSTEM REFERENCE — ERPNext / Frappe Desk"* (deployment inspection,
+10 August 2026). Everything below exists in `src/styles/tokens.css` as CSS
+custom properties. **No component may introduce a literal colour** — an
+automated check (`check-ui.mjs`, criterion I1) fails the build if one does.
 A redesign may change the *values*; it must keep them in tokens.
+
+The source document grades its own claims, and this section keeps that
+grading: values it marks **SITE ASSET** are exact CSS served by the
+deployment and are reproduced verbatim; anything Fruit adds or adapts is
+called out as such, with the reason.
 
 ### 3.1 The governing visual idea
 
-> Fruit should not look like a productivity app. It should look like an
-> **instrument**: ruled lines, graduated scales, and the visible offset between
-> two traces.
+> A deliberately quiet, compact enterprise interface: **neutral-first
+> surfaces**, Inter Variable typography, 8px radii, 28px controls, slim 48px
+> navigation bars, low-elevation shadows, and semantic colour used mainly for
+> status and feedback.
 
-Reference points are the oscilloscope, the tide table and the engineering
-drawing — not the dashboard, the kanban board, or the wellness app. Tight radii
-(2–6px), hairline rules, dense but never cramped, and numerals that line up.
+Hierarchy comes from **spacing, weight and gray value**, not from decorative
+colour. Gray establishes borders, hover fills, controls and primary actions;
+chromatic colour is reserved for status, alerts, links and charts. A page has
+one primary action, and that action is *neutral* (near-black), not brand-blue.
 
-### 3.2 Colour — dark is primary
+Fruit's own idea — that the product is about the **visible offset between what
+you planned and what happened** — survives inside this. It survives as the one
+place chromatic colour carries meaning outside of status: the drift axis in
+§3.2. Everything else is gray.
 
-```
-Dark (default)                     Light
---ink        #0e1116  page         #f5f6f8
---surface    #151a21  panels       #ffffff
---raised     #1d242d  plates       #edeff3
---line       #262e39  borders      #dadee5
---rule       #1f2630  hairlines    #e4e7ec
---paper      #e3e7ec  body text    #12161c
---muted      #8b95a3  secondary    #5b6572
---faint      #5a6472  tertiary     #96a0ae
+### 3.2 Colour — light is primary
 
-The drift axis — ordinal, meaning is fixed:
---plot       #56c2d6  PLANNED      #0e7c90
---track      #e9a63c  ACTUAL       #b4741a
---over       #e2603c  overrun      #c2451f
---done       #6ebe8c  complete     #2f8b57
---danger     #d9455f  DESTRUCTIVE  #c22943   ← never used for overrun
-```
-
-Notes that matter:
-
-- `--ink` is **blue-black, not neutral black** — neutral black reads dead
-  under a cyan accent.
-- `--paper` is **not pure white** — `#fff` halates at 14px on a dark ground.
-- Light theme hues are *darker*, not the same hues on a light ground, so they
-  hold 4.5:1 contrast.
-
-**Activity has its own separate categorical ramp** (`--app-1` … `--app-8`),
-eight hues at one lightness with no ranking implied. This is deliberate: the
-drift axis is *ordinal* (cool means planned), and reusing it for "which
-application" would mean a hue signified overrun in one panel and Slack in the
-next. The app→hue mapping is a hash; the hues live in tokens.
-
-### 3.3 Type
-
-| Face | Role | Token |
-|---|---|---|
-| **Space Grotesk** 500/700 | Focus clock, view titles, large numerals | `--font-display` |
-| **Instrument Sans** 400/500/600 | All interface text | `--font-ui` |
-| **Commit Mono** 400/500 | Durations, clock times, parser tokens, OFFLINE badge | `--font-data` |
+The source's ten-step gray ramp is the whole hierarchy. Fruit names semantic
+roles on top of it, and only the semantic names may be used by a component.
 
 ```
---t-display-xl  4.5rem     the Focus clock, and nothing else
---t-display     1.5rem     view titles
---t-title       1.125rem   panel headings
---t-body        0.875rem   body
---t-label       0.8125rem
---t-caption     0.75rem
---t-data        0.8125rem  monospace figures
---t-micro       0.6875rem
+Gray ramp · SITE ASSET
+--gray-50   #f8f8f8   page/list hover, subtle background
+--gray-100  #f3f3f3   default control and secondary-button fill
+--gray-200  #ededed   dividers and table borders
+--gray-300  #e2e2e2   input borders, control hover
+--gray-400  #c7c7c7   stronger borders, scrollbars
+--gray-500  #999999   placeholders, tertiary icons
+--gray-600  #7c7c7c   muted labels — 4.17:1, see --faint
+--gray-700  #525252   secondary text
+--gray-800  #383838   primary body text
+--gray-900  #171717   headings and primary actions
 ```
 
-All sizes are **rem**, so Windows text scaling works. The layout is verified at
-125% scaling as part of the automated checks.
+```
+Semantic role      Light               Dark
+--ink              #ffffff  canvas     #0f0f0f
+--surface          #ffffff  panels     #1a1a1a
+--subtle           gray-50  hover      #232323
+--raised           gray-100 controls   #2b2b2b
+--raised-hover     gray-300            #3a3a3a
+--raised-active    gray-400            #4a4a4a
+--sunken           gray-200 tracks     #232323
+--hatch            gray-100 "unknown"  #303030
+--line             gray-300 borders    #383838
+--rule             gray-200 dividers   #2b2b2b
+--line-strong      gray-400            #525252
+--strong           gray-900 headings   #f8f8f8
+--paper            gray-800 body       #d4d4d4
+--muted            gray-700 secondary  #999999
+--faint            #6b6b6b  tertiary   #7c7c7c
+--placeholder      gray-500            #7c7c7c
+--focus-ring       #007be0             #65b9fc
+```
+
+**The canvas is white, not gray.** The source's dark-mapping table names
+`surface-white` as the *primary application canvas* and gray-50 as *subtle
+background / hover*. Inverting those costs you the entire control layer: a
+gray-100 button on a gray-50 page is invisible.
+
+**Semantic status pairs · SITE ASSET.** Surface + text, contrast measured
+against the paired surface:
+
+```
+                surface   text      contrast   role
+Blue / info     #edf6fd   #0070cc   4.58:1     information, links, active
+Green / success #e4f5e9   #16794c   4.79:1     completed, healthy
+Yellow / caution#fff7d3   #8c5600   —          pending, caution
+Orange / attn   #fff1e7   #bd3e0c   4.92:1     attention, medium severity
+Red / danger    #fff0f0   #b52a2a   5.70:1     error, failed, destructive
+Purple          #f9f0ff   #6e399d   6.92:1     category
+Pink            #fff7fc   #9c2671   6.81:1     category
+Cyan            #f5fbfc   #267a94   4.68:1     category
+```
+
+**Two deliberate departures from the source's own tokens, both of them the
+source's own remediations:**
+
+1. **Amber text is #8c5600, not #ab6e05.** The published token measures 3.93:1
+   and fails AA for normal text; the document's fix is *"darken amber text to
+   approximately #8C5600"*. Taken. But that fix applies only to text — a 3px
+   trace or a progress fill is a graphical object needing 3:1, and at bar scale
+   #8c5600 reads as dark brown rather than amber. So amber has **two** tokens:
+   `--track` for text, `--track-graphic` (#ab6e05) for fills, traces and marks.
+2. **The focus ring is #007be0 in light, not #65b9fc.** The published focus
+   token is 2.3:1 on white and fails the source's own acceptance criterion
+   ("at least 3:1 focus contrast"). #007be0 is also from the deployment — it is
+   the focus border-colour in the document's own form-field recipe. Dark mode
+   keeps #65b9fc, where it is well clear.
+
+**The drift axis.** Fruit's one piece of chromatic meaning outside status:
+cool is what you planned, warm is what happened, and the gap is the product.
+Each hue is an ERPNext status token, so the axis lives *inside* the system
+rather than beside it:
+
+```
+--plot   ← blue / info         the plan — an informational claim
+--track  ← yellow / caution    the record — "this is what it cost"
+--over   ← orange / attention  overrun — medium severity, not an alarm
+--done   ← green / success     finished
+--danger ← red                 DESTRUCTIVE ONLY
+```
+
+Red is absent from the drift system on purpose. Overrun is a continuation, not
+a failure, and colouring it red would teach the user to fear the column that
+exists to be trusted.
+
+**Activity's categorical ramp** (`--app-1` … `--app-8`) is the eight chromatic
+families at their text lightness, ordered so the three the source labels
+*Category* (cyan, purple, pink) come first and red comes last — the commonest
+applications land on hues that carry no verdict. The app→hue mapping is a hash
+in `Activity.tsx`; the hues live in tokens.
+
+**Dark theme.** The neutral column is SITE ASSET — the source's own mapping
+(surface-white → #0f0f0f, surface-gray-1 → #232323, surface-gray-2 → #2b2b2b,
+ink-gray-6/8/9 → #999999/#d4d4d4/#f8f8f8). **The chromatic column is not.**
+The source states a dark theme exists in the deployment CSS but was never
+rendered, and publishes no dark values for the status pairs. Fruit's dark hues
+keep each family's identity and are lifted until they clear 4.5:1 on #0f0f0f
+and on #232323 — an extension, marked as one, to be replaced the moment a
+logged-in dark capture exists.
+
+### 3.3 Type — one family
+
+**InterVariable**, then static **Inter**, then a system stack. The previous
+three-family split (display / UI / mono) is gone: this system does not have
+one, and durations get fixed-width figures from Inter's `tnum` feature rather
+than from a separate monospace face.
+
+```
+Weight  420  regular — "a deliberate midpoint that reads slightly sturdier
+             than 400 at compact enterprise sizes". Requires the variable file.
+        500  medium — selected rows, emphasised figures
+        600  semibold — headings, column labels
+        700  bold — the display scale
+```
+
+```
+--t-micro       0.6875rem  11px  text-tiny — metadata, dense detail
+--t-caption     0.75rem    12px  text-xs — column labels, timestamps
+--t-label       0.8125rem  13px  text-sm — compact labels, status pills
+--t-data        0.8125rem  13px  tabular figures
+--t-body        0.875rem   14px  text-base — the default
+--t-title       1rem       16px  text-lg — panel and dialog headings
+--t-display     1.25rem    20px  text-2xl — page titles, KPI figures
+--t-display-xl  4rem       64px  the Focus clock, and nothing else
+--tracking-ui   0.02em           the source's typical UI tracking
+```
+
+All sizes are **rem**, so Windows text scaling works; the layout is verified at
+125% as part of the automated checks.
 
 **Every changing numeral uses tabular figures** (`font-variant-numeric:
-tabular-nums`). This is checked automatically (criterion I4). A timer whose
-digits shift width as it counts is unreadable at a glance, and this app is full
-of counting numbers.
+tabular-nums`), checked automatically (criterion I4). A timer whose digits
+shift width as it counts is unreadable at a glance, and this app is full of
+counting numbers.
 
 Fonts are **bundled as woff2 and self-hosted**. Referencing a font CDN is
 forbidden — an offline-first app that links one silently falls back to system
 faces on exactly the machine it was built for.
 
-### 3.4 Space and radius
+### 3.4 Space, shape and control metrics
 
 ```
---s-2 --s-4 --s-6 --s-8 --s-12 --s-16 --s-20 --s-24 --s-32 --s-40 --s-48
+Spacing · SITE ASSET: 5, 7, 15, 20, 30, 40
+--ds-space-1  5px   --ds-space-4  20px
+--ds-space-2  7px   --ds-space-5  30px
+--ds-space-3  15px  --ds-space-6  40px
 ```
 
-A 4px base. **Nothing between these values.** If a layout needs 14px, the
-layout is wrong.
+*"Use 5/7 for compact controls; 15/20 for component padding; 30/40 for
+page-level separation."* The `--s-*` aliases components ask for resolve onto
+this scale, plus the two values the source's own component recipes use
+constantly — 8px control padding and 12px modal-footer padding — and a 2px
+hairline offset.
 
 ```
---r-plate  2px    blocks, chips        (plates are not cards)
---r-panel  4px    panels
---r-sheet  6px    modals, overlays
+Radius · SITE ASSET: 4, 8, 10, 12, 999
+--r-bar     4px   progress tracks and small bars
+--r-plate   8px   the default control radius — buttons, inputs, rows, chips
+--r-panel  10px   the Desk main-section container
+--r-sheet  12px   cards, modals, drawers
+--r-pill  999px   status pills, switches
 ```
 
-### 3.5 Motion
+```
+Control metrics · SITE ASSET
+--control-h        28px   every button and input
+--control-h-touch  44px   the coarse-pointer wrapper
+--icon-btn         28px
+--list-head-h      30px   the quiet column-label band
+--pill-h           20px   status pill height
+--pill-dot          6px   the semantic dot inside it
+--checkbox         14px → 18px below 992px, and on coarse pointers
+```
+
+### 3.5 Elevation and motion
+
+*"Prefer borders/gray shifts for routine hierarchy; reserve stronger shadows
+for menus and overlays."* Three levels, no more:
+
+```
+--shadow-modal  0 5px 10px rgb(0 0 0 / 0.1)   dialogs
+--shadow-menu   0 12px 24px …                 menus, drawers, toasts, readouts
+(nothing)                                     everything else
+```
 
 ```
 --m-fast    120ms   hovers, toggles
---m-settle  240ms   the drift rail settling in
---m-sheet   180ms   overlays
+--m-drawer  200ms   the overlay drawer slide      · SITE ASSET
+--m-modal   300ms   the dialog rise from -50px    · SITE ASSET
+--m-settle  240ms   the drift rail settling in    · Fruit's own
 --e-out            ease-out
 --e-settle         cubic-bezier(0.2, 0.8, 0.2, 1)
 ```
 
-`prefers-reduced-motion: reduce` **removes the settle animation and every
-transition**, not merely shortens them. This is verified automatically
-(criterion I6).
+`prefers-reduced-motion: reduce` **removes** the settle, the drawer slide and
+every transition — it does not merely shorten them. Verified automatically
+(criterion I6), and the source ships the same override.
 
 ### 3.6 Layout arithmetic
 
 ```
---rail-w              76px   icon-over-label navigation
---sidebar-w          260px   projects / backlog
---sidebar-collapsed-w 48px
---detail-w           360px   right inspector
---topbar-h            48px
---gutter-w            48px   the time gutter on Day and Planner
---hour-h              56px   scales 32–120px via ⌘+ / ⌘−, persisted
+--rail-w               76px   icon-over-label navigation · Fruit's own
+--sidebar-w           220px   projects / backlog         · SITE ASSET
+--sidebar-collapsed-w  48px
+--detail-w            277px   right inspector — the "form sidebar" · SITE ASSET
+--topbar-h             48px   navbar                     · SITE ASSET
+--pagehead-h           48px   sticky title/action bar    · SITE ASSET
+--gutter-w             48px   the time gutter on Day and Planner
+--page-bottom          60px   page bottom margin         · SITE ASSET
+--page-max-w          900px   centred content patterns   · SITE ASSET
+--hour-h               56px   scales 32–120px via Ctrl + / Ctrl −, persisted
 ```
 
-Minimum supported window: **960 × 640**. Below 1280px the right detail panel
-drops out entirely rather than squeezing the grid past legibility — selection
-then opens nothing rather than opening something unreadable.
+### 3.7 Breakpoints — one canonical map
+
+```
+--bp-sm  576px   --bp-lg   992px   --bp-2xl  1440px
+--bp-md  768px   --bp-xl  1200px
+```
+
+The source notes the deployment ships adjacent values (567/576, 991/992) and
+instructs: *"Adopt one canonical breakpoint map in new work."* Fruit's previous
+ad-hoc 1129/1279 pair is gone. What each tier does:
+
+| Range | Adaptation |
+|---|---|
+| ≥ 1200 | Persistent sidebar, dense list columns, the detail panel and the planner backlog both present. |
+| 992–1199 | Detail panel and backlog drop out; summary cards go 6 → 3 up; dashboards and the export layout stack; Reconcile loses its evidence column. |
+| < 992 | Checkbox hit geometry grows 14 → 18px; cards go 3 → 2 up; the offline badge drops; Reconcile narrows to two columns. |
+| coarse pointer | Every control keeps its 28px look inside a ≥44px hit area. This is the source's High-priority accessibility finding, implemented as a density mode rather than as a resize. |
+
+Minimum supported window: **960 × 640**. Below the 1200px tier the right detail
+panel drops out entirely rather than squeezing the grid past legibility —
+selection then opens nothing rather than opening something unreadable.
 
 ---
 
@@ -330,9 +480,9 @@ Every screen sits inside the same frame.
 │ DAY  │                                                     │               │
 │      │                                                     │   detail /    │
 │ ▤    │              main view                              │   inspector   │
-│PLANNR│                                                     │   (360px,     │
+│PLANNR│                                                     │   (277px,     │
 │      │                                                     │   drops below │
-│ ☰    │                                                     │   1280px)     │
+│ ☰    │                                                     │   ≥1200px)    │
 │PROJCT│                                                     │               │
 │      │                                                     │               │
 │ ◷    │                                                     │               │
@@ -394,7 +544,7 @@ does not have.
 | Shortcut sheet | `?` | Centred modal, grouped |
 | Reconcile | `⌘R` / topbar | Full-width three-column sheet |
 | Focus | `F` | Full-screen, one number |
-| Task detail | `Enter` on a task | Column ≥1280px, sheet below |
+| Task detail | `Enter` on a task | Column ≥1200px, sheet below |
 | Block dialogs | `R` / `⌫` on a block | Small modal |
 | Fill dialog | Day-view gap | Small modal |
 | Recovery modal | On launch, unresolved session | Blocking |
@@ -708,7 +858,7 @@ BlockIntent = "work" | "entertainment" | "life"
 │ COMPLETED│      │          │          ││Window ·││          │              │
 │ ▸ Fix f… │21:00 │          │          ││Film    ││          │              │
 │          │      │          │          │└ ─ ─ ─ ─┘│          │              │
-│  260px   │ 48px │          │          │  ↑dashed = entertainment intent    │
+│  220px   │ 48px │          │          │  ↑dashed = entertainment intent    │
 └──────────┴──────┴──────────┴──────────┴──────────┴──────────┴──────────────┘
 ```
 
@@ -779,7 +929,7 @@ Someday · Completed. Completed sits at the bottom and recedes.
 │          │                                          │ │into a subtask.   │ │
 │          │ COMPLETED                            ▾   │ └──────────────────┘ │
 │          │  ▸ Fix the flaky test        ✓ 25m       │                      │
-│  260px   │                                          │       360px          │
+│  220px   │                                          │       277px          │
 └──────────┴──────────────────────────────────────────┴──────────────────────┘
 ```
 
@@ -1389,7 +1539,7 @@ Reports (month) ─▶ read findings ─▶ "Review source intervals" ─▶ Day
 | `RecordingIndicator` | topbar | Three states: recording, paused, off |
 | `DriftRail` | blocks, task rows, report bars | **The signature element.** Two traces; state computed once in Rust so all three renderings agree |
 | `DriftBar` | reports | Horizontal variant |
-| `Sidebar` | Projects, Planner | 260px; collapses to 48px |
+| `Sidebar` | Projects, Planner | 220px; collapses to 48px |
 | `PlannerBacklog` | Planner | Drag source |
 | `Palette` | overlay | Fuzzy match over commands, tasks, projects, tags; matched substring in `--plot` |
 | `ShortcutSheet` | overlay | Reads the same registry |
@@ -1405,6 +1555,28 @@ Reports (month) ─▶ read findings ─▶ "Review source intervals" ─▶ Day
 | `Empty` | everywhere | One sentence + inline key hint |
 | `Note` | Task detail | Plain text, `pre-wrap`, bare URLs linkified |
 
+### Shared primitives
+
+These are CSS-only and carry the design system directly. A redesign changes
+these once and every screen follows.
+
+| Class | Contract |
+|---|---|
+| `.btn` | 28px, 8px radius, filled gray-100, gray-900 label, no border. `:hover` gray-300, `:active` gray-400. |
+| `.btn-primary` | Filled `--strong` (near-black light / near-white dark), surface-coloured label. **One per page.** |
+| `.btn-secondary` | Filled #7c7c7c, white label. Strong but non-primary. |
+| `.btn-danger` | Filled #e03636, white label. Destructive confirmation only. |
+| `.btn-quiet` | Transparent at rest, gray-100 on hover. Toolbars and icon-only controls. |
+| `.btn-icon` | 28 × 28px square. Pair with `.btn-quiet` and an `aria-label`. |
+| `.btn[aria-pressed="true"]` | Gray-400 fill, medium weight. Neutral — a toggle is a state, not an action. |
+| `.status` + `.status-{info,success,caution,attention,danger,neutral}` | 20px pill, 999px radius, 13px/420, 6px `currentColor` dot, tinted surface. Always carries its word. |
+| `.tag` `.chip` `.badge-offline` `.recording` | The same pill geometry, quieter defaults. |
+| `.group-head`, `.day-table thead th` | The 30px gray-100 column-label band — quiet, 12px/600, not an uppercase header. |
+| `.task-row` | 30px min, gray-50 on hover **and** focus-within, 1px gray-200 bottom rule. |
+| `.modal` / `.modal-head` / `.modal-body` / `.modal-foot` | 575px, 12px radius, `0 5px 10px/10%`. Header 16px + bottom rule; body 16px, scrolls; footer 12px + top rule, right-aligned, secondary → primary. |
+| `.sheet` | Full-height drawer, off-canvas → 0 over 200ms, scrim, z-index 1300. Focus is trapped and restored. |
+| `.panel` / `.card` | White, 1px `--line`, 12px / 10px radius, 20px body padding. No shadow — routine hierarchy is borders and gray shifts. |
+
 ---
 
 ## 9. Accessibility — non-negotiable
@@ -1416,11 +1588,20 @@ These are acceptance criteria with automated checks. A redesign must keep them.
 | **I1** | No literal colours in components — tokens only | Automated, fails the build |
 | **I3** | Every drift/state encoding has a text alternative | Automated: counts unlabelled encodings |
 | **I4** | Changing numerals use tabular figures | Automated |
-| **I5** | No horizontal overflow at 960×640, 1130×720, 1280×800, 1490×900, and 1440×900 at 125% text | Automated, five viewports, every view |
+| **I5** | No horizontal overflow at 960×640, 1130×720, 1200×800, 1280×800, 1490×900, and 1440×900 at 125% text | Automated, six viewports, every view |
 | **I6** | `prefers-reduced-motion` removes settle **and** every transition | Automated |
 | **I7** | No network request of any kind, fonts included | Automated |
 | **U10** | Focus visible on every interactive element | Automated |
 | **I2** | Contrast ≥4.5:1 body, ≥3:1 graphics, both themes, including Focus text over all four gradients | **Not yet automated — open** |
+| **A1** | Touch targets ≥44 × 44px, or a ≥44px wrapper around the 28px visual control | Implemented as a `pointer: coarse` density mode — **not yet automated** |
+| **A2** | Overlays trap focus, close on Escape, and restore focus to the opener | Implemented — **not yet automated** |
+
+Three of the source document's own accessibility findings were acted on
+directly, and each is recorded where it was fixed rather than only here: the
+28px control size gets a coarse-pointer wrapper (§3.4), the published focus
+token was too low-contrast to meet the source's own 3:1 criterion and was
+replaced (§3.2), and the amber status pair was darkened for text while keeping
+the published value for graphics (§3.2).
 
 **Colour is never the only carrier.** Every state has a glyph or a word:
 selected rows get a solid left edge as well as a tint; signed variances carry
@@ -1496,3 +1677,4 @@ Genuine uncertainties, not rhetorical ones.
 | `PLAN-WEEKLY-GOALS.md` | The week horizon: goals, pace, fragmentation, notices, the report |
 | `ARCHITECTURE.md` | The three layers and why the split is load-bearing |
 | `SPIKE-BROWSER-CONNECTOR.md` | The connector's protocol and its three open field assumptions |
+| `ERPNext_Design_System_Extraction.docx` | The design system of record for §3. Values it marks SITE ASSET are exact deployment CSS; values it marks INFERRED still need a logged-in visual QA pass. |

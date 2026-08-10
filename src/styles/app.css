@@ -1,5 +1,11 @@
 /* ══════════════════════════════════════════════════════════════════════
-   Components — §5.7. Every colour resolves to a §5.2 token (I1).
+   Components — ERPNext / Frappe Desk contracts.
+
+   Every colour resolves to a token in tokens.css (I1). Every control is
+   28px unless it is a named exception, every radius comes from the 4/8/10/12
+   scale, every focus state is a 2px ring, and every hover is a gray shift
+   rather than a colour change. Where this sheet departs from the source
+   document the departure is stated in a comment with its reason.
    ══════════════════════════════════════════════════════════════════════ */
 
 button,
@@ -8,6 +14,7 @@ textarea,
 select {
   font: inherit;
   color: inherit;
+  letter-spacing: inherit;
 }
 
 button {
@@ -17,55 +24,257 @@ button {
   cursor: pointer;
 }
 
+/* ─── Form controls ──────────────────────────────────────────────────────
+   "Text input — 28px high; 14px; 8px radius; compact 6 × 8px padding. Focus
+   uses a stronger border and 2px ring." White fill even in the control
+   family, because an input is where you type and a filled control is where
+   you press. */
+
 input,
 textarea,
 select {
-  background: var(--raised);
+  min-height: var(--control-h);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
-  padding: var(--s-6) var(--s-8);
+  padding: 6px var(--s-8);
+  color: var(--paper);
+  transition: border-color var(--m-fast) var(--e-out);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--focus-ring);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: var(--faint);
+  color: var(--placeholder);
 }
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  /* "Keep state perceivable without reducing opacity to illegibility." */
+  background: var(--sunken);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
+/* "Native arrow suppressed; custom icon positioned on the right. Maintain
+   pointer-safe padding." */
+select {
+  appearance: none;
+  padding-right: 24px;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 13px) calc(50% + 1px), calc(100% - 9px) calc(50% + 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+/* An invalid control is a red border *and* a sentence, never colour alone. */
+[aria-invalid="true"],
+[aria-invalid="true"] input {
+  border-color: var(--danger);
+}
+.field-error {
+  display: block;
+  color: var(--danger);
+  font-size: var(--t-label);
+  margin-top: var(--s-4);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────
+   The source's variant table, verbatim. The default is a filled gray-100
+   control, not an outline: in this system a button is a surface you press,
+   and the outline button does not exist. Hierarchy rule, also from the
+   source: "A page should usually have one primary action. Use neutral
+   primary styling; reserve chromatic fills for destructive or explicit
+   semantic actions." */
 
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-6);
-  height: 28px;
-  padding: 0 var(--s-12);
-  border: 1px solid var(--line);
+  min-height: var(--control-h);
+  padding: 4px var(--s-8);
+  border: 1px solid transparent;
   border-radius: var(--r-plate);
   background: var(--raised);
-  font-size: var(--t-label);
-  transition: border-color var(--m-fast) var(--e-out);
+  color: var(--strong);
+  font-size: var(--t-body);
+  font-weight: var(--w-regular);
+  line-height: 1.15;
+  letter-spacing: var(--tracking-ui);
+  white-space: nowrap;
+  transition: background var(--m-fast) var(--e-out);
 }
 .btn:hover {
-  border-color: var(--muted);
+  background: var(--raised-hover);
 }
+.btn:active {
+  background: var(--raised-active);
+}
+.btn:disabled {
+  background: var(--sunken);
+  color: var(--faint);
+  cursor: not-allowed;
+}
+
 .btn-primary {
-  border-color: var(--plot);
-  color: var(--plot);
+  background: var(--strong);
+  color: var(--surface);
 }
+.btn-primary:hover {
+  background: var(--paper);
+}
+.btn-primary:active {
+  background: var(--strong);
+}
+
+/* "Secondary — #7C7C7C / white. Strong but non-primary action." */
+.btn-secondary {
+  background: var(--btn-secondary-fill);
+  color: #ffffff;
+}
+.btn-secondary:hover {
+  background: var(--btn-secondary-hover);
+}
+
 .btn-danger {
-  border-color: var(--danger);
-  color: var(--danger);
+  background: var(--btn-danger-fill);
+  color: #ffffff;
 }
+.btn-danger:hover {
+  background: var(--btn-danger-hover);
+}
+.btn-danger:active {
+  background: var(--btn-danger-active);
+}
+
+/* A quiet variant for dense toolbars and icon-only controls: transparent at
+   rest, gray-100 on hover. The source's "Icon — 28 × 28px, surface shift". */
+.btn-quiet {
+  background: transparent;
+  color: var(--muted);
+}
+.btn-quiet:hover {
+  background: var(--raised);
+  color: var(--strong);
+}
+.btn-icon {
+  width: var(--icon-btn);
+  min-width: var(--icon-btn);
+  padding: 0;
+}
+
+/* "Pressed / selected — darker fill or selected gray surface." Neutral, not
+   chromatic: a toggled toolbar button is a state, not an action. */
 .btn[aria-pressed="true"] {
-  border-color: var(--plot);
-  color: var(--plot);
+  background: var(--raised-active);
+  color: var(--strong);
+  font-weight: var(--w-medium);
+}
+.btn-primary[aria-pressed="true"] {
+  background: var(--strong);
+  color: var(--surface);
 }
 
 .kbd {
   display: inline-block;
   padding: 1px var(--s-4);
   border: 1px solid var(--line);
-  border-radius: var(--r-plate);
-  font-family: var(--font-data);
+  border-radius: var(--r-bar);
+  background: var(--surface);
   font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* ─── Status pills ───────────────────────────────────────────────────────
+   "Inline-flex, 20px high, 4.5 × 8px padded, full-radius, 13px/420 text,
+   with a 6px semantic dot and a 6px gap." The dot is `currentColor`, so a
+   variant only has to name a surface and a text colour. Never colour alone —
+   every pill in this app carries its word. */
+
+.status,
+.tag,
+.chip,
+.badge-offline,
+.recording,
+.day-state .micro {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-4);
+  /* min-height, not height: a few of these carry an inline control (the
+     "Remove" button on a label chip), and a fixed 20px would clip it. */
+  min-height: var(--pill-h);
+  padding: 0 var(--s-8);
+  /* Transparent rather than absent, so a chip that sets its own borderColor
+     inline — the project-colour label chips in Settings — has an edge to
+     colour without shifting the layout of every other pill. */
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  background: var(--raised);
+  color: var(--muted);
+  font-size: var(--t-label);
+  font-weight: var(--w-regular);
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
+  line-height: 1.2;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A pill that carries a control gets room for it and loses its own padding on
+   that side. */
+.tag:has(> .btn),
+.chip:has(> .btn) {
+  padding-right: var(--s-4);
+}
+
+/* "…include a 6px semantic dot with a 6px gap." The dot is `currentColor`, so
+   a variant only has to name a surface and a text colour. `.status` draws it
+   as a pseudo-element; `.recording` and `.tag` already ship a real element
+   for it, because those two animate and tint it independently. */
+.status::before,
+.recording .dot,
+.tag > i {
+  content: "";
+  flex: none;
+  width: var(--pill-dot);
+  height: var(--pill-dot);
+  margin-right: var(--s-2);
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-info {
+  background: var(--plot-surface);
+  color: var(--plot);
+}
+.status-success {
+  background: var(--done-surface);
+  color: var(--done);
+}
+.status-caution {
+  background: var(--track-surface);
+  color: var(--track);
+}
+.status-attention {
+  background: var(--over-surface);
+  color: var(--over);
+}
+.status-danger {
+  background: var(--danger-surface);
+  color: var(--danger);
+}
+.status-neutral {
+  background: var(--raised);
   color: var(--muted);
 }
 
@@ -80,7 +289,7 @@ textarea::placeholder {
 .shell-body {
   display: flex;
   min-height: 0;
-  /* The page body must never scroll horizontally (§5.8). */
+  /* The page body must never scroll horizontally. */
   overflow: hidden;
 }
 
@@ -92,8 +301,7 @@ textarea::placeholder {
   background: var(--ink);
 }
 
-/* §5.7 Top bar — 48px: 44px cannot hold 14px text with 12px padding plus a
-   20px control. */
+/* "Navbar height 48px — persistent top navigation baseline." */
 .topbar {
   height: var(--topbar-h);
   display: flex;
@@ -101,22 +309,15 @@ textarea::placeholder {
   gap: var(--s-12);
   padding: 0 var(--s-12);
   background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: var(--s-8);
-  font-family: var(--font-display);
-  font-weight: 500;
-}
-
-.badge-offline {
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: var(--r-plate);
-  padding: 1px var(--s-4);
+  font-weight: var(--w-semibold);
+  color: var(--strong);
 }
 
 .topbar-centre {
@@ -129,18 +330,25 @@ textarea::placeholder {
   min-width: 0;
 }
 
-/* §5.7 Nav rail — icon over label, 2px `plot` indicator. The label is on
-   screen because this app has six destinations, not two, and an icon-only rail
-   costs a hover on every visit until the whole set is learnt. */
+/* ─── Nav rail ───────────────────────────────────────────────────────────
+   Icon over label. The label is on screen because this app has six
+   destinations, not two, and an icon-only rail costs a hover on every visit
+   until the whole set is learnt.
+
+   "Selected items use the subtle gray-100 surface rather than a saturated
+   brand fill" — so the current page is a gray plate with gray-900 text and a
+   neutral marker, not a tinted one. Neutral-first, all the way into the
+   navigation. */
+
 .rail-nav {
   width: var(--rail-w);
   flex: none;
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: var(--s-8);
+  padding-top: var(--s-6);
   gap: var(--s-2);
 }
 
@@ -154,46 +362,51 @@ textarea::placeholder {
   justify-content: center;
   gap: 1px;
   color: var(--muted);
-  border-radius: var(--r-panel);
-  transition: color var(--m-fast) var(--e-out);
+  border-radius: var(--r-plate);
+  transition: background var(--m-fast) var(--e-out);
 }
 .rail-label {
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 .rail-item:hover {
-  color: var(--paper);
-}
-.rail-item[aria-current="page"] {
-  color: var(--plot);
+  background: var(--subtle);
+  color: var(--strong);
 }
 .rail-item[aria-current="page"] {
   background: var(--raised);
+  color: var(--strong);
+  font-weight: var(--w-medium);
 }
 .rail-item[aria-current="page"]::before {
   content: "";
   position: absolute;
   left: -6px;
-  top: 8px;
-  bottom: 8px;
+  top: 10px;
+  bottom: 10px;
   width: 2px;
-  background: var(--plot);
+  border-radius: 1px;
+  background: var(--strong);
 }
+/* An unread marker is an attention state, so it is the attention hue. */
 .rail-dot {
   position: absolute;
   top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--track);
+  right: 8px;
+  width: var(--pill-dot);
+  height: var(--pill-dot);
+  border-radius: var(--r-pill);
+  background: var(--over);
 }
 
-/* §5.7 Sidebar — 260px default, 200–400 resizable, collapses below 1130px. */
+/* ─── Sidebar ────────────────────────────────────────────────────────────
+   "Primary sidebar 220px — compact persistent navigation rail on supported
+   widths." Collapses to a 48px strip below the 1200px tier. */
+
 .sidebar {
   width: var(--sidebar-w);
   flex: none;
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--rule);
   overflow-y: auto;
   padding: var(--s-12);
   display: flex;
@@ -202,13 +415,17 @@ textarea::placeholder {
 }
 .sidebar[data-collapsed="true"] {
   width: var(--sidebar-collapsed-w);
-  padding: var(--s-8) var(--s-4);
+  padding: var(--s-6) var(--s-4);
   align-items: center;
 }
 
 .sidebar-group-title {
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   color: var(--muted);
-  margin-bottom: var(--s-6);
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
+  margin-bottom: var(--s-4);
 }
 
 .sidebar-row {
@@ -217,13 +434,15 @@ textarea::placeholder {
   align-items: center;
   gap: var(--s-8);
   width: 100%;
+  min-height: var(--control-h);
   padding: var(--s-4) var(--s-6);
   border-radius: var(--r-plate);
   text-align: left;
   color: var(--paper);
+  transition: background var(--m-fast) var(--e-out);
 }
 .sidebar-row:hover {
-  background: var(--raised);
+  background: var(--subtle);
 }
 .sidebar-row.draggable {
   cursor: grab;
@@ -233,31 +452,35 @@ textarea::placeholder {
 }
 .sidebar-row[aria-selected="true"] {
   background: var(--raised);
-  box-shadow: inset 2px 0 0 var(--plot);
+  color: var(--strong);
+  font-weight: var(--w-medium);
 }
 .sidebar-row .count {
   margin-left: auto;
   color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .dot {
   width: 8px;
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   flex: none;
 }
 
 /* Weekly-target bar — the same plot/track encoding, one dimension. */
 .target-bar {
-  height: 2px;
-  background: var(--line);
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--sunken);
   position: relative;
   margin-top: var(--s-4);
+  overflow: hidden;
 }
 .target-bar > i {
   position: absolute;
   inset: 0 auto 0 0;
-  background: var(--track);
+  background: var(--track-graphic);
 }
 .target-bar > b {
   position: absolute;
@@ -267,9 +490,11 @@ textarea::placeholder {
   background: var(--plot);
 }
 
-/* ─── §5.6 The drift rail ─────────────────────────────────────────────
+/* ─── The drift rail ─────────────────────────────────────────────────────
    Two parallel traces on the plate's left edge. A fill bar shows a ratio;
-   this product is about a *gap*, so the gap is the visible object. */
+   this product is about a *gap*, so the gap is the visible object. Texture
+   carries the state as well as hue, which is what keeps it legible in
+   greyscale and to a red-green viewer. */
 
 .rail {
   position: absolute;
@@ -280,86 +505,83 @@ textarea::placeholder {
   pointer-events: none;
 }
 
-/* Plot trace: x=0, 1px, full height, dashed 3-3, --plot @ 35%. Always full
-   height — it is what you intended, whatever happened. */
+/* Plot trace: x=0, 1px, full height, dashed 3-3. Always full height — it is
+   what you intended, whatever happened. */
 .rail .plot {
   position: absolute;
-  left: 0;
+  left: 2px;
   top: 0;
   bottom: 0;
   width: 1px;
   background-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--plot) 35%, transparent) 0 3px,
+    color-mix(in srgb, var(--plot) 55%, transparent) 0 3px,
     transparent 3px 6px
   );
   background-size: 1px 6px;
 }
 
 /* After the day is over, the unfilled plot becomes the "never happened"
-   trace: dotted, --faint. Texture carries the state, not just colour (I3). */
+   trace: dotted, --faint. */
 .rail[data-state="underrunPast"] .plot,
 .rail[data-state="notStarted"][data-past="true"] .plot {
-  background-image: linear-gradient(
-    to bottom,
-    var(--faint) 0 1px,
-    transparent 1px 4px
-  );
+  background-image: linear-gradient(to bottom, var(--faint) 0 1px, transparent 1px 4px);
   background-size: 1px 4px;
 }
 
-/* Track trace: x=3, 3px, from the top, h = min(1, tracked/planned) × H. */
+/* Track trace: 3px wide, from the top, h = min(1, tracked/planned) × H. */
 .rail .track {
   position: absolute;
-  left: 3px;
+  left: 4px;
   top: 0;
   width: 3px;
-  background: var(--track);
+  border-radius: var(--r-pill);
+  background: var(--track-graphic);
 }
 
-/* Overrun tail: continues below the plate into the 8px gutter, bounded at
-   24px so it can never collide with the next block — v1's bubble could. */
+/* Overrun tail: continues below the plate into the gutter, bounded so it can
+   never collide with the next block. */
 .rail .tail {
   position: absolute;
-  left: 3px;
+  left: 4px;
   top: 100%;
   width: 3px;
-  background-image: repeating-linear-gradient(
-    45deg,
-    var(--over) 0 1px,
-    transparent 1px 3px
-  );
+  border-radius: var(--r-pill);
+  background-image: repeating-linear-gradient(45deg, var(--over) 0 1px, transparent 1px 3px);
   background-color: color-mix(in srgb, var(--over) 30%, transparent);
 }
 
-/* Invisible 10px column spanning both traces; hover or focus reveals a readout. */
+/* Invisible 10px column spanning both traces; hover or focus reveals a
+   readout. */
 .rail-hit {
   position: absolute;
   left: -2px;
   top: 0;
   bottom: -24px;
-  width: 10px;
+  width: 12px;
   pointer-events: auto;
   background: transparent;
 }
 
+/* "Menus use 8px item radii, light border, and stronger 2xl elevation." A
+   readout is a menu-class surface. */
 .rail-readout {
   position: absolute;
-  left: 12px;
+  left: 14px;
   top: 0;
-  z-index: 5;
+  z-index: var(--z-sticky);
   white-space: nowrap;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--r-panel);
-  padding: var(--s-4) var(--s-6);
-  box-shadow: var(--overlay-shadow);
+  border-radius: var(--r-plate);
+  padding: var(--s-4) var(--s-8);
+  box-shadow: var(--shadow-menu);
   pointer-events: none;
 }
 
-/* The one orchestrated moment (§5.5): rails grow from zero on mount,
-   staggered 12ms by vertical order. It reads as an instrument taking a
-   reading. Nothing else on the planner animates. */
+/* The one orchestrated moment: rails grow from zero on mount, staggered by
+   vertical order. It reads as an instrument taking a reading. Nothing else
+   on the planner animates. */
 @media (prefers-reduced-motion: no-preference) {
   .rail-settle .track,
   .rail-settle .tail {
@@ -380,8 +602,8 @@ textarea::placeholder {
   transform-origin: top;
 }
 
-/* Compact horizontal form for task rows — 40px wide, 2px traces. Same
-   encoding at a different scale, which is what makes it a language. */
+/* Compact horizontal form for task rows — same encoding at a different
+   scale, which is what makes it a language. */
 .rail-compact {
   /* A span is inline by default, and width/height do not apply to inline
      boxes — the traces would collapse to nothing. */
@@ -399,7 +621,7 @@ textarea::placeholder {
   height: 1px;
   background-image: linear-gradient(
     to right,
-    color-mix(in srgb, var(--plot) 35%, transparent) 0 3px,
+    color-mix(in srgb, var(--plot) 55%, transparent) 0 3px,
     transparent 3px 6px
   );
   background-size: 6px 1px;
@@ -409,12 +631,14 @@ textarea::placeholder {
   left: 0;
   top: 4px;
   height: 2px;
-  background: var(--track);
+  border-radius: var(--r-pill);
+  background: var(--track-graphic);
 }
 .rail-compact .tail {
   position: absolute;
   top: 4px;
   height: 2px;
+  border-radius: var(--r-pill);
   background-image: repeating-linear-gradient(45deg, var(--over) 0 1px, transparent 1px 3px);
   background-color: color-mix(in srgb, var(--over) 30%, transparent);
 }
@@ -424,8 +648,8 @@ textarea::placeholder {
   display: block;
   position: relative;
   height: 14px;
-  background: var(--rule);
-  border-radius: var(--r-plate);
+  background: var(--sunken);
+  border-radius: var(--r-bar);
   overflow: hidden;
 }
 .rail-bar .plot {
@@ -439,20 +663,23 @@ textarea::placeholder {
   left: 0;
   top: 3px;
   bottom: 3px;
-  background: var(--track);
+  border-radius: var(--r-pill);
+  background: var(--track-graphic);
 }
 .rail-bar .tail {
   position: absolute;
   top: 3px;
   bottom: 3px;
+  border-radius: var(--r-pill);
   background-image: repeating-linear-gradient(45deg, var(--over) 0 1px, transparent 1px 3px);
   background-color: color-mix(in srgb, var(--over) 30%, transparent);
 }
 
 .badge-drift {
   color: var(--over);
-  /* `micro` is uppercase for badges and kind labels; a duration is not a label,
-     and "+14M" reads as megabytes. */
+  font-variant-numeric: tabular-nums;
+  /* `micro` is uppercase for badges and kind labels; a duration is not a
+     label, and "+14M" reads as megabytes. */
   text-transform: none;
 }
 .badge-drift[data-under="true"] {
@@ -468,18 +695,22 @@ textarea::placeholder {
   flex: 1;
 }
 
+/* "Page head height 48px — sticky action/title bar, z-index 6, 1px bottom
+   border." */
 .planner-head {
   display: flex;
   align-items: center;
-  gap: var(--s-12);
-  padding: var(--s-8) var(--s-12);
-  border-bottom: 1px solid var(--line);
+  gap: var(--s-8);
+  min-height: var(--pagehead-h);
+  padding: var(--s-6) var(--s-12);
+  border-bottom: 1px solid var(--rule);
 }
 
 .planner-daynames {
   display: grid;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   padding-left: var(--gutter-w);
+  background: var(--surface);
 }
 
 .dayname {
@@ -490,10 +721,11 @@ textarea::placeholder {
   gap: var(--s-6);
 }
 .dayname[data-today="true"] {
-  background: var(--surface);
+  background: var(--raised);
 }
 .dayname .num {
-  color: var(--paper);
+  color: var(--strong);
+  font-weight: var(--w-semibold);
 }
 .dayname .totals {
   margin-left: auto;
@@ -504,6 +736,7 @@ textarea::placeholder {
   flex: 1;
   overflow: auto;
   position: relative;
+  background: var(--surface);
 }
 
 .planner-grid {
@@ -512,8 +745,8 @@ textarea::placeholder {
   padding-left: var(--gutter-w);
 }
 
-/* §5.1 The grid is a graduated scale: heavy rule at the hour, hairline at the
-   quarter, numerals set in the gutter like a chart axis. */
+/* The grid is a graduated scale: rule at the hour, hairline at the quarter,
+   numerals set in the gutter like a chart axis. */
 .hour-rows {
   position: absolute;
   inset: 0;
@@ -528,7 +761,7 @@ textarea::placeholder {
   left: 0;
   right: 0;
   border-top: 1px dotted var(--rule);
-  opacity: 0.6;
+  opacity: 0.7;
 }
 .hour-label {
   position: absolute;
@@ -545,23 +778,25 @@ textarea::placeholder {
   border-left: 1px solid var(--rule);
   min-width: 0;
 }
-/* The current-day column is subtly lifted. */
+/* Today is the column you came for, so it is the one that is *not* quiet:
+   the past columns recede to the subtle surface and today keeps the white. */
 .day-col[data-today="true"] {
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  background: var(--surface);
 }
 .day-col[data-past="true"] {
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: var(--subtle);
 }
 
-/* §1.5 — the now cursor is a hairline `paper` cursor with a gutter indicator,
-   minute-aligned. Red is reserved for destructive actions only. */
+/* The now cursor is a hairline with a gutter indicator, minute-aligned. It
+   is drawn in the strongest ink rather than in a hue, because red here would
+   read as an alarm and nothing is wrong. */
 .now-cursor {
   position: absolute;
   left: calc(var(--gutter-w) * -1);
   right: 0;
   height: 0;
-  border-top: 1px solid var(--paper);
-  opacity: 0.55;
+  border-top: 1px solid var(--strong);
+  opacity: 0.6;
   pointer-events: none;
   z-index: 3;
 }
@@ -570,56 +805,57 @@ textarea::placeholder {
   position: absolute;
   left: calc(var(--gutter-w) - 10px);
   top: -3px;
-  border-left: 6px solid var(--paper);
+  border-left: 6px solid var(--strong);
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
 }
 
-/* §5.7 Block plate — `raised` fill, 1px `line`, 2px radius, no shadow.
-   A calendar of soft cards says "your day is fine". A chart of ruled plates
-   says "here is the record". */
+/* ─── Block plate ────────────────────────────────────────────────────────
+   "Kanban card — white/subtle surface, quiet shadow or border, compact
+   metadata." A plate is Fruit's kanban card laid on a time axis: white fill,
+   1px gray-200 border, 8px radius, no shadow. */
 .plate {
   position: absolute;
   /* A pointer drag must not start a text selection instead. */
   user-select: none;
-  background: var(--raised);
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
-  padding: var(--s-4) var(--s-6) var(--s-4) 12px;
+  padding: var(--s-4) var(--s-6) var(--s-4) 14px;
   /* Deliberately NOT `overflow: hidden`: the overrun tail has to continue
-     below the plate into the gutter (§5.6). Text is clipped per-line instead. */
+     below the plate into the gutter. Text is clipped per-line instead. */
   overflow: visible;
   text-align: left;
   display: block;
   color: var(--paper);
 }
-/* Project colour appears only as a 2px top border, so it never competes with
+/* Project colour appears only as a 2px top band, so it never competes with
    the drift traces. */
 .plate::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--s-8);
+  right: var(--s-8);
   top: 0;
   height: 2px;
+  border-radius: 0 0 1px 1px;
   background: var(--project-colour, transparent);
 }
 .plate[data-selected="true"] {
-  border-color: var(--plot);
-  box-shadow: inset 0 0 0 1px var(--plot);
+  border-color: var(--strong);
+  box-shadow: inset 0 0 0 1px var(--strong);
 }
 .plate[data-fixed="true"] {
-  border-style: solid;
-  border-left: 2px solid var(--muted);
+  border-left: 2px solid var(--line-strong);
 }
 .plate[data-running="true"] {
   border-color: var(--track);
 }
-/* A completed block is history, not plan. It recedes to `faint` so the eye
-   goes to what is still open, but it keeps its drift rail — what a finished
-   block cost is the whole point of having drawn it. */
+/* A completed block is history, not plan. It recedes so the eye goes to what
+   is still open, but it keeps its drift rail — what a finished block cost is
+   the whole point of having drawn it. */
 .plate[data-done="true"] {
-  background: color-mix(in srgb, var(--raised) 55%, var(--ink));
+  background: var(--subtle);
   border-color: var(--rule);
   color: var(--faint);
 }
@@ -627,7 +863,7 @@ textarea::placeholder {
   text-decoration: line-through;
 }
 .plate[data-done="true"]::after {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 .plate[data-done="true"] .rail {
   opacity: 0.7;
@@ -640,18 +876,18 @@ textarea::placeholder {
   opacity: 1;
 }
 .plate[data-warn="true"] {
-  background: color-mix(in srgb, var(--over) 12%, var(--raised));
+  background: color-mix(in srgb, var(--over-surface) 70%, var(--surface));
 }
-/* An evening plotted for a film is a plan, and it has to read as one — a plate
-   that looks like work makes "planned two hours of television" and "two hours
-   of missing work" the same picture. Tinted plus a word in the title, never
-   colour alone (M16). */
+/* An evening plotted for a film is a plan, and it has to read as one — a
+   plate that looks like work makes "planned two hours of television" and
+   "two hours of missing work" the same picture. Tinted surface plus a dashed
+   edge plus a word in the title: three signals, never colour alone. */
 .plate[data-intent="entertainment"] {
-  background: color-mix(in srgb, var(--over) 10%, var(--raised));
+  background: var(--over-surface);
   border-style: dashed;
 }
 .plate[data-intent="life"] {
-  background: color-mix(in srgb, var(--track) 8%, var(--raised));
+  background: var(--track-surface);
   border-style: dashed;
 }
 .plate .intent-mark,
@@ -659,42 +895,22 @@ textarea::placeholder {
   color: var(--muted);
   margin-right: 4px;
 }
-.day-chip[data-intent="entertainment"] {
-  border-style: dashed;
-}
+.day-chip[data-intent="entertainment"],
 .day-chip[data-intent="life"] {
   border-style: dashed;
 }
 
-/* The Monday-morning card (W9). Bottom-right, above the toast stack, and
-   deliberately a panel rather than a toast: a toast is for something you just
-   did, and this is about a week you have not looked at. */
-.monday-card {
-  position: fixed;
-  right: var(--s-16);
-  bottom: var(--s-16);
-  z-index: 40;
-  width: min(380px, calc(100vw - 2 * var(--s-16)));
-  max-width: calc(100vw - 2 * var(--s-16));
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-8);
-  padding: var(--s-12);
-  background: var(--raised);
-  border: 1px solid var(--plot);
-  border-radius: var(--r-plate);
-  box-shadow: var(--overlay-shadow);
-}
-.headline {
-  font-size: var(--t-title);
-  line-height: 1.3;
-  margin: var(--s-4) 0 var(--s-8);
-}
 .plate .plate-title {
   display: block;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--strong);
+  font-weight: var(--w-medium);
+}
+.plate[data-done="true"] .plate-title {
+  color: inherit;
+  font-weight: var(--w-regular);
 }
 .plate .plate-time {
   display: block;
@@ -708,9 +924,9 @@ textarea::placeholder {
   right: var(--s-6);
   bottom: var(--s-2);
 }
-/* Below 28px there is room for nothing but a colour bar. */
+/* Below 28px there is room for nothing but a colour band. */
 .plate[data-tiny="true"] {
-  padding: 0 0 0 12px;
+  padding: 0 0 0 14px;
 }
 
 .plate-drag-ghost {
@@ -720,12 +936,53 @@ textarea::placeholder {
 .drop-plate {
   position: absolute;
   border: 1px dashed var(--plot);
-  background: color-mix(in srgb, var(--plot) 10%, transparent);
+  background: var(--plot-surface);
   border-radius: var(--r-plate);
   pointer-events: none;
-  padding: var(--s-2) var(--s-6) 0 12px;
+  padding: var(--s-2) var(--s-6) 0 14px;
   color: var(--plot);
   z-index: 4;
+}
+
+/* A repeating block is an ordinary block with one extra glyph… */
+.repeat-mark {
+  color: var(--muted);
+  margin-right: 4px;
+  font-size: var(--t-micro);
+}
+/* …and a dotted right edge, which survives where the glyph cannot: a
+   15-minute stand-up is a `data-tiny` plate with room for no text at all,
+   and it is exactly the kind of block that repeats. */
+.plate[data-series="true"] {
+  border-right: 2px dotted var(--line-strong);
+}
+
+/* ─── The Monday-morning card ────────────────────────────────────────────
+   Bottom-right, above the toast stack, and deliberately a panel rather than
+   a toast: a toast is for something you just did, and this is about a week
+   you have not looked at. */
+.monday-card {
+  position: fixed;
+  right: var(--s-16);
+  bottom: var(--s-16);
+  z-index: var(--z-toast);
+  width: min(380px, calc(100vw - 2 * var(--s-16)));
+  max-width: calc(100vw - 2 * var(--s-16));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  padding: var(--s-16);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--shadow-menu);
+}
+.headline {
+  font-size: var(--t-title);
+  font-weight: var(--w-semibold);
+  line-height: 1.35;
+  color: var(--strong);
+  margin: var(--s-4) 0 var(--s-8);
 }
 
 /* ─── Tasks ──────────────────────────────────────────────────────────── */
@@ -735,51 +992,62 @@ textarea::placeholder {
   flex: 1;
 }
 
+/* "Header row — 30px high; gray-100 fill; 8px radius; inline 7px padding.
+   Treat as a quiet column-label band, not a heavy table header." */
 .group-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--s-8);
-  padding: var(--s-12) var(--s-16) var(--s-4);
+  height: var(--list-head-h);
+  margin: var(--s-12) var(--s-16) var(--s-4);
+  padding: 0 var(--s-6);
+  border-radius: var(--r-plate);
+  background: var(--raised);
   color: var(--muted);
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   position: sticky;
   top: 0;
-  background: var(--ink);
   z-index: 1;
 }
 .group-head .total {
   margin-left: auto;
   color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
 
-/* §5.7 Task row — 36px, `raised` on hover, 1px `line` bottom. No hover-only
-   controls: hover-only destructive controls are unreachable by keyboard. */
+/* "Row — 14px / weight 420 / .02em; 1px bottom border; pointer cursor.
+   Hover/focus changes the background to gray-50." No hover-only controls:
+   hover-only destructive controls are unreachable by keyboard. */
 .task-row {
   display: flex;
   user-select: none;
   align-items: center;
   gap: var(--s-8);
-  height: 36px;
-  padding: 0 var(--s-16);
-  border-bottom: 1px solid var(--line);
+  min-height: var(--list-head-h);
+  padding: var(--s-4) var(--s-16);
+  border-bottom: 1px solid var(--rule);
   width: 100%;
   text-align: left;
+  transition: background var(--m-fast) var(--e-out);
 }
-.task-row:hover {
-  background: var(--raised);
+.task-row:hover,
+.task-row:focus-within {
+  background: var(--subtle);
 }
 .task-row[data-selected="true"] {
   background: var(--raised);
-  box-shadow: inset 2px 0 0 var(--plot);
+  box-shadow: inset 2px 0 0 var(--strong);
 }
 .task-row[data-done="true"] .task-title {
   color: var(--faint);
   text-decoration: line-through;
 }
 
-/* §3.2 — completed work sits at the bottom of the project, greyed. It stays
-   visible because it is the record of what the project actually cost; a
-   finished project that renders empty is lying. Recessive, not hidden:
-   still readable, still clickable, still keyboard-reachable. */
+/* Completed work sits at the bottom of the project, greyed. It stays visible
+   because it is the record of what the project actually cost; a finished
+   project that renders empty is lying. Recessive, not hidden: still
+   readable, still clickable, still keyboard-reachable. */
 [data-group="done"] .task-row,
 [data-group="done"] .group-head {
   color: var(--faint);
@@ -819,77 +1087,75 @@ textarea::placeholder {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--strong);
 }
 .task-meta {
   color: var(--muted);
   flex: none;
 }
 
+/* "Checkbox — 14px desktop, 18px below ~992px; 5–8px label gap." */
 .check {
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--muted);
-  border-radius: var(--r-plate);
+  width: var(--checkbox);
+  height: var(--checkbox);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-bar);
+  background: var(--surface);
   flex: none;
   display: grid;
   place-items: center;
+  font-size: 10px;
+  line-height: 1;
 }
 .check[data-checked="true"] {
+  background: var(--done);
   border-color: var(--done);
-  color: var(--done);
+  color: #ffffff;
 }
 
 .priority-mark {
   width: 3px;
   height: 14px;
   flex: none;
-  border-radius: 1px;
+  border-radius: var(--r-pill);
 }
 .priority-mark[data-p="3"] {
   background: var(--over);
 }
 .priority-mark[data-p="2"] {
-  background: var(--track);
+  background: var(--track-graphic);
 }
 .priority-mark[data-p="1"] {
-  background: var(--muted);
+  background: var(--line-strong);
 }
 
-/* §5.7 Tag pill — 20px, `micro`, `raised` fill, 1px `line`, colour as a 4px dot. */
+/* A tag is a pill whose dot carries the project colour. */
 .tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-4);
-  height: 20px;
-  padding: 0 var(--s-6);
-  background: var(--raised);
-  border: 1px solid var(--line);
-  border-radius: var(--r-plate);
-  color: var(--muted);
+  gap: 0;
 }
 .tag i {
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
   background: var(--plot);
 }
 
 .due-chip {
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .due-chip[data-overdue="true"] {
   color: var(--over);
+  font-weight: var(--w-medium);
 }
 
 /* ─── Capture ────────────────────────────────────────────────────────── */
 
 .capture {
   padding: var(--s-12) var(--s-16);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
 }
 .capture input {
   width: 100%;
-  height: 32px;
+  min-height: 32px;
 }
 .chips {
   display: flex;
@@ -898,46 +1164,43 @@ textarea::placeholder {
   margin-top: var(--s-6);
   align-items: center;
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-4);
-  padding: 1px var(--s-6);
-  border: 1px solid var(--line);
-  border-radius: var(--r-plate);
-  color: var(--muted);
-}
+/* Parser feedback: each chip says which token it matched, in that token's
+   semantic colour, with the word still readable. */
 .chip[data-kind="project"] {
+  background: var(--plot-surface);
   color: var(--plot);
-  border-color: color-mix(in srgb, var(--plot) 40%, var(--line));
 }
 .chip[data-kind="estimate"] {
+  background: var(--track-surface);
   color: var(--track);
-  border-color: color-mix(in srgb, var(--track) 40%, var(--line));
 }
 .chip[data-kind="due"] {
-  color: var(--paper);
+  background: var(--raised);
+  color: var(--strong);
 }
 .chip[data-creates="true"]::after {
-  content: "create";
-  color: var(--faint);
+  content: "· create";
+  color: currentColor;
+  opacity: 0.75;
+  margin-left: var(--s-4);
 }
 
-/* ─── Timer chip & pomodoro (§5.7) ───────────────────────────────────── */
+/* ─── Timer chip & pomodoro ──────────────────────────────────────────── */
 
 .timer-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--s-8);
-  height: 32px;
+  height: var(--control-h);
   padding: 0 var(--s-8);
-  background: var(--raised);
-  border: 1px solid var(--track); /* the semantic colour already says "tracking" */
-  border-radius: 999px;
+  background: var(--track-surface);
+  color: var(--track);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
   max-width: 320px;
 }
 .timer-chip[data-idle="true"] {
-  border-color: var(--line);
+  background: var(--raised);
   color: var(--muted);
 }
 .timer-chip .chip-title {
@@ -953,112 +1216,172 @@ textarea::placeholder {
   gap: var(--s-6);
 }
 .pomo-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  border: 1px solid var(--faint);
+  width: var(--pill-dot);
+  height: var(--pill-dot);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong);
 }
 .pomo-dot[data-state="done"] {
-  background: var(--track);
-  border-color: var(--track);
+  background: var(--track-graphic);
+  border-color: var(--track-graphic);
 }
 .pomo-dot[data-state="current"] {
-  background: color-mix(in srgb, var(--track) 40%, transparent);
+  background: var(--track-surface);
   border-color: var(--track);
 }
 /* The long-break dot is a square, so shape carries the distinction. */
 .pomo-dot[data-long="true"] {
-  border-radius: 0;
+  border-radius: 1px;
 }
 
-/* ─── Overlays: sheet, palette, toast (§5.7) ─────────────────────────── */
+/* ─── Overlays: drawer, modal, palette, toast ────────────────────────────
+   Drawer requirement, from the source: "Trap keyboard focus, move focus to
+   the drawer heading or first control on open, close on Escape, restore
+   focus to the opener, and prevent background content from remaining
+   interactive." Implemented in the React overlay host; the geometry and
+   motion contract is here. */
 
 .scrim {
   position: fixed;
   inset: 0;
   background: var(--scrim);
-  z-index: 40;
+  z-index: var(--z-scrim);
 }
 
+/* The deployment's overlay sidebar slides from the left; Fruit's detail
+   drawer is on the right, because it is a detail panel for a selected row
+   and belongs on the side the eye ends on. Everything else — full viewport
+   height, off-canvas start, 0.2s slide, scrim, z-index 1300 — is the
+   source's contract. */
 .sheet {
   position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
-  width: 360px;
+  width: var(--detail-w);
   max-width: 100vw;
   background: var(--surface);
-  border-left: 1px solid var(--line);
-  z-index: 41;
+  border-left: 1px solid var(--rule);
+  z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
-  animation: sheet-in var(--m-sheet) var(--e-settle);
+  box-shadow: var(--shadow-menu);
+  animation: drawer-in var(--m-drawer) var(--e-settle);
 }
-@keyframes sheet-in {
+@keyframes drawer-in {
   from {
-    transform: translateX(12px);
-    opacity: 0;
+    transform: translateX(110%);
   }
 }
 .sheet-head {
   display: flex;
   align-items: center;
   gap: var(--s-8);
-  padding: var(--s-12);
-  border-bottom: 1px solid var(--line);
+  min-height: var(--pagehead-h);
+  padding: var(--s-8) var(--s-16);
+  border-bottom: 1px solid var(--rule);
 }
 .sheet-body {
   flex: 1;
   overflow: auto;
-  padding: var(--s-12);
+  padding: var(--s-16);
 }
 
+/* "Dialog — max width 575px. Surface — 1px border; 12px radius; soft
+   0 5px 10px / 10% shadow. Motion — default transform from -50px over
+   0.3s." */
 .modal {
   position: fixed;
   left: 50%;
   top: 12vh;
   transform: translateX(-50%);
-  width: 560px;
-  max-width: calc(100vw - 32px);
+  width: 575px;
+  max-width: calc(100vw - 2 * var(--s-16));
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-sheet);
-  z-index: 41;
-  animation: sheet-in var(--m-sheet) var(--e-settle);
+  box-shadow: var(--shadow-modal);
+  z-index: var(--z-modal);
+  animation: modal-in var(--m-modal) var(--e-settle);
 }
+@keyframes modal-in {
+  from {
+    transform: translate(-50%, -50px);
+    opacity: 0;
+  }
+}
+/* "Use wider/specialized dialogs only as named variants." */
 .modal-wide {
-  width: 680px;
+  width: 780px;
 }
 
+/* "Header — 16px padding; bottom border; close control aligned right.
+   Body — 16px padding; independently scrollable when needed.
+   Footer — 12px padding; top border; right-aligned actions; 4px item
+   margins. Order secondary → primary." */
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  padding: var(--s-16);
+  border-bottom: 1px solid var(--rule);
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: var(--t-title);
+  font-weight: var(--w-semibold);
+  color: var(--strong);
+}
+.modal-body {
+  padding: var(--s-16);
+  max-height: 60vh;
+  overflow: auto;
+}
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-4);
+  padding: var(--s-12);
+  border-top: 1px solid var(--rule);
+}
+
+/* The command palette's search field is the dialog's only control and its
+   whole purpose, so it is a named exception to the 28px rule at 36px —
+   the same allowance the source makes for specialised dialog variants. */
 .palette-input {
   width: 100%;
-  height: 44px;
+  min-height: 36px;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   border-radius: var(--r-sheet) var(--r-sheet) 0 0;
   background: transparent;
   padding: 0 var(--s-16);
+  font-size: var(--t-title);
 }
 .palette-list {
   max-height: 50vh;
   overflow: auto;
   padding: var(--s-4);
 }
+/* "Menus use 8px item radii, 4 × 8px padding." */
 .palette-item {
   display: flex;
   align-items: center;
   gap: var(--s-8);
   width: 100%;
-  padding: var(--s-6) var(--s-12);
+  min-height: var(--control-h);
+  padding: 4px var(--s-8);
   border-radius: var(--r-plate);
   text-align: left;
 }
 .palette-item[data-active="true"] {
   background: var(--raised);
+  color: var(--strong);
 }
 .palette-item mark {
   background: none;
   color: var(--plot);
+  font-weight: var(--w-semibold);
 }
 .palette-item .hint {
   margin-left: auto;
@@ -1073,7 +1396,7 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
   gap: var(--s-8);
-  z-index: 50;
+  z-index: var(--z-toast);
 }
 .toast {
   position: relative;
@@ -1082,22 +1405,25 @@ textarea::placeholder {
   gap: var(--s-12);
   min-width: 320px;
   max-width: 520px;
-  padding: var(--s-8) var(--s-12);
+  padding: var(--s-8) var(--s-16);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-sheet);
-  box-shadow: var(--overlay-shadow);
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
 }
 .toast[data-tone="danger"] {
+  background: var(--danger-surface);
   border-color: var(--danger);
+  color: var(--danger);
 }
-/* Countdown as a 1px `plot` hairline along the bottom edge, paused on hover
-   or focus (§4.6, U5). */
+/* Countdown as a 1px hairline along the bottom edge, paused on hover or
+   focus. */
 .toast-progress {
   position: absolute;
   left: 0;
   bottom: 0;
-  height: 1px;
+  height: 2px;
   background: var(--plot);
   animation: toast-countdown 8s linear forwards;
 }
@@ -1114,7 +1440,8 @@ textarea::placeholder {
   }
 }
 
-/* §5.7 Empty state — centred, caption, one sentence with an inline key hint. */
+/* "Empty — plain-language explanation + next action. Do not present an
+   unexplained blank region." */
 .empty {
   display: grid;
   place-items: center;
@@ -1127,39 +1454,40 @@ textarea::placeholder {
   color: var(--muted);
 }
 
-/* ─── Focus mode (§3.4) ──────────────────────────────────────────────── */
+/* ─── Focus mode ─────────────────────────────────────────────────────────
+   Four gradients, bound to the Pomodoro phase so a break is recognisable
+   peripherally from across the room. Dark in both themes — a full-screen
+   light field defeats the purpose — and each is the dark canvas (#0F0F0F)
+   with one status surface lifted into it. */
 
 .focus {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-focus-mode);
   display: grid;
   place-items: center;
-  color: var(--paper);
+  color: #f8f8f8;
   overflow: hidden;
 }
-/* Four gradients, bound to the Pomodoro phase so a break is recognisable
-   peripherally from across the room. Dark in both themes — a full-screen
-   light field defeats the purpose. */
 .focus[data-bg="desk"] {
-  background: radial-gradient(120% 90% at 20% 10%, #23303c 0%, #0e1116 60%);
+  background: radial-gradient(120% 90% at 20% 10%, #1d2a36 0%, #0f0f0f 60%);
 }
 .focus[data-bg="terrain"] {
-  background: radial-gradient(120% 90% at 80% 0%, #2a2f24 0%, #0e1116 62%);
+  background: radial-gradient(120% 90% at 80% 0%, #242b1e 0%, #0f0f0f 62%);
 }
 .focus[data-bg="water"] {
-  background: radial-gradient(120% 90% at 50% 100%, #12313a 0%, #0e1116 62%);
+  background: radial-gradient(120% 90% at 50% 100%, #102b33 0%, #0f0f0f 62%);
 }
 .focus[data-bg="night"] {
-  background: radial-gradient(120% 90% at 50% 20%, #191c2c 0%, #0b0d12 66%);
+  background: radial-gradient(120% 90% at 50% 20%, #1c1a2b 0%, #0b0b0b 66%);
 }
-/* Every gradient ships with a validated scrim — the glowing-text-over-gradient
-   treatment in v1 would not have held 4.5:1 (I2). */
+/* Every gradient ships with a validated scrim, so the clock holds 4.5:1
+   wherever it lands on the field. */
 .focus::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgb(0 0 0 / 0.28);
+  background: rgb(0 0 0 / 0.3);
   pointer-events: none;
 }
 .focus-inner {
@@ -1172,6 +1500,8 @@ textarea::placeholder {
 .focus-clock {
   font-family: var(--font-display);
   font-size: var(--t-display-xl);
+  font-weight: var(--w-bold);
+  letter-spacing: -0.02em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -1191,15 +1521,15 @@ textarea::placeholder {
   position: fixed;
   top: var(--s-20);
   right: var(--s-24);
-  color: var(--muted);
+  color: var(--gray-500);
   transition: opacity 600ms var(--e-out);
 }
 
-/* ─── Reconcile (§3.7) ───────────────────────────────────────────────── */
+/* ─── Reconcile ──────────────────────────────────────────────────────── */
 
 .reconcile-item {
   padding: var(--s-16);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
 }
 .reconcile-verbs {
   display: flex;
@@ -1212,47 +1542,52 @@ textarea::placeholder {
   gap: var(--s-16);
   padding: var(--s-8) var(--s-16);
   color: var(--faint);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 
-/* ─── Reports (§3.6) ─────────────────────────────────────────────────── */
+/* ─── Panels and reports ─────────────────────────────────────────────────
+   "Generic card — white surface, 1px light border, 12px radius, 20px body
+   padding." Panel headings are the quiet 12px/600 label, not an uppercase
+   band: the source describes column labels as a quiet band and reserves
+   emphasis for the data. */
 
 .panel {
   border: 1px solid var(--line);
-  border-radius: var(--r-panel);
+  border-radius: var(--r-sheet);
   background: var(--surface);
-  padding: var(--s-16);
+  padding: var(--s-20);
   margin-bottom: var(--s-16);
 }
-.panel h2 {
-  margin: 0 0 var(--s-8);
-  font-size: var(--t-label);
-  font-weight: 600;
+.panel h2,
+.panel h3 {
+  margin: 0 0 var(--s-12);
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
 }
 .bucket-row {
   display: grid;
   grid-template-columns: 64px 1fr 92px;
   align-items: center;
   gap: var(--s-12);
-  padding: var(--s-6) 0;
+  padding: var(--s-4) 0;
 }
 .bucket-row[data-reportable="false"] {
   color: var(--faint);
 }
 
-/* ─── Activity (§3.5, P2) ────────────────────────────────────────────── */
+/* ─── Activity ───────────────────────────────────────────────────────── */
 
 /* One stacked bar, no legend: proportion is the message, and the app name is
    in the tooltip and the accessible label where a legend would have put it. */
 .app-bar {
   display: flex;
   height: 10px;
-  border-radius: 1px;
+  border-radius: var(--r-bar);
   overflow: hidden;
-  background: var(--rule);
+  background: var(--sunken);
   min-width: 0;
 }
 .app-bar > i {
@@ -1261,11 +1596,12 @@ textarea::placeholder {
   min-width: 1px;
 }
 
-/* The Planner's axis, reused exactly — same hour height, same 48px gutter — so
-   the two screens can be compared by eye rather than by reading both. */
+/* The Planner's axis, reused exactly — same hour height, same 48px gutter —
+   so the two screens can be compared by eye rather than by reading both. */
 .activity-timeline {
   overflow: auto;
   max-height: 52vh;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
 }
@@ -1289,7 +1625,7 @@ textarea::placeholder {
   position: absolute;
   left: 2px;
   right: 2px;
-  border-radius: 1px;
+  border-radius: var(--r-bar);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -1298,26 +1634,21 @@ textarea::placeholder {
   white-space: nowrap;
 }
 
-/* The recording indicator (§3.5): visible whenever sampling is live, and it
-   pulses on an actual write rather than on a timer. */
+/* The recording indicator: visible whenever sampling is live, and it pulses
+   on an actual write rather than on a timer. */
 .recording {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-6);
-  padding: 2px var(--s-8);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
+  background: var(--over-surface);
+  color: var(--over);
 }
 .recording .dot {
-  background: var(--over);
   transition: opacity 160ms linear;
 }
 .recording[data-fresh="true"] .dot {
   opacity: 0.35;
 }
-.recording[data-paused="true"] .dot {
-  background: var(--muted);
+.recording[data-paused="true"] {
+  background: var(--raised);
+  color: var(--muted);
 }
 @media (prefers-reduced-motion: reduce) {
   .recording .dot {
@@ -1328,8 +1659,18 @@ textarea::placeholder {
   }
 }
 
-/* A switch reads as on or off from its knob position and its word, not from
-   colour alone (§5.9, U11). */
+/* The offline badge is a steady-state fact, not a warning. */
+.badge-offline {
+  background: var(--raised);
+  color: var(--muted);
+  font-size: var(--t-caption);
+}
+
+/* ─── Switch ─────────────────────────────────────────────────────────────
+   A switch reads as on or off from its knob position and its word, not from
+   colour alone. On is the primary neutral fill, which is what "primary
+   action" looks like everywhere else in this system. */
+
 .switch {
   display: inline-flex;
   align-items: center;
@@ -1341,10 +1682,10 @@ textarea::placeholder {
   position: relative;
   width: 34px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 1px solid var(--line);
-  background: var(--rule);
-  transition: background 120ms linear;
+  background: var(--raised);
+  transition: background var(--m-fast) linear;
 }
 .switch > i::after {
   content: "";
@@ -1354,23 +1695,26 @@ textarea::placeholder {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--muted);
-  transition: transform 120ms ease, background 120ms linear;
+  background: var(--gray-500);
+  transition: transform var(--m-fast) ease, background var(--m-fast) linear;
 }
 .switch[aria-checked="true"] > i {
-  background: color-mix(in srgb, var(--plot) 30%, var(--rule));
-  border-color: var(--plot);
+  background: var(--strong);
+  border-color: var(--strong);
 }
 .switch[aria-checked="true"] > i::after {
   transform: translateX(16px);
-  background: var(--plot);
+  background: var(--surface);
 }
 .switch[aria-checked="true"] {
-  color: var(--ink);
+  color: var(--strong);
 }
 .switch:disabled {
-  opacity: 0.45;
+  color: var(--faint);
   cursor: not-allowed;
+}
+.switch:disabled > i {
+  background: var(--sunken);
 }
 @media (prefers-reduced-motion: reduce) {
   .switch > i,
@@ -1379,19 +1723,7 @@ textarea::placeholder {
   }
 }
 
-/* A repeating block is an ordinary block with one extra glyph (§4.3, P2). */
-.repeat-mark {
-  color: var(--muted);
-  margin-right: 4px;
-  font-size: var(--t-micro);
-}
-/* …and a dotted right edge, which survives where the glyph cannot: a 15-minute
-   stand-up is a `data-tiny` plate with room for no text at all, and it is
-   exactly the kind of block that repeats. Without this, ⌫ would ask "which
-   occurrences?" on a plate carrying no sign that it was part of a series. */
-.plate[data-series="true"] {
-  border-right: 2px dotted var(--muted);
-}
+/* ─── Layout utilities ───────────────────────────────────────────────── */
 
 .scroll-y {
   overflow-y: auto;
@@ -1400,6 +1732,7 @@ textarea::placeholder {
 
 .view-pad {
   padding: var(--s-16);
+  padding-bottom: var(--s-32);
   overflow: auto;
 }
 
@@ -1421,19 +1754,7 @@ textarea::placeholder {
   min-width: 0;
 }
 
-/* §5.8 — the sidebar auto-collapses below 1130px so seven day columns still
-   clear the 110px minimum legible width:
-     52 (rail) + 48 (collapsed sidebar) + 48 (gutter) + 7 × 110 = 918 ≤ 960. */
-@media (max-width: 1129px) {
-  /* At this width the day totals wrap and fight the date. Drop them; the
-     numbers are still one keystroke away in Reports. */
-  .dayname .totals,
-  .badge-offline {
-    display: none;
-  }
-}
-
-/* ─── Day view (Plan Rev 3 §8.1) — the primary operational screen ─────── */
+/* ─── Day view — the primary operational screen ─────────────────────── */
 
 .day-view {
   display: flex;
@@ -1443,44 +1764,42 @@ textarea::placeholder {
   padding: 0 var(--s-16) var(--s-12);
 }
 
-/* The wireframe's context bar: navigation, zoom and the two actions, on one
-   line above the numbers. */
+/* The page head: navigation, zoom and the two actions, on one line above the
+   numbers. 48px, sticky, 1px bottom border — the source's page-head
+   contract. */
 .context-bar {
   display: flex;
   align-items: center;
   gap: var(--s-8);
-  height: 50px;
+  min-height: var(--pagehead-h);
   flex: none;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--rule);
   margin-bottom: var(--s-12);
 }
 .context-bar h1 {
-  font-size: 1.05rem;
+  font-size: var(--t-title);
   margin: 0 var(--s-6) 0 0;
-  font-weight: 500;
+  font-weight: var(--w-semibold);
+  color: var(--strong);
 }
+
+/* A segmented control is one control, so the group carries the radius and
+   the members square off against each other. */
 .segmented {
   display: flex;
+  border-radius: var(--r-plate);
+  overflow: hidden;
 }
 .segmented .btn {
   border-radius: 0;
-  margin-left: -1px;
+  box-shadow: inset 1px 0 0 var(--surface);
 }
 .segmented .btn:first-child {
-  border-radius: var(--r-plate) 0 0 var(--r-plate);
-  margin-left: 0;
-}
-.segmented .btn:last-child {
-  border-radius: 0 var(--r-plate) var(--r-plate) 0;
-}
-/* A pressed segment has to beat its neighbours\' borders or the group reads as
-   one long control with a tinted word in it. */
-.segmented .btn[aria-pressed="true"] {
-  position: relative;
-  z-index: 1;
+  box-shadow: none;
 }
 
-/* Six cards, the wireframe\'s summary row. */
+/* Six summary cards. "Number card — 8px top/right/bottom, 12px left
+   padding. Compact KPI dashboard tile." */
 .cards {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -1492,10 +1811,10 @@ textarea::placeholder {
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   background: var(--surface);
-  padding: var(--s-8) var(--s-12);
+  padding: var(--s-8) var(--s-8) var(--s-8) var(--s-12);
   display: flex;
   flex-direction: column;
-  gap: var(--s-4);
+  gap: var(--s-2);
   min-width: 0;
 }
 .card > .micro {
@@ -1505,18 +1824,21 @@ textarea::placeholder {
   text-overflow: ellipsis;
 }
 .card > strong {
-  font-size: 1.05rem;
-  font-weight: 500;
+  font-size: var(--t-display);
+  font-weight: var(--w-semibold);
+  line-height: 1.15;
+  color: var(--strong);
+  font-variant-numeric: tabular-nums;
 }
-/* Unaccounted is hatched, exactly like the rows it counts, so the eye connects
-   the figure to the thing it can act on. */
+/* Unaccounted is hatched, exactly like the rows it counts, so the eye
+   connects the figure to the thing it can act on. */
 .card[data-hatched="true"] {
   background: repeating-linear-gradient(
     135deg,
     var(--surface),
     var(--surface) 6px,
-    color-mix(in srgb, var(--rule) 60%, var(--surface)) 6px,
-    color-mix(in srgb, var(--rule) 60%, var(--surface)) 9px
+    var(--hatch) 6px,
+    var(--hatch) 9px
   );
 }
 
@@ -1526,68 +1848,84 @@ textarea::placeholder {
   gap: var(--s-12);
   flex: 1;
 }
+/* "Desk main section — 10px radius, no visible shadow, no border, zero outer
+   padding. Primary list/form content container." Kept a hairline border here
+   because this container sits on the gray-50 canvas rather than on white,
+   and without it the table's own rules would run to the page edge. */
 .day-table-wrap {
   flex: 1;
   min-width: 0;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
+  overflow: hidden;
 }
 .day-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
+/* The quiet column-label band, at table scale. */
 .day-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--raised);
-  border-bottom: 1px solid var(--line);
-  padding: var(--s-6) var(--s-8);
+  border-bottom: 1px solid var(--rule);
+  height: var(--list-head-h);
+  padding: 0 var(--s-6);
   text-align: left;
-  font-size: var(--t-label);
-  font-weight: 600;
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
 }
-.day-table thead th:first-child { width: 64px; }
-.day-table thead th:nth-child(2) { width: 24%; }
-.day-table thead th:nth-child(4) { width: 15%; }
-.day-table thead th:last-child   { width: 168px; }
+.day-table thead th:first-child {
+  width: 64px;
+}
+.day-table thead th:nth-child(2) {
+  width: 24%;
+}
+.day-table thead th:nth-child(4) {
+  width: 15%;
+}
+.day-table thead th:last-child {
+  width: 168px;
+}
 
 .day-row > * {
-  padding: var(--s-2) var(--s-8);
+  padding: var(--s-2) var(--s-6);
   border-bottom: 1px solid var(--rule);
   vertical-align: middle;
   height: 26px;
 }
-/* A heavier rule at the hour, hairline between — the planner\'s rhythm in a
+/* A heavier rule at the hour, hairline between — the planner's rhythm in a
    table. Without it 48 identical rows read as a wall of text. */
 .day-row[data-hour="true"] > * {
   border-top: 1px solid var(--line);
 }
-/* The now line spans the grid, as in the wireframe: a rule, not a tinted row,
-   because a tint is one more thing competing with six states. */
+/* The now line spans the grid: a rule, not a tinted row, because a tint is
+   one more thing competing with six states. */
 .day-row[data-now="true"] > * {
-  box-shadow: inset 0 2px 0 var(--paper);
+  box-shadow: inset 0 2px 0 var(--strong);
 }
 .day-row[data-now="true"] .day-time::after {
   content: "NOW";
   margin-left: var(--s-4);
   font-size: 9px;
   letter-spacing: 0.08em;
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--strong);
+  color: var(--surface);
   padding: 0 3px;
-  border-radius: 1px;
+  border-radius: 2px;
 }
 .day-row[data-selected="true"] > * {
   background: var(--raised);
 }
 .day-row .day-time {
   color: var(--muted);
-  font-weight: 400;
+  font-weight: var(--w-regular);
   text-align: right;
   white-space: nowrap;
 }
@@ -1603,43 +1941,54 @@ textarea::placeholder {
   cursor: pointer;
 }
 /* The selection says what it covers and waits. Nothing happens until it is
-   asked for: a selection that acted on its own would be a four-hour edit made
-   by a stray shift-click. */
+   asked for: a selection that acted on its own would be a four-hour edit
+   made by a stray shift-click. */
 .selection-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  flex-wrap: wrap;
   margin: var(--s-8) 0;
   padding: var(--s-8) var(--s-12);
   border: 1px solid var(--plot);
   border-radius: var(--r-plate);
-  background: var(--raised);
+  background: var(--plot-surface);
+  color: var(--plot);
 }
 
 /* Unaccounted time is hatched and labelled, never blank: blank is
    indistinguishable from "not loaded yet", and this is the state the user is
-   here to act on (Plan Rev 3 §17.4). */
+   here to act on. */
 .day-row[data-state="empty"] > * {
   background: repeating-linear-gradient(
     135deg,
     transparent,
     transparent 6px,
-    color-mix(in srgb, var(--rule) 55%, transparent) 6px,
-    color-mix(in srgb, var(--rule) 55%, transparent) 9px
+    var(--hatch) 6px,
+    var(--hatch) 9px
   );
 }
+/* A pill surface behind 13px of text and the same surface across a whole
+   26px row are not the same amount of colour. These are the status surfaces
+   mixed halfway back to the canvas, so a screenful of observed rows reads as
+   a tint rather than as a warning. */
 .day-row[data-state="plannedNotStarted"] > * {
-  background: color-mix(in srgb, var(--plot) 7%, transparent);
+  background: color-mix(in srgb, var(--plot-surface) 55%, var(--surface));
 }
 .day-row[data-state="observedOnly"] > * {
-  background: color-mix(in srgb, var(--track) 6%, transparent);
+  background: color-mix(in srgb, var(--track-surface) 55%, var(--surface));
 }
 /* Placed after the state backgrounds so a selected row reads as selected
-   whatever it contains. The solid left edge is the part that does not depend on
-   colour at all (M16) — the bar above the table says the same thing in words. */
+   whatever it contains. The solid left edge is the part that does not depend
+   on colour at all — and the bar above the table says the same thing in
+   words. */
 .day-row[data-in-range="true"] > * {
-  background: color-mix(in srgb, var(--plot) 18%, var(--raised));
+  background: var(--raised);
 }
 .day-row[data-in-range="true"] .day-time {
-  color: var(--paper);
-  box-shadow: inset 2px 0 0 var(--plot);
+  color: var(--strong);
+  font-weight: var(--w-medium);
+  box-shadow: inset 2px 0 0 var(--strong);
 }
 
 .day-row[data-state="private"] .day-actual {
@@ -1657,15 +2006,17 @@ textarea::placeholder {
   text-align: left;
   color: inherit;
 }
-.day-chip + .day-chip { margin-left: var(--s-8); }
+.day-chip + .day-chip {
+  margin-left: var(--s-8);
+}
 .day-chip > i {
   flex: none;
   width: 3px;
   height: 12px;
-  border-radius: 1px;
+  border-radius: var(--r-pill);
 }
-/* The plan is an outline, the record is solid — the same distinction the drift
-   rail makes, so the two screens teach one vocabulary. */
+/* The plan is an outline, the record is solid — the same distinction the
+   drift rail makes, so the two screens teach one vocabulary. */
 .day-chip[data-plan="true"] {
   color: var(--muted);
 }
@@ -1702,35 +2053,39 @@ textarea::placeholder {
   white-space: nowrap;
 }
 .day-state .micro {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
+  display: inline-flex;
+  height: 18px;
+  font-size: var(--t-micro);
 }
 
-/* The selected interval — the wireframe\'s right column. */
+/* The selected interval — the right column. "Form sidebar 277px —
+   metadata/actions region on record forms." */
 .day-detail {
-  width: 268px;
+  width: var(--detail-w);
   flex: none;
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
   background: var(--surface);
-  padding: var(--s-12);
+  padding: var(--s-16);
   overflow-y: auto;
 }
 .day-detail h2 {
-  font-size: var(--t-body);
+  font-size: var(--t-title);
+  font-weight: var(--w-semibold);
+  color: var(--strong);
   margin: 0 0 var(--s-8);
 }
 .day-detail .field {
   margin: var(--s-12) 0;
 }
-.day-detail .field > label {
+.day-detail .field > label,
+.reconcile-modal .evidence .field > label {
   display: block;
-  font-size: var(--t-micro);
+  font-size: var(--t-caption);
+  font-weight: var(--w-medium);
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
   margin-bottom: var(--s-4);
 }
 .day-detail select,
@@ -1741,29 +2096,25 @@ textarea::placeholder {
   display: block;
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
-  background: var(--raised);
-  min-height: 30px;
-  padding: var(--s-6) var(--s-8);
+  background: var(--surface);
+  min-height: var(--control-h);
+  padding: 6px var(--s-8);
   text-align: left;
+  color: var(--paper);
+}
+.fake-input:hover {
+  border-color: var(--line-strong);
 }
 .fake-input.note {
   min-height: 64px;
 }
-.tag {
-  display: inline-block;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 1px var(--s-8);
-  font-size: var(--t-micro);
-  color: var(--muted);
-}
 
 .day-bar {
   display: flex;
-  height: 8px;
-  border-radius: 1px;
+  height: 10px;
+  border-radius: var(--r-bar);
   overflow: hidden;
-  background: var(--rule);
+  background: var(--sunken);
   flex: none;
 }
 .day-bar > i {
@@ -1774,7 +2125,7 @@ textarea::placeholder {
   display: inline-block;
   width: 8px;
   height: 8px;
-  border-radius: 1px;
+  border-radius: 2px;
   margin-right: 4px;
   vertical-align: baseline;
 }
@@ -1785,53 +2136,61 @@ textarea::placeholder {
   gap: var(--s-12);
   color: var(--muted);
 }
-.l-work     { background: var(--track); }
-.l-life     { background: var(--plot); }
-.l-sleep    { background: var(--faint); }
-.l-fun      { background: var(--over); }
-.l-private  { background: color-mix(in srgb, var(--faint) 60%, var(--rule)); }
-.l-observed { background: color-mix(in srgb, var(--track) 45%, var(--rule)); }
-.l-idle     { background: var(--rule); }
-.l-empty    { background: repeating-linear-gradient(
-                135deg, var(--rule), var(--rule) 3px,
-                color-mix(in srgb, var(--muted) 30%, var(--rule)) 3px,
-                color-mix(in srgb, var(--muted) 30%, var(--rule)) 4px); }
+.l-work {
+  background: var(--track-graphic);
+}
+.l-life {
+  background: var(--plot);
+}
+.l-sleep {
+  background: var(--purple-text);
+}
+.l-fun {
+  background: var(--over);
+}
+.l-private {
+  background: var(--gray-400);
+}
+.l-observed {
+  background: var(--cyan-text);
+}
+.l-idle {
+  background: var(--sunken);
+}
+.l-empty {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--sunken),
+    var(--sunken) 3px,
+    var(--line-strong) 3px,
+    var(--line-strong) 4px
+  );
+}
 
 .area-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
   gap: var(--s-4);
-}
-/* Life-area names are one or two words, so the grid never had to cope with a
-   long label. Task titles are sentences — "Delete this project when you're
-   done" — and they wrapped straight over the button below. Rows size to their
-   tallest cell and each button fills its row, so a wrapped title makes its
-   whole row taller instead of escaping. */
-.area-grid {
   grid-auto-rows: 1fr;
   align-items: stretch;
 }
+/* Life-area names are one or two words, so the grid never had to cope with a
+   long label. Task titles are sentences — "Delete this project when you're
+   done" — and they wrapped straight over the button below. Rows size to
+   their tallest cell and each button fills its row, so a wrapped title makes
+   its whole row taller instead of escaping. */
 .area-grid > .btn {
   height: auto;
-  min-height: 28px;
+  min-height: var(--control-h);
   white-space: normal;
   text-align: left;
+  justify-content: flex-start;
   line-height: 1.25;
   padding-block: var(--s-4);
 }
 
-/* §5.8 — the day table has five columns and a detail panel. Below 1280px the
-   panel would squeeze the grid past legibility, so it drops out and selection
-   opens nothing rather than opening something unreadable. */
-@media (max-width: 1279px) {
-  .day-detail { display: none; }
-  .cards { grid-template-columns: repeat(3, 1fr); }
-}
+/* ─── Month dashboard ────────────────────────────────────────────────── */
 
-/* ─── Month dashboard (wireframe screen 3) ───────────────────────────── */
-
-/* Four panels, two up. The wireframe's proportions: the trend chart and the
-   targets get the wider column because both are read left-to-right. */
 .dashboard {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
@@ -1840,14 +2199,6 @@ textarea::placeholder {
 }
 .dashboard .panel {
   margin: 0;
-}
-.panel h3 {
-  margin: 0 0 var(--s-8);
-  font-size: var(--t-label);
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .linechart {
@@ -1872,15 +2223,23 @@ textarea::placeholder {
 .heat {
   position: relative;
   aspect-ratio: 1.6;
-  border: 1px solid var(--line);
-  border-radius: 1px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-bar);
   padding: 2px 4px;
   color: var(--muted);
   overflow: hidden;
+  font-variant-numeric: tabular-nums;
 }
-.heat[data-level="1"] { background: color-mix(in srgb, var(--plot) 12%, transparent); }
-.heat[data-level="2"] { background: color-mix(in srgb, var(--plot) 26%, transparent); }
-.heat[data-level="3"] { background: color-mix(in srgb, var(--plot) 42%, transparent); color: var(--paper); }
+.heat[data-level="1"] {
+  background: var(--plot-surface);
+}
+.heat[data-level="2"] {
+  background: color-mix(in srgb, var(--plot) 22%, var(--surface));
+}
+.heat[data-level="3"] {
+  background: color-mix(in srgb, var(--plot) 42%, var(--surface));
+  color: var(--strong);
+}
 /* A day that has not arrived: outlined only, and never marked as a problem. */
 .heat[data-future="true"] {
   border-style: dashed;
@@ -1895,7 +2254,7 @@ textarea::placeholder {
   top: 0;
   border-width: 0 7px 7px 0;
   border-style: solid;
-  border-color: transparent var(--track) transparent transparent;
+  border-color: transparent var(--track-graphic) transparent transparent;
 }
 
 .bars .bar-row {
@@ -1903,7 +2262,7 @@ textarea::placeholder {
   grid-template-columns: 130px 1fr 44px auto;
   align-items: center;
   gap: var(--s-8);
-  margin: var(--s-6) 0;
+  margin: var(--s-4) 0;
 }
 .bar-row > .micro:first-child {
   overflow: hidden;
@@ -1912,10 +2271,11 @@ textarea::placeholder {
 }
 .bar {
   display: block;
+  position: relative;
   height: 14px;
-  border: 1px solid var(--line);
-  border-radius: 1px;
-  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-bar);
+  background: var(--sunken);
   overflow: hidden;
 }
 .bar > i {
@@ -1923,18 +2283,19 @@ textarea::placeholder {
   height: 100%;
 }
 
-/* Where the elapsed days say you would be, on a goal bar.
-   A mark rather than a second fill: "ahead" and "behind" are then a glance at
-   which side of the notch the fill ends, with no arithmetic and no reliance on
-   colour. `overflow: hidden` on the bar keeps it inside the track. */
+/* Where the elapsed days say you would be, on a goal bar. A mark rather than
+   a second fill: "ahead" and "behind" are then a glance at which side of the
+   notch the fill ends, with no arithmetic and no reliance on colour.
+   (This previously read `var(--fg)`, a token that has never existed in this
+   codebase, so the notch rendered with no background at all.) */
 .bar-notch {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 2px;
   margin-left: -1px;
-  background: var(--fg);
-  opacity: 0.55;
+  background: var(--strong);
+  opacity: 0.6;
 }
 
 .warning-list > div {
@@ -1942,53 +2303,52 @@ textarea::placeholder {
   justify-content: space-between;
   align-items: baseline;
   gap: var(--s-8);
-  padding: var(--s-6) 0;
+  padding: var(--s-4) 0;
   border-top: 1px solid var(--rule);
 }
 .warning-list > div:first-child {
   border-top: 0;
 }
-/* A finding worth acting on gets a rule in `track`, the app's "actual" hue —
-   never red, which stays reserved for destructive actions (§9.4). */
+/* A finding worth acting on gets a rule in the caution hue — never red,
+   which stays reserved for destructive actions. */
 .warning-list > div[data-warning="true"] {
-  box-shadow: inset 2px 0 0 var(--track);
+  box-shadow: inset 2px 0 0 var(--track-graphic);
   padding-left: var(--s-8);
 }
 
-/* ─── Wireframe language, shared ─────────────────────────────────────────
-   The wireframes distinguish the four layers by *border*, not by fill:
+/* ─── The layer grammar, shared ──────────────────────────────────────────
+   The four record layers are distinguished by *border*, not by fill:
    solid = confirmed, dotted = planned, dashed = observed, hatched = empty.
-   That survives greyscale and a printed export, which is where a colour-only
-   scheme fails first (M16). Applied here so every screen speaks it. */
+   That survives greyscale and a printed export, which is where a
+   colour-only scheme fails first. Applied here so every screen speaks it. */
 
 .day-chip[data-plan="true"] > i {
-  /* The plan is drawn, not filled — a dotted mark against the record's solid. */
-  background-image: linear-gradient(
-    to bottom,
-    currentColor 0 2px,
-    transparent 2px 4px
-  );
+  /* The plan is drawn, not filled — a dotted mark against the record's
+     solid. */
+  background-image: linear-gradient(to bottom, currentColor 0 2px, transparent 2px 4px);
   opacity: 0.9;
 }
 .day-chip[data-owner="observed"] > i,
 .day-chip[data-owner="idle"] > i {
   background: transparent !important;
-  border-left: 3px dashed var(--muted);
+  border-left: 3px dashed var(--line-strong);
   width: 0;
 }
 
-/* The classification cell is a boxed status, as in the wireframe: a word in a
-   rule reads as a state, the same word bare reads as a caption. */
-.day-state .micro {
-  border: 1px solid var(--line);
-  border-radius: var(--r-plate);
-  padding: 0 var(--s-6);
-  display: inline-block;
-  max-width: 100%;
-}
+/* The classification cell is a status pill, so a state reads as a state.
+   Empty is the one that has to look unfinished, so it keeps a dashed edge. */
 .day-row[data-state="empty"] .day-state .micro {
-  border-style: dashed;
+  background: transparent;
+  border: 1px dashed var(--line-strong);
   color: var(--muted);
+}
+.day-row[data-state="plannedNotStarted"] .day-state .micro {
+  background: var(--plot-surface);
+  color: var(--plot);
+}
+.day-row[data-state="observedOnly"] .day-state .micro {
+  background: var(--track-surface);
+  color: var(--track);
 }
 
 /* Vertical rules between columns. The wireframe is a grid, not a list — the
@@ -2002,13 +2362,7 @@ textarea::placeholder {
   border-right: 0;
 }
 
-@media (max-width: 1129px) {
-  .dashboard {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ─── Planner: in-canvas backlog and the month span (wireframe screen 2) ── */
+/* ─── Planner: in-canvas backlog and the month span ──────────────────── */
 
 .planner-layout {
   display: flex;
@@ -2022,6 +2376,10 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  overflow: hidden;
 }
 /* Beside the grid, not across the window: "what needs a slot" and "where are
    the slots" are one question. */
@@ -2039,35 +2397,42 @@ textarea::placeholder {
 }
 .planner-backlog h3 {
   margin: 0;
-  font-size: var(--t-label);
-  font-weight: 600;
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
 }
+/* "Kanban card — white/subtle surface, quiet border, compact metadata.
+   Draggable task/project work item." */
 .task-card {
   display: block;
   width: 100%;
   text-align: left;
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
-  background: var(--raised);
+  background: var(--surface);
   padding: var(--s-6) var(--s-8);
   cursor: grab;
+  transition: background var(--m-fast) var(--e-out);
+}
+.task-card:hover {
+  background: var(--subtle);
 }
 .task-card:active {
   cursor: grabbing;
 }
 .task-card > b {
   display: block;
-  font-weight: 500;
+  font-weight: var(--w-medium);
+  color: var(--strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .task-card[aria-selected="true"] {
-  border-color: var(--plot);
-  box-shadow: inset 2px 0 0 var(--plot);
+  border-color: var(--strong);
+  box-shadow: inset 2px 0 0 var(--strong);
 }
 
 /* A month is a calendar, not 31 hour-columns: at a legible width those need
@@ -2078,6 +2443,7 @@ textarea::placeholder {
   gap: var(--s-4);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
+  background: var(--surface);
   padding: var(--s-8);
   overflow-y: auto;
 }
@@ -2088,7 +2454,7 @@ textarea::placeholder {
 }
 .month-cell {
   min-height: 74px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   border-radius: var(--r-plate);
   background: var(--surface);
   padding: var(--s-6);
@@ -2098,16 +2464,19 @@ textarea::placeholder {
   align-items: stretch;
   text-align: left;
 }
+.month-cell:hover {
+  background: var(--subtle);
+}
 .month-cell[data-pad="true"] {
   border-style: dashed;
-  border-color: var(--rule);
   background: none;
 }
 .month-cell[data-today="true"] {
-  border-color: var(--plot);
+  border-color: var(--strong);
+  box-shadow: inset 0 0 0 1px var(--strong);
 }
 .month-cell[data-past="true"] {
-  background: color-mix(in srgb, var(--surface) 60%, var(--ink));
+  background: var(--subtle);
 }
 /* Reconciled is a corner mark, not a fill — the fill already means "past". */
 .month-cell[data-reconciled="true"] {
@@ -2115,6 +2484,7 @@ textarea::placeholder {
 }
 .month-date {
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .month-bars {
   display: flex;
@@ -2124,21 +2494,21 @@ textarea::placeholder {
 .month-bars > i {
   display: block;
   height: 3px;
-  border-radius: 1px;
+  border-radius: var(--r-pill);
   min-width: 1px;
 }
 .month-bars > .plot {
   background: color-mix(in srgb, var(--plot) 60%, transparent);
 }
 .month-bars > .track {
-  background: var(--track);
+  background: var(--track-graphic);
 }
 .month-blocks {
   color: var(--faint);
   margin-top: auto;
 }
 
-/* ─── Excel export (wireframe screen 5) ──────────────────────────────── */
+/* ─── Excel export ───────────────────────────────────────────────────── */
 
 .export-layout {
   display: grid;
@@ -2154,18 +2524,20 @@ textarea::placeholder {
 .sheet-preview {
   margin: 0;
 }
+/* "Allow data grids to scroll horizontally rather than crushing columns." */
 .mini-sheet-wrap {
   overflow-x: auto;
-  border: 1px solid var(--line);
+  border: 1px solid var(--rule);
   border-radius: var(--r-plate);
 }
-/* Deliberately a spreadsheet, not the app's own table: every cell ruled, header
-   filled, monospace figures. It has to be recognisable as the artefact the
-   client already keeps. */
+/* Deliberately a spreadsheet, not the app's own table: every cell ruled,
+   header filled, figures tabular. It has to be recognisable as the artefact
+   the client already keeps. */
 .mini-sheet {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
 }
 .mini-sheet th,
 .mini-sheet td {
@@ -2180,21 +2552,22 @@ textarea::placeholder {
 .mini-sheet thead th {
   background: var(--raised);
   color: var(--muted);
-  font-weight: 600;
+  font-weight: var(--w-semibold);
 }
 .mini-sheet tbody th {
   background: var(--raised);
   color: var(--muted);
-  font-weight: 400;
+  font-weight: var(--w-regular);
 }
-/* The same grammar as the Day view: hatched is a gap, dashed is an observation. */
+/* The same grammar as the Day view: hatched is a gap, dashed is an
+   observation. */
 .mini-sheet td[data-kind="gap"] {
   background: repeating-linear-gradient(
     135deg,
     transparent,
     transparent 4px,
-    color-mix(in srgb, var(--rule) 70%, transparent) 4px,
-    color-mix(in srgb, var(--rule) 70%, transparent) 6px
+    var(--hatch) 4px,
+    var(--hatch) 6px
   );
   color: var(--faint);
   font-style: italic;
@@ -2211,6 +2584,7 @@ textarea::placeholder {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--t-label);
+  font-variant-numeric: tabular-nums;
 }
 .variance th,
 .variance td {
@@ -2221,52 +2595,45 @@ textarea::placeholder {
 .variance thead th {
   background: var(--raised);
   color: var(--muted);
-  font-weight: 600;
+  font-weight: var(--w-semibold);
 }
-/* A moved figure gets `track` — the app's "actual" hue. Never red: a rounding
-   difference is expected, and colouring it as an error would teach the user to
-   ignore the column that exists to be trusted. */
+/* A moved figure gets the caution hue. Never red: a rounding difference is
+   expected, and colouring it as an error would teach the user to ignore the
+   column that exists to be trusted. */
 .variance td[data-variance="true"] {
   color: var(--track);
+  font-weight: var(--w-medium);
 }
 
 .callout {
-  border-width: 2px;
+  border-color: var(--line-strong);
   margin: 0;
 }
 .callout > strong {
   display: block;
   margin-bottom: var(--s-4);
+  color: var(--strong);
 }
 
-@media (max-width: 1129px) {
-  .export-layout {
-    grid-template-columns: 1fr;
-  }
-  .planner-backlog {
-    display: none;
-  }
-}
-
-/* ─── Reconcile: three columns (wireframe screen 4) ──────────────────────
+/* ─── Reconcile: three columns ───────────────────────────────────────────
    queue · decision · evidence. The split is the argument — how much is left,
    what to decide, and where the claim came from. */
 
 .reconcile-modal {
   position: fixed;
   inset: 70px 8vw 40px 8vw;
-  z-index: 40;
+  z-index: var(--z-modal);
   display: grid;
-  grid-template-columns: 220px 1fr 240px;
+  grid-template-columns: 220px 1fr var(--detail-w);
   background: var(--surface);
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--r-sheet);
-  box-shadow: var(--overlay-shadow);
+  box-shadow: var(--shadow-modal);
   overflow: hidden;
 }
 .reconcile-modal .queue {
-  border-right: 1px solid var(--line);
-  background: var(--ink);
+  border-right: 1px solid var(--rule);
+  background: var(--subtle);
   padding: var(--s-16);
   display: flex;
   flex-direction: column;
@@ -2282,19 +2649,19 @@ textarea::placeholder {
 .queue-foot {
   flex: none;
   padding-top: var(--s-8);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--rule);
 }
 .queue-foot .btn {
-  justify-content: center;
+  width: 100%;
 }
 .reconcile-modal .queue h3,
 .reconcile-modal .evidence h3 {
   margin: 0;
-  font-size: var(--t-label);
-  font-weight: 600;
+  font-size: var(--t-caption);
+  font-weight: var(--w-semibold);
   color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-ui);
+  text-transform: none;
 }
 .queue-item {
   display: block;
@@ -2306,18 +2673,23 @@ textarea::placeholder {
   padding: var(--s-6) var(--s-8);
   color: var(--paper);
 }
+.queue-item:hover {
+  background: var(--subtle);
+}
 .queue-item[aria-current="true"] {
-  border-color: var(--plot);
-  box-shadow: inset 2px 0 0 var(--plot);
+  border-color: var(--strong);
+  box-shadow: inset 2px 0 0 var(--strong);
+  color: var(--strong);
 }
 /* Done is a tick and a recession, never a strikethrough: the item is still
    reachable and still editable until the day is closed. */
 .queue-item[data-done="true"] {
-  color: var(--muted);
+  color: var(--faint);
 }
 .queue-when {
   display: block;
   color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .reconcile-modal .decision {
@@ -2327,6 +2699,8 @@ textarea::placeholder {
 .reconcile-modal .decision h2 {
   margin: var(--s-8) 0 var(--s-4);
   font-size: var(--t-title);
+  font-weight: var(--w-semibold);
+  color: var(--strong);
 }
 .choice {
   display: block;
@@ -2334,13 +2708,18 @@ textarea::placeholder {
   text-align: left;
   border: 1px solid var(--line);
   border-radius: var(--r-plate);
-  background: var(--raised);
+  background: var(--surface);
   padding: var(--s-8) var(--s-12);
   color: var(--paper);
+  transition: background var(--m-fast) var(--e-out);
+}
+.choice:hover {
+  background: var(--subtle);
 }
 .choice > b {
   display: block;
-  font-weight: 500;
+  font-weight: var(--w-medium);
+  color: var(--strong);
 }
 .choice > .caption {
   display: block;
@@ -2349,40 +2728,114 @@ textarea::placeholder {
    equally legitimate and must not read as discouraged. */
 .choice[data-recommended="true"] {
   border-width: 2px;
-  border-color: var(--muted);
+  border-color: var(--line-strong);
 }
 .choice[data-chosen="true"] {
-  border-color: var(--plot);
-  box-shadow: inset 2px 0 0 var(--plot);
+  border-color: var(--strong);
+  box-shadow: inset 2px 0 0 var(--strong);
+  background: var(--raised);
 }
 
 .reconcile-modal .evidence {
-  border-left: 1px solid var(--line);
-  background: var(--ink);
+  border-left: 1px solid var(--rule);
+  background: var(--subtle);
   padding: var(--s-16);
   overflow-y: auto;
 }
 .reconcile-modal .evidence .field {
   margin: var(--s-12) 0;
 }
-.reconcile-modal .evidence .field > label {
-  display: block;
-  font-size: var(--t-micro);
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: var(--s-4);
-}
 
-@media (max-width: 1129px) {
+/* ══════════════════════════════════════════════════════════════════════
+   Responsive — the canonical map: 576 / 768 / 992 / 1200 / 1440.
+
+   The source's own instruction, after noting the deployment ships adjacent
+   values (567/576, 991/992): "Adopt one canonical breakpoint map in new
+   work." This replaces the previous ad-hoc 1129/1279 pair. Every media query
+   in this sheet is below, in descending order, so the cascade is readable in
+   one place.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ≥ 1200px — persistent sidebar + main content; dense list columns; the
+   contextual form sidebar present. Nothing to say; that is the base sheet. */
+
+/* 992–1199px — "Reduce peripheral width; begin hiding less important row
+   fields; maintain 48px chrome." */
+@media (max-width: 1199px) {
+  /* The day table has five columns and a detail panel. Below this tier the
+     panel would squeeze the grid past legibility, so it drops out and
+     selection opens nothing rather than opening something unreadable. */
+  .day-detail {
+    display: none;
+  }
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  /* At this width the day totals wrap and fight the date. Drop them; the
+     numbers are still one keystroke away in Reports. */
+  .dayname .totals {
+    display: none;
+  }
+  .dashboard,
+  .export-layout {
+    grid-template-columns: 1fr;
+  }
+  .planner-backlog {
+    display: none;
+  }
   .reconcile-modal {
-    inset: 56px 2vw 24px 2vw;
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: 220px 1fr;
   }
   /* Below this width the evidence column would squeeze the decision past
      legibility. It folds away rather than shrinking — the decision is the
      thing that has to stay readable. */
   .reconcile-modal .evidence {
     display: none;
+  }
+}
+
+/* < 992px — "Sidebars become overlays; checkbox hit geometry grows from 14
+   to 18px; lists simplify." */
+@media (max-width: 991px) {
+  :root {
+    --checkbox: var(--checkbox-touch);
+  }
+  .badge-offline {
+    display: none;
+  }
+  .reconcile-modal {
+    inset: 56px 2vw 24px 2vw;
+    grid-template-columns: 180px 1fr;
+  }
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Coarse pointer — "Retain 28px visual controls on dense desktop, but
+   provide ≥44px clickable wrappers or a larger mobile density mode." This is
+   the density mode: the same visual weight, a 44px hit area. */
+@media (pointer: coarse) {
+  .btn,
+  input,
+  textarea,
+  select,
+  .fake-input,
+  .sidebar-row,
+  .task-row,
+  .palette-item,
+  .queue-item,
+  .timer-chip {
+    min-height: var(--control-h-touch);
+  }
+  .btn-icon {
+    width: var(--control-h-touch);
+    min-width: var(--control-h-touch);
+  }
+  .day-time-mark {
+    min-height: 24px;
+  }
+  :root {
+    --checkbox: var(--checkbox-touch);
   }
 }

@@ -207,7 +207,7 @@ let toastSeq = 0;
 export const useApp = create<AppState>((set, get) => ({
   view: "day",
   overlay: null,
-  theme: "dark",
+  theme: "light",
   sidebarWidth: 260,
   sidebarCollapsed: false,
   ready: false,
@@ -267,7 +267,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   async boot() {
     const settings = await ipc.getSettings().catch(() => ({}) as Record<string, unknown>);
-    const theme = (settings["general.theme"] as "dark" | "light" | "system") ?? "dark";
+    const theme = (settings["general.theme"] as "dark" | "light" | "system") ?? "light";
     const hourHeight = (settings["planner.hourHeight"] as number) ?? 56;
     const slotMinutes = (settings["day.slotMinutes"] as number) ?? 30;
     const reportHorizon = (settings["reports.horizon"] as "week" | "month") ?? "month";
