@@ -788,6 +788,148 @@ fn d6_export_import_round_trips_exactly() {
     assert_eq!(fresh.export_json(TZ).unwrap()["tasks"], before["tasks"]);
 }
 
+/// The testing reset: everything the user recorded goes, the built-in taxonomy
+/// and the configuration stay, and the database is left in a state the app can
+/// keep running against rather than one that needs a restart.
+#[test]
+fn reset_empties_user_data_and_keeps_the_builtins() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    store.seed_first_run(TZ).unwrap();
+    store.seed_life_areas().unwrap();
+
+    // A full day's worth of every record type, plus a running timer.
+    let t = task(&mut store, "Extra task");
+    let b = block(&mut store, &t.id, at(2025, 7, 30, 14, 0), 45);
+    store.start_timer(&t.id, Some(&b.id)).unwrap();
+    clock.advance(50 * 60_000);
+    store.stop_timer().unwrap();
+    store.apply_reconcile("2025-07-30", vec![], TZ).unwrap();
+
+    let areas = store.get_life_areas(TZ, false).unwrap();
+    let builtin_areas = areas.len();
+    assert!(builtin_areas > 0, "the fixture needs built-in life areas");
+    let mine = store
+        .create_life_area(NewLifeArea {
+            name: "Something I added".into(),
+            ..Default::default()
+        })
+        .unwrap();
+
+    // Configuration the tester set, which must survive.
+    store
+        .set_setting("general.hour12", &serde_json::json!(true))
+        .unwrap();
+    // …and runtime state, which must not.
+    store
+        .set_setting("notices.fired", &serde_json::json!(["off-plan"]))
+        .unwrap();
+
+    // A second timer left running, so the reset has a live pointer to clear.
+    store.start_timer(&t.id, None).unwrap();
+
+    let summary = store.reset_all_data().unwrap();
+    assert!(summary.projects >= 1, "should report what it destroyed");
+    assert!(summary.tasks >= 4);
+    assert!(summary.sessions >= 1);
+
+    // Nothing the user recorded is left — including soft-deleted rows, so the
+    // next run does not open with a restore list from the last one.
+    let export = store.export_json(TZ).unwrap();
+    for key in [
+        "projects", "tasks", "tags", "taskTags", "notes", "blocks", "sessions", "dayReviews",
+    ] {
+        assert_eq!(
+            export[key].as_array().unwrap().len(),
+            0,
+            "{key} survived the reset"
+        );
+    }
+
+    // The built-in taxonomy is schema, not data: no migration will ever create
+    // it again, so it stays. What the user added to it goes.
+    let after = store.get_life_areas(TZ, true).unwrap();
+    assert_eq!(after.len(), builtin_areas, "built-in life areas must survive");
+    assert!(!after.iter().any(|a| a.id == mine.id), "user areas must go");
+    assert!(
+        !store.get_categories(None, TZ).unwrap().is_empty(),
+        "built-in observation categories must survive"
+    );
+
+    // Configuration survives; runtime state does not.
+    assert_eq!(
+        store.get_setting("general.hour12").unwrap(),
+        Some(serde_json::json!(true))
+    );
+    assert_eq!(store.get_setting("notices.fired").unwrap(), None);
+
+    // The seed flag stays set: the point of the button is a database that stays
+    // empty, not one that grows the demo project back on the next launch.
+    assert!(store.is_seeded());
+    store.seed_first_run(TZ).unwrap();
+    assert_eq!(
+        store.export_json(TZ).unwrap()["tasks"].as_array().unwrap().len(),
+        0
+    );
+
+    // The store is still usable in-process: the timer runtime let go of the
+    // session row it was holding, and a fresh day reads as genuinely empty.
+    assert!(store.timer_state().unwrap().session.is_none());
+    let day = store.get_day("2025-07-30", TZ, Some(30)).unwrap();
+    assert_eq!(
+        day.slots.iter().filter(|s| s.state != SlotState::Empty).count(),
+        0,
+        "every slot should read as unaccounted after a reset"
+    );
+    let t2 = task(&mut store, "After the reset");
+    assert_eq!(t2.title, "After the reset");
+}
+
+/// The reset's escape hatch: on a real, file-backed database it snapshots
+/// first, and that snapshot still holds everything the reset destroyed.
+///
+/// Worth its own test because the in-memory store takes the other branch
+/// entirely — there is no file to copy, so `backup_path` is `None` and the
+/// snapshot code never runs. "Cannot be undone" is only acceptable copy if the
+/// file it points at is really there and really loads.
+#[test]
+fn reset_snapshots_first_and_the_snapshot_restores() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("fruit.db");
+
+    let backup = {
+        let mut store = Store::open(&path).unwrap();
+        store.seed_first_run(TZ).unwrap();
+        let before = store.export_json(TZ).unwrap();
+        let tasks_before = before["tasks"].as_array().unwrap().len();
+        assert!(tasks_before > 0);
+
+        let summary = store.reset_all_data().unwrap();
+        let backup = summary.backup_path.expect("a file-backed store must snapshot");
+        assert!(
+            std::path::Path::new(&backup).exists(),
+            "the snapshot the UI points the user at has to exist"
+        );
+
+        // The live database really is empty…
+        assert_eq!(
+            store.export_json(TZ).unwrap()["tasks"].as_array().unwrap().len(),
+            0
+        );
+        backup
+    };
+
+    // …and the snapshot really does still hold what was there.
+    let restored = Store::open(std::path::Path::new(&backup)).unwrap();
+    assert!(
+        restored.export_json(TZ).unwrap()["tasks"]
+            .as_array()
+            .unwrap()
+            .len()
+            > 0,
+        "the snapshot should predate the reset, not mirror it"
+    );
+}
+
 /// §7.3 — import is untrusted input.
 #[test]
 fn imports_reject_junk_before_opening_a_transaction() {

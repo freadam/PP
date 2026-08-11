@@ -1013,6 +1013,17 @@ fn run_integrity_check(state: State<'_, AppState>) -> Res<IntegrityReport> {
     with(&state, |s| s.run_integrity_check())
 }
 
+/// Empty the database of everything the user recorded, for testing.
+///
+/// Deliberately not guarded behind a debug build: the person who needs it is
+/// running a release binary against their own data, and a switch that only
+/// exists in a build they never run is a switch that does not exist. The guard
+/// is the confirmation in the UI and the snapshot the core takes first.
+#[tauri::command]
+fn reset_all_data(state: State<'_, AppState>) -> Res<ResetSummary> {
+    with(&state, |s| s.reset_all_data())
+}
+
 #[tauri::command]
 fn rebuild_caches(state: State<'_, AppState>) -> Res<()> {
     with(&state, |s| {
@@ -1284,6 +1295,7 @@ pub fn run() {
             export_data,
             import_data,
             run_integrity_check,
+            reset_all_data,
             rebuild_caches,
             report_input,
         ])

@@ -754,6 +754,19 @@ export interface IntegrityReport {
   checkedAt: Millis;
 }
 
+/** What a testing reset destroyed. Counted before the delete, so the numbers
+ *  say what went rather than what is left. */
+export interface ResetSummary {
+  projects: number;
+  tasks: number;
+  blocks: number;
+  sessions: number;
+  lifeEntries: number;
+  activitySpans: number;
+  /** The snapshot taken immediately before the delete. */
+  backupPath: string | null;
+}
+
 export type CollisionPolicy = "overlap" | "push" | "shrink";
 export type IdleActionKind = "keep" | "discard" | "assignToBreak";
 export type RecoveryActionKind = "trimToHeartbeat" | "keepAll" | "discard";

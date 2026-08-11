@@ -1549,6 +1549,24 @@ pub struct ImportSummary {
     pub skipped: i64,
 }
 
+/// What `reset_all_data` removed. Counted *before* the delete, because the
+/// point of the figures is to say what was destroyed — a confirmation reading
+/// "0 projects, 0 tasks" after the fact tells the user nothing about whether
+/// the thing they were worried about is gone.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetSummary {
+    pub projects: i64,
+    pub tasks: i64,
+    pub blocks: i64,
+    pub sessions: i64,
+    pub life_entries: i64,
+    pub activity_spans: i64,
+    /// The snapshot taken immediately before the delete. `None` only for an
+    /// in-memory store, which has no file to snapshot.
+    pub backup_path: Option<String>,
+}
+
 // ─── capture parser (§4.4) ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Serialize)]

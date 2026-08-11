@@ -33,6 +33,7 @@ import type {
   UnlabelledRow,
   IdleActionKind,
   IntegrityReport,
+  ResetSummary,
   LocalDate,
   Millis,
   NewTask,
@@ -284,6 +285,9 @@ export const importData = (path: string, mode: "merge" | "replace" | "append") =
   call<{ tasks: number; skipped: number }>("import_data", { path, mode });
 
 export const runIntegrityCheck = () => call<IntegrityReport>("run_integrity_check", {});
+
+/** Empties the database of everything the user recorded. Snapshots first. */
+export const resetAllData = () => call<ResetSummary>("reset_all_data", {});
 
 export const rebuildCaches = () => call<void>("rebuild_caches", {});
 

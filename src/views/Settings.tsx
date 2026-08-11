@@ -16,6 +16,7 @@ import type {
   IntegrityReport,
   MatchKind,
   ObservationCategory,
+  ResetSummary,
 } from "../lib/types";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -68,6 +69,118 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         {hint && <span className="caption">{hint}</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * The testing reset — empties the database of everything you ever recorded, so
+ * a run can start from nothing.
+ *
+ * Three deliberate choices:
+ *
+ * 1. **Type the word.** Not a second click, which is muscle memory after the
+ *    third reset and stops being a decision. Typing `erase` takes a second and
+ *    cannot happen by accident. This is the only control in the app that asks
+ *    for it, because it is the only one with no undo.
+ * 2. **No undo toast.** Every other delete in Fruit is undoable and says so.
+ *    This one destroys thousands of rows across a dozen tables and the honest
+ *    thing is to say it is final and hand back the path to the snapshot the
+ *    core took a moment earlier — a real escape hatch, not a fake one.
+ * 3. **It says what it will keep**, before you press it. A button labelled
+ *    "delete everything" that silently keeps your theme is a button you cannot
+ *    reason about.
+ */
+function ResetAllData() {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const refresh = useApp((s) => s.refresh);
+  const closeDetail = useApp((s) => s.closeDetail);
+
+  const [arming, setArming] = useState(false);
+  const [word, setWord] = useState("");
+  const [last, setLast] = useState<ResetSummary | null>(null);
+  const ready = word.trim().toLowerCase() === "erase";
+
+  const reset = async () => {
+    const summary = await run(() => ipc.resetAllData(), "Couldn't clear the data.");
+    if (!summary) return;
+    setArming(false);
+    setWord("");
+    setLast(summary);
+    // The open detail panel is showing a task that no longer exists.
+    closeDetail();
+    await refresh();
+    toast(
+      `Cleared ${summary.projects} projects, ${summary.tasks} tasks, ${summary.sessions} sessions.`,
+    );
+  };
+
+  return (
+    <>
+      <Field
+        label="Clear all data"
+        hint="Deletes every project, task, note, block, session, life entry, observed span, goal and day review — including anything in Recently deleted. Your settings, and the built-in life areas and observation categories, are kept: they are what the app needs to count against, and no migration will create them again. This cannot be undone from inside Fruit, so a snapshot is written to the backups folder first."
+      >
+        {!arming ? (
+          <div className="row">
+            <button className="btn btn-danger" onClick={() => setArming(true)}>
+              Clear all data…
+            </button>
+            {last && (
+              <span className="caption">
+                Last cleared{" "}
+                <span className="data">
+                  {last.projects} projects · {last.tasks} tasks · {last.blocks} blocks ·{" "}
+                  {last.sessions} sessions · {last.lifeEntries} life entries ·{" "}
+                  {last.activitySpans} observed spans
+                </span>
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="stack">
+            <label className="caption" htmlFor="reset-confirm">
+              Type <strong>erase</strong> to confirm. There is no undo.
+            </label>
+            <div className="row">
+              <input
+                id="reset-confirm"
+                value={word}
+                autoFocus
+                placeholder="erase"
+                aria-label="Type erase to confirm"
+                onChange={(e) => setWord(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && ready) void reset();
+                  if (e.key === "Escape") {
+                    setArming(false);
+                    setWord("");
+                  }
+                }}
+                style={{ width: 140 }}
+              />
+              <button
+                className="btn"
+                onClick={() => {
+                  setArming(false);
+                  setWord("");
+                }}
+              >
+                Cancel <span className="kbd">Esc</span>
+              </button>
+              <button className="btn btn-danger" disabled={!ready} onClick={() => void reset()}>
+                Erase everything
+              </button>
+            </div>
+          </div>
+        )}
+      </Field>
+      {last?.backupPath && (
+        <Field label="Snapshot" hint="Written immediately before the last clear. Restore it with Settings → Data → Import, or by replacing fruit.db while the app is closed.">
+          <span className="caption data">{last.backupPath}</span>
+        </Field>
+      )}
+    </>
   );
 }
 
@@ -350,6 +463,10 @@ export function Settings() {
         <Field label="Backups" hint="A VACUUM INTO snapshot on launch if the newest is over 24h old; 7 daily kept. Storing the database in Dropbox, iCloud or OneDrive is a known corruption path — don't.">
           <span className="caption">Managed automatically.</span>
         </Field>
+      </Section>
+
+      <Section title="Testing">
+        <ResetAllData />
       </Section>
 
       <Section title="Shortcuts">

@@ -39,6 +39,46 @@ const TABLES: &[(&str, &str)] = &[
     ("dayReviews", "day_review"),
 ];
 
+/// The only tables `reset_all_data` leaves alone entirely.
+///
+/// This is a **keep-list, not a delete-list**, and the direction is the whole
+/// point. A delete-list has to be edited every time a migration adds a table,
+/// and forgetting is silent: the button still says "cleared everything" and the
+/// new table quietly survives every reset. With a keep-list, forgetting wipes
+/// something that should have been kept — which is wrong too, but wrong
+/// *loudly*, on the first run, instead of hiding inside a test suite that
+/// starts from a state nobody expected.
+///
+/// (The first draft of this was a delete-list. It named `domain_rule`, a table
+/// migration 0007 folded into `activity_rule` and dropped, and the reset threw
+/// "no such table" on every call. The list was wrong on the day it was written.)
+const RESET_KEEP_TABLES: &[&str] = &[
+    // Configuration, not data. Wiping it would make a tester reconfigure the
+    // app on every run; the handful of runtime keys are removed by name below.
+    "setting",
+    // The singleton. Its `device_id` identifies the machine, not the data, so
+    // the row is edited rather than deleted.
+    "app_state",
+];
+
+/// Tables where the built-in rows are schema, not data: migrations 0005 and
+/// 0007 created them, no migration will create them again, and the counting
+/// invariant needs somewhere for every second to land. Only what the *user*
+/// added to these is removed.
+const RESET_KEEP_BUILTIN: &[&str] = &["activity_rule", "observation_category", "life_area"];
+
+/// Settings that hold runtime state or point at rows that are about to stop
+/// existing. Everything else in `setting` is configuration and survives —
+/// see the doc comment on `reset_all_data`. Undo tokens are cleared separately
+/// by prefix.
+const RESET_SETTINGS: &[&str] = &[
+    "timer.focusEndsAt",
+    "notices.fired",
+    "notices.silentUntil",
+    "activity.lastPurgeAt",
+    "onboarding.railExplained",
+];
+
 impl Store {
     // ─── export ────────────────────────────────────────────────────────
 
@@ -229,6 +269,20 @@ impl Store {
         })
     }
 
+    /// Every table this database actually has, asked of the schema rather than
+    /// remembered in a list. `sqlite_%` covers SQLite's own internals
+    /// (`sqlite_sequence`, `sqlite_stat1`); views are excluded because a view
+    /// has nothing to delete.
+    fn user_tables(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT name FROM sqlite_master
+              WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+              ORDER BY name",
+        )?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
+
     fn count(&self, table: &str) -> Result<i64> {
         Ok(self
             .conn
@@ -354,6 +408,108 @@ impl Store {
         let doc: Value = serde_json::from_str(&text)
             .map_err(|e| AppError::Import(format!("That file isn't valid JSON ({e}).")))?;
         self.import_json(&doc, mode)
+    }
+
+    // ─── reset ─────────────────────────────────────────────────────────
+
+    /// Empty the database of everything the user ever recorded, so a test run
+    /// can start from nothing.
+    ///
+    /// Three things this deliberately does **not** touch, and each would be a
+    /// bug if it did:
+    ///
+    /// 1. **The built-in taxonomy.** Life areas, observation categories and
+    ///    their starter rules are created by migrations 0005/0007 and marked
+    ///    `is_builtin = 1`. The counting invariant needs somewhere for every
+    ///    second to land, and recreating those rows is the migration's job —
+    ///    a command that deleted them would leave a database no migration will
+    ///    ever repair. Everything the *user* added to those tables goes.
+    /// 2. **Configuration.** Theme, clock format, pomodoro lengths and the
+    ///    activity switches are settings, not data; wiping them would make a
+    ///    tester reconfigure the app on every run. Only the keys that hold
+    ///    *runtime* state or point at now-deleted rows are cleared.
+    /// 3. **`app_state.device_id`.** It identifies the machine, not the data.
+    ///
+    /// Deletes are hard, not soft: "Recently deleted" has to be empty too, or
+    /// the next run starts with a restore list from the last one.
+    ///
+    /// Takes a snapshot first when the store is file-backed. This is
+    /// irreversible from inside the app, and the one-key escape hatch costs a
+    /// `VACUUM INTO` that nobody will notice.
+    pub fn reset_all_data(&mut self) -> Result<ResetSummary> {
+        let summary = ResetSummary {
+            projects: self.count("project")?,
+            tasks: self.count("task")?,
+            blocks: self.count("scheduled_block")?,
+            sessions: self.count("time_session")?,
+            life_entries: self.count("life_entry")?,
+            activity_spans: self.count("activity_span")?,
+            backup_path: None,
+        };
+
+        let backup_path = match self.db_path.clone() {
+            Some(path) => {
+                let to = db::backups_dir(&path).join(format!("fruit-pre-reset-{}.db", self.now()));
+                std::fs::create_dir_all(db::backups_dir(&path))?;
+                db::snapshot(&self.conn, &to)?;
+                Some(to.display().to_string())
+            }
+            None => None,
+        };
+
+        // The running timer's row is about to be deleted. `ON DELETE SET NULL`
+        // clears the database pointer, but the in-process runtime holds its own
+        // copy of the session id and would go on ticking against a row that no
+        // longer exists — so it is reset too, before the delete.
+        self.timer = super::TimerRuntime::default();
+
+        let now = self.now();
+        let tables = self.user_tables()?;
+        let tx = self.conn.transaction()?;
+
+        // Foreign keys are checked at commit rather than per statement, so the
+        // deletes need no dependency ordering — by the time the constraint is
+        // evaluated every table involved is already empty. Ordering a list that
+        // is discovered at runtime would otherwise mean topologically sorting
+        // the schema, which is a lot of machinery to delete nothing.
+        tx.execute_batch("PRAGMA defer_foreign_keys = ON")?;
+
+        tx.execute(
+            "UPDATE app_state SET running_session_id = NULL, last_purge_at = NULL WHERE id = 1",
+            [],
+        )?;
+
+        for table in &tables {
+            if RESET_KEEP_TABLES.contains(&table.as_str()) {
+                continue;
+            }
+            if RESET_KEEP_BUILTIN.contains(&table.as_str()) {
+                tx.execute(&format!("DELETE FROM \"{table}\" WHERE is_builtin = 0"), [])?;
+            } else {
+                tx.execute(&format!("DELETE FROM \"{table}\""), [])?;
+            }
+        }
+
+        for key in RESET_SETTINGS {
+            tx.execute("DELETE FROM setting WHERE key = ?1", [key])?;
+        }
+        tx.execute("DELETE FROM setting WHERE key LIKE 'undo.%'", [])?;
+        // Left set on purpose. The point of this button is a database that
+        // *stays* empty; clearing the flag would hand the next launch the
+        // "Welcome to Fruit" demo project instead of nothing.
+        tx.execute(
+            "INSERT INTO setting (key, value, updated_at) VALUES (?1, 'true', ?2)
+             ON CONFLICT(key) DO UPDATE SET value = 'true', updated_at = excluded.updated_at",
+            rusqlite::params![super::seed::SEED_FLAG, now],
+        )?;
+
+        db::rebuild_tracked_caches(&tx)?;
+        tx.commit()?;
+
+        Ok(ResetSummary {
+            backup_path,
+            ..summary
+        })
     }
 
     // ─── integrity and backups ─────────────────────────────────────────
