@@ -6,7 +6,9 @@ Time Planner and Tracker*)
 **Release target:** Windows-first MVP, 12 weeks
 **Status of this document:** the specification of record. Where it disagrees
 with anything else in this repository, this document wins and the other file
-needs updating.
+needs updating. The one exception is *direction*: [`VISION.md`](VISION.md)
+argues why this product should exist and where it is going, and this document
+does not overrule it on that. It overrules it on every fact.
 
 ---
 

@@ -15,6 +15,11 @@ Each item says what the spec asks for, what exists today, why it matters, and
 roughly how big it is. Nothing here is a guess about priority order — that is a
 conversation, not a field.
 
+For the priority *argument* — which of these matter most and why, plus ten
+`V*` items that come from the product's direction rather than from an audit —
+see [`VISION.md`](VISION.md) §9. This file stays the reference; that one stays
+the ranking.
+
 `ACCEPTANCE.md` remains the record of what is *signed off*. This file is the
 record of what is *known to be missing*. An item leaves here by being built, or
 by the specification being changed on purpose — and if the second, the change

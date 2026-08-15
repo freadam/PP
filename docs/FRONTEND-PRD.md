@@ -1670,6 +1670,7 @@ Genuine uncertainties, not rhetorical ones.
 
 | Document | What it holds |
 |---|---|
+| `VISION.md` | Why this product exists, what the category does, and the ranked list of what is still missing |
 | `PRODUCT-SPEC.md` | The specification of record. Where it disagrees with anything else, it wins. |
 | `ACCEPTANCE.md` | What is signed off, criterion by criterion, with the test that proves it |
 | `BACKLOG.md` | What is known to be missing, and why it matters |
