@@ -755,9 +755,17 @@ select {
 
 /* The grid is a graduated scale: rule at the hour, hairline at the quarter,
    numerals set in the gutter like a chart axis. */
+/* The hour grid is a sibling of the day columns and is rendered *before* them,
+   so without a z-index every column carrying a background paints straight over
+   it — the rules survived only in the fully transparent future columns, which
+   is why today and the past days rendered as one unbroken block while tomorrow
+   was ruled into hours.
+   Three layers, explicitly: column tints (0) · the hour grid (1) · plates (2).
+   The now-cursor (3) and the drop preview (4) sit above all of them. */
 .hour-rows {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 .hour-row {
@@ -833,6 +841,9 @@ select {
    1px gray-200 border, 8px radius, no shadow. */
 .plate {
   position: absolute;
+  /* Above the hour grid, which is above the column tints. A rule drawn across
+     a block would read as a split block. */
+  z-index: 2;
   /* A pointer drag must not start a text selection instead. */
   user-select: none;
   background: var(--surface);
