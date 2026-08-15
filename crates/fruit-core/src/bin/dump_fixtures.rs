@@ -490,6 +490,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             NewGoal {
                 subject_kind: Some(GoalSubject::Metric),
                 subject_id: metric.into(),
+                period: None,
                 direction: Some(direction),
                 target_sec: hours * 3600,
                 applies_days: weekdays.then_some(0b0011111),
@@ -572,6 +573,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "exePath": "(the desktop app prints the real path here)",
             "queuedSamples": 0,
         }),
+    );
+    // The work report, recorded for the week the rest of the fixture lives in.
+    // Preview shows the real Rust shape — a hand-written JS mock would be the
+    // second implementation this architecture exists to avoid.
+    out.insert("get_task_categories".into(), json!(store.get_task_categories()?));
+    out.insert(
+        "get_work_report".into(),
+        json!(store.get_work_report(&today, "week", &tz)?),
     );
     out.insert("get_rrule_presets".into(), json!(fruit_core::rrule::presets()));
     out.insert("extend_series_to".into(), json!(0));

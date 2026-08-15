@@ -41,7 +41,8 @@ fn task_cols(now_param: usize) -> String {
                    AND b.starts_at + b.duration_sec*1000 >= ?{now_param}),
          (SELECT MIN(s.started_at) FROM time_session s WHERE s.task_id = t.id),
          (SELECT MAX(COALESCE(s.ended_at, s.started_at)) FROM time_session s
-           WHERE s.task_id = t.id)"
+           WHERE s.task_id = t.id),
+         t.category_id"
     )
 }
 
@@ -72,6 +73,7 @@ impl Store {
             // task cost, and when, is the interesting fact about it.
             first_session_at: row.get(19)?,
             last_session_at: row.get(20)?,
+            category_id: row.get(21)?,
             tags: Vec::new(),
         })
     }

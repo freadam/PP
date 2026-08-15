@@ -22,6 +22,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0010_import_batch.sql"),
     include_str!("../migrations/0011_note_is_plain_text.sql"),
     include_str!("../migrations/0012_life_series.sql"),
+    include_str!("../migrations/0013_categories_daily_goals_focus.sql"),
 ];
 
 pub fn schema_version() -> i64 {

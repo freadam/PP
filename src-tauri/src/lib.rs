@@ -342,6 +342,100 @@ fn pick_ics_file(app: AppHandle) -> Res<Option<PathBuf>> {
         .and_then(|f| f.into_path().ok()))
 }
 
+// ─── launch at login ───────────────────────────────────────────────────
+//
+// The point of this feature is not convenience — it is *coverage*. Observation
+// only records while Fruit is running, so a day that starts with "I forgot to
+// open it" has a hole in it that no amount of reconciling can fill honestly.
+// Autostart is what makes "90% of waking hours accounted" reachable at all.
+
+/// True when this process was launched by the OS at login rather than by the
+/// user. Set by the `--autostart` argument the plugin passes.
+fn is_autostart_launch() -> bool {
+    std::env::args().any(|a| a == "--autostart")
+}
+
+#[tauri::command]
+fn get_autostart(app: AppHandle) -> Res<bool> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch()
+        .is_enabled()
+        .map_err(|e| AppError::invalid(format!("Couldn't read the startup setting ({e}).")).into())
+}
+
+#[tauri::command]
+fn set_autostart(app: AppHandle, enabled: bool) -> Res<bool> {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    let result = if enabled {
+        manager.enable()
+    } else {
+        manager.disable()
+    };
+    result.map_err(|e| {
+        AppError::invalid(format!(
+            "Couldn't {} launching at login ({e}).",
+            if enabled { "turn on" } else { "turn off" }
+        ))
+    })?;
+    Ok(manager.is_enabled().unwrap_or(enabled))
+}
+
+// ─── kinds of work, and the work report (migration 0013) ───────────────
+
+#[tauri::command]
+fn get_task_categories(state: State<'_, AppState>) -> Res<Vec<TaskCategoryRow>> {
+    with(&state, |s| s.get_task_categories())
+}
+
+#[tauri::command]
+fn create_task_category(
+    state: State<'_, AppState>,
+    name: String,
+    colour: Option<String>,
+) -> Res<TaskCategoryRow> {
+    with(&state, |s| s.create_task_category(&name, colour.as_deref()))
+}
+
+#[tauri::command]
+fn update_task_category(
+    state: State<'_, AppState>,
+    id: String,
+    name: Option<String>,
+    colour: Option<String>,
+) -> Res<TaskCategoryRow> {
+    with(&state, |s| {
+        s.update_task_category(&id, name.as_deref(), colour.as_deref())
+    })
+}
+
+/// Returns how many tasks were freed, so the confirmation can say it.
+#[tauri::command]
+fn delete_task_category(state: State<'_, AppState>, id: String) -> Res<i64> {
+    with(&state, |s| s.delete_task_category(&id))
+}
+
+#[tauri::command]
+fn set_task_category(
+    state: State<'_, AppState>,
+    task_id: String,
+    category_id: Option<String>,
+) -> Res<()> {
+    with(&state, |s| {
+        s.set_task_category(&task_id, category_id.as_deref())
+    })
+}
+
+#[tauri::command]
+fn get_work_report(
+    state: State<'_, AppState>,
+    date: String,
+    period: String,
+    tz: String,
+) -> Res<WorkReport> {
+    with(&state, |s| s.get_work_report(&date, &period, &tz))
+}
+
 // ─── Focus wallpapers ──────────────────────────────────────────────────
 //
 // Three thin commands over `fruit_core::wallpaper`, which holds the rules —
@@ -1169,6 +1263,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        // Launch at login (§ "whenever you start your PC").
+        //
+        // `--autostart` is passed so the app can tell a login launch from a
+        // double-click. A tracker that opens a window on top of whatever you
+        // were doing every time you boot is a tracker you uninstall, so a
+        // login launch starts to the tray and observation begins there —
+        // see `is_autostart_launch` below.
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .plugin(
             tauri_plugin_log::Builder::new()
                 // 5 files × 2MB, info in release (§7.2). Task titles and note
@@ -1183,6 +1288,18 @@ pub fn run() {
         )
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Launched by the OS at login: start to the tray rather than
+            // putting a window on top of whatever the user opened their machine
+            // to do. Observation begins either way — the window is the part
+            // nobody asked for, and a tracker that steals focus every boot is a
+            // tracker that gets its autostart turned off within a week.
+            if is_autostart_launch() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
             let db_path = data_dir(&handle).join("fruit.db");
 
             let mut store = match Store::open(&db_path) {
@@ -1306,6 +1423,14 @@ pub fn run() {
             get_rrule_presets,
             import_ics,
             pick_ics_file,
+            get_autostart,
+            set_autostart,
+            get_task_categories,
+            create_task_category,
+            update_task_category,
+            delete_task_category,
+            set_task_category,
+            get_work_report,
             get_wallpapers,
             read_wallpaper,
             pick_wallpaper_dir,

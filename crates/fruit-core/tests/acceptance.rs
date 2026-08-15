@@ -788,6 +788,203 @@ fn d6_export_import_round_trips_exactly() {
     assert_eq!(fresh.export_json(TZ).unwrap()["tasks"], before["tasks"]);
 }
 
+/// The work report: five questions, one range, one round trip.
+#[test]
+fn the_work_report_answers_all_five_questions() {
+    // A Wednesday, so the week has days either side of it.
+    let (mut store, clock) = store_at(at(2025, 7, 30, 8, 0));
+    let cats = store.get_task_categories().unwrap();
+    assert!(
+        cats.len() >= 5,
+        "migration 0013 should seed the starter categories"
+    );
+    let coding = cats.iter().find(|c| c.name == "Coding").unwrap().id.clone();
+    let meeting = cats.iter().find(|c| c.name == "Meeting").unwrap().id.clone();
+
+    let project = store
+        .create_project(NewProject {
+            name: "Ledger".into(),
+            colour: None,
+            kind: None,
+            weekly_target_sec: None,
+        })
+        .unwrap();
+    let build = store
+        .create_task(NewTask {
+            title: "Build the thing".into(),
+            project_id: Some(project.id.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+    let standup = task(&mut store, "Standup");
+    // Deliberately left uncategorised and unassigned to a project, so both
+    // fallback buckets are exercised.
+    let odds = task(&mut store, "Odds and ends");
+
+    store.set_task_category(&build.id, Some(&coding)).unwrap();
+    store.set_task_category(&standup.id, Some(&meeting)).unwrap();
+
+    // 2h coding, 30m meeting, 15m uncategorised — all on the Wednesday.
+    for (t, minutes) in [(&build.id, 120), (&standup.id, 30), (&odds.id, 15)] {
+        store.start_timer(t, None).unwrap();
+        clock.advance(minutes * 60_000);
+        store.stop_timer().unwrap();
+    }
+
+    // A six-hour weekday target.
+    store
+        .set_goal(
+            NewGoal {
+                subject_kind: Some(GoalSubject::Metric),
+                subject_id: fruit_core::model::metric::ALL_WORK.into(),
+                period: Some("day".into()),
+                direction: Some(GoalDirection::AtLeast),
+                target_sec: 6 * 3600,
+                applies_days: Some(0b0011111),
+            },
+            "2025-07-30",
+        )
+        .unwrap();
+
+    // A focus session that ran short of its plotted length.
+    store.start_focus(&build.id, Some(45)).unwrap();
+    clock.advance(20 * 60_000);
+    store.stop_timer().unwrap();
+
+    let day = store.get_work_report("2025-07-30", "day", TZ).unwrap();
+
+    // 1. Work hours, and the target it is measured against.
+    assert_eq!(day.period, "day");
+    assert_eq!(day.days.len(), 1);
+    assert_eq!(day.total_work_sec, (120 + 30 + 15 + 20) * 60);
+    assert_eq!(day.target_sec, Some(6 * 3600));
+    assert_eq!(day.target_days_applicable, Some(1));
+    // 3h05 against a 6h target: applicable, and not met.
+    assert_eq!(day.target_days_met, Some(0));
+    assert!(day.days[0].target_applies, "Wednesday is a weekday");
+
+    // 2. Split by kind of work. The uncategorised bucket is present, because
+    //    the shares have to add up to the total.
+    let cat = |name: &str| {
+        day.by_category
+            .iter()
+            .find(|s| s.name == name)
+            .map(|s| s.seconds)
+    };
+    assert_eq!(cat("Coding"), Some((120 + 20) * 60));
+    assert_eq!(cat("Meeting"), Some(30 * 60));
+    assert_eq!(cat("Uncategorised"), Some(15 * 60));
+    let summed: i64 = day.by_category.iter().map(|s| s.seconds).sum();
+    assert_eq!(
+        summed, day.total_work_sec,
+        "the split must account for every second of the total, exactly once"
+    );
+
+    // 3. Split by project, with the same rule for work that has none.
+    let proj = |name: &str| {
+        day.by_project
+            .iter()
+            .find(|s| s.name == name)
+            .map(|s| s.seconds)
+    };
+    assert_eq!(proj("Ledger"), Some((120 + 20) * 60));
+    assert_eq!(proj("No project"), Some((30 + 15) * 60));
+    assert_eq!(
+        day.by_project.iter().map(|s| s.seconds).sum::<i64>(),
+        day.total_work_sec
+    );
+
+    // 4. Focus sessions: one, plotted for 45m, run for 20m — and *not* counted
+    //    as completed, because it did not run its length.
+    assert_eq!(day.focus.sessions, 1);
+    assert_eq!(day.focus.planned_sec, 45 * 60);
+    assert_eq!(day.focus.tracked_sec, 20 * 60);
+    assert_eq!(day.focus.completed, 0);
+
+    // 5. Apps used. Nothing was observed in this fixture, and an empty list is
+    //    the honest answer rather than a fabricated one.
+    assert!(day.apps.is_empty());
+
+    // The week contains the day, and the days sum to the week's total — the
+    // property that makes the graph trustworthy.
+    let week = store.get_work_report("2025-07-30", "week", TZ).unwrap();
+    assert_eq!(week.days.len(), 7);
+    assert_eq!(week.from, "2025-07-28");
+    assert_eq!(week.to, "2025-08-03");
+    assert_eq!(week.total_work_sec, day.total_work_sec);
+    assert_eq!(
+        week.days.iter().map(|d| d.work_sec).sum::<i64>(),
+        week.total_work_sec
+    );
+    // Mon–Fri applicable, and only the days that have happened are counted —
+    // Thursday and Friday have not, and a day that has not arrived is not a
+    // day you failed to work six hours on.
+    assert_eq!(week.target_days_applicable, Some(3));
+    assert_eq!(week.days.iter().filter(|d| d.target_applies).count(), 5);
+
+    // A month is the same shape with different bounds.
+    let month = store.get_work_report("2025-07-30", "month", TZ).unwrap();
+    assert_eq!((month.from.as_str(), month.to.as_str()), ("2025-07-01", "2025-07-31"));
+    assert_eq!(month.days.len(), 31);
+    assert_eq!(month.total_work_sec, day.total_work_sec);
+
+    // December is the rollover case a naive `month + 1` gets wrong.
+    let december = store.get_work_report("2025-12-14", "month", TZ).unwrap();
+    assert_eq!((december.from.as_str(), december.to.as_str()), ("2025-12-01", "2025-12-31"));
+}
+
+/// A category is a taxonomy, so deleting one frees its tasks rather than
+/// destroying them — and never touches the time recorded against them.
+#[test]
+fn deleting_a_category_frees_its_tasks_and_keeps_their_time() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let mine = store.create_task_category("Ops", Some("#123456")).unwrap();
+    assert!(!mine.is_builtin);
+
+    let t = task(&mut store, "Rotate the certs");
+    store.set_task_category(&t.id, Some(&mine.id)).unwrap();
+    store.start_timer(&t.id, None).unwrap();
+    clock.advance(40 * 60_000);
+    store.stop_timer().unwrap();
+
+    // Two categories cannot share a name — a split report is a bug report.
+    assert!(store.create_task_category("ops", None).is_err());
+
+    // Renaming a built-in makes it the user's, so it stops claiming to be ours.
+    let coding = store
+        .get_task_categories()
+        .unwrap()
+        .into_iter()
+        .find(|c| c.name == "Coding")
+        .unwrap();
+    let renamed = store
+        .update_task_category(&coding.id, Some("Engineering"), None)
+        .unwrap();
+    assert_eq!(renamed.name, "Engineering");
+    assert!(!renamed.is_builtin);
+
+    let freed = store.delete_task_category(&mine.id).unwrap();
+    assert_eq!(freed, 1);
+    assert!(!store
+        .get_task_categories()
+        .unwrap()
+        .iter()
+        .any(|c| c.id == mine.id));
+
+    // The task is still there, still open, and still carries its 40 minutes.
+    let report = store.get_work_report("2025-07-30", "day", TZ).unwrap();
+    assert_eq!(report.total_work_sec, 40 * 60);
+    assert_eq!(
+        report
+            .by_category
+            .iter()
+            .find(|s| s.name == "Uncategorised")
+            .map(|s| s.seconds),
+        Some(40 * 60),
+        "freed time lands in the uncategorised bucket, not nowhere"
+    );
+}
+
 /// Reassigning a record to a different task — the commonest correction there
 /// is, and the one the Day view had no control for.
 #[test]

@@ -60,7 +60,9 @@ export interface TaskRow {
   firstSessionAt: Millis | null;
   lastSessionAt: Millis | null;
   createdAt: Millis;
-  updatedAt: Millis;
+  updatedAt: Millis;  /** What kind of work this is (migration 0013). One per task, which is what
+   *  makes the split in Reports → Work add up to the total exactly once. */
+  categoryId: string | null;
 }
 
 export interface BlockRow {
@@ -255,15 +257,24 @@ export interface GoalRow {
   subjectName: string;
   direction: GoalDirection;
   targetSec: number;
+  /** `day` | `week` | `month`. Part of a goal's identity, not a display
+   *  detail: a daily and a weekly target on the same subject are two coherent
+   *  claims, not a contradiction. */
+  period: GoalPeriod;
   /** Bitmask, Monday = 1 … Sunday = 64. */
   appliesDays: number;
   startsWeek: string;
   endsWeek: string | null;
 }
 
+export type GoalPeriod = "day" | "week" | "month";
+
 export interface NewGoal {
   subjectKind?: GoalSubject;
   subjectId: string;
+  /** Defaults to `week`, which is what every goal written before this existed
+   *  was. */
+  period?: GoalPeriod;
   direction?: GoalDirection;
   targetSec: number;
   appliesDays?: number | null;
@@ -765,6 +776,83 @@ export interface ResetSummary {
   activitySpans: number;
   /** The snapshot taken immediately before the delete. */
   backupPath: string | null;
+}
+
+/** A kind of work — "Coding", "Design", "Meeting" (migration 0013).
+ *  One per task, which is what makes the split add to the total exactly once. */
+export interface TaskCategoryRow {
+  id: string;
+  name: string;
+  colour: string;
+  sortRank: number;
+  isBuiltin: boolean;
+  /** Live tasks carrying it, so a delete can say what it frees. */
+  taskCount: number;
+  createdAt: Millis;
+  updatedAt: Millis;
+}
+
+export type WorkPeriod = "day" | "week" | "month";
+
+/** The five work reports over one range, in one round trip. */
+export interface WorkReport {
+  from: LocalDate;
+  to: LocalDate;
+  tz: string;
+  period: WorkPeriod;
+  totalWorkSec: number;
+  /** The live daily target, if one is set. */
+  targetSec: number | null;
+  /** Days on which the target applied *and had happened*, and how many were
+   *  met. `null` when there is no target — "0 of 0" is not a fact. */
+  targetDaysMet: number | null;
+  targetDaysApplicable: number | null;
+  /** One entry per date, oldest first, always complete: a day with no work is
+   *  a zero, never a missing point. */
+  days: WorkDay[];
+  byCategory: WorkSlice[];
+  byProject: WorkSlice[];
+  focus: FocusSummary;
+  apps: AppUsage[];
+}
+
+export interface WorkDay {
+  date: LocalDate;
+  workSec: number;
+  targetApplies: boolean;
+  focusSec: number;
+}
+
+/** A named share of the work total — the same shape for categories and
+ *  projects, because it is the same chart. */
+export interface WorkSlice {
+  /** `null` is the uncategorised / no-project bucket, always shown so the
+   *  shares add up to the total. */
+  id: string | null;
+  name: string;
+  colour: string;
+  seconds: number;
+  share: number;
+}
+
+export interface FocusSummary {
+  sessions: number;
+  /** What the sessions were plotted for… */
+  plannedSec: number;
+  /** …and what they actually cost. The gap is the same drift the rest of the
+   *  app is built around. */
+  trackedSec: number;
+  longestSec: number;
+  completed: number;
+}
+
+export interface AppUsage {
+  appId: string;
+  name: string;
+  seconds: number;
+  share: number;
+  /** Stamped at write time, never recomputed on read. */
+  category: string | null;
 }
 
 /** One image in the Focus wallpaper folder. `name` is the handle every

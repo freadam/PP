@@ -858,6 +858,17 @@ impl Store {
                 ..Default::default()
             })
             .ok();
+        // Marked, so "how many focus sessions this week, for how long" has a
+        // query. Stamped after the insert rather than threaded through
+        // `NewBlock`: a focus block is an ordinary block in every way the
+        // planner, the reconciler and the drift rail care about, and the only
+        // thing that differs is how it was started (migration 0013).
+        if let Some(block) = &block {
+            self.conn.execute(
+                "UPDATE scheduled_block SET is_focus = 1 WHERE id = ?1",
+                [&block.id],
+            )?;
+        }
 
         let state = self.start_timer(task_id, block.as_ref().map(|b| b.id.as_str()))?;
         self.set_setting(

@@ -36,11 +36,13 @@ mod recurrence;
 mod reports;
 mod search;
 mod seed;
+mod task_categories;
 mod tasks;
 mod timer;
 mod week;
 mod import;
 mod week_report;
+mod work_report;
 
 pub use activity::{
     ENABLED as ACTIVITY_ENABLED, MIN_SPAN_SEC as ACTIVITY_MIN_SPAN_SEC,

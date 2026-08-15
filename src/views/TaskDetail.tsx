@@ -6,12 +6,12 @@
  * until the user confirms them.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
 import { Note } from "../components/Note";
-import type { SessionRow } from "../lib/types";
+import type { SessionRow, TaskCategoryRow } from "../lib/types";
 
 export function TaskDetail({ mode }: { mode: "column" | "sheet" }) {
   const detail = useApp((s) => s.detail);
@@ -119,12 +119,23 @@ function TitleField() {
 function Fields() {
   const detail = useApp((s) => s.detail)!;
   const projects = useApp((s) => s.projects);
+  const [kinds, setKinds] = useState<TaskCategoryRow[]>([]);
+
+  useEffect(() => {
+    void ipc
+      .getTaskCategories()
+      .then(setKinds)
+      .catch(() => setKinds([]));
+  }, []);
 
   const patch = async (p: Parameters<typeof ipc.updateTask>[1]) => {
     const { run, refresh } = useApp.getState();
     await run(() => ipc.updateTask(detail.task.id, p), "Couldn't save that change.");
     await refresh();
   };
+
+  const run = useApp((s) => s.run);
+  const refresh = useApp((s) => s.refresh);
 
   return (
     <div className="stack" style={{ marginBottom: 16 }}>
@@ -193,6 +204,34 @@ function Fields() {
           <option value={1}>Low</option>
           <option value={2}>Medium</option>
           <option value={3}>High</option>
+        </select>
+      </div>
+
+      <div className="row">
+        <label className="label" style={{ width: 76, color: "var(--muted)" }} htmlFor="d-kind">
+          Kind
+        </label>
+        {/* One per task, not a tag: the split in Reports → Work has to add to
+            the work total exactly once, and a task carrying three tags has no
+            single answer. The list is editable in Settings → Work. */}
+        <select
+          id="d-kind"
+          className="grow"
+          value={detail.task.categoryId ?? ""}
+          onChange={async (e) => {
+            await run(
+              () => ipc.setTaskCategory(detail.task.id, e.target.value || null),
+              "Couldn't set that.",
+            );
+            await refresh();
+          }}
+        >
+          <option value="">Uncategorised</option>
+          {kinds.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
       </div>
 

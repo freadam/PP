@@ -35,6 +35,9 @@ import type {
   IntegrityReport,
   ResetSummary,
   WallpaperFolder,
+  TaskCategoryRow,
+  WorkPeriod,
+  WorkReport,
   LocalDate,
   Millis,
   NewTask,
@@ -297,6 +300,39 @@ export const runIntegrityCheck = () => call<IntegrityReport>("run_integrity_chec
 
 /** Empties the database of everything the user recorded. Snapshots first. */
 export const resetAllData = () => call<ResetSummary>("reset_all_data", {});
+
+/* ─── launch at login ───────────────────────────────────────────────────
+   Coverage, not convenience: observation only records while Fruit is running,
+   so a morning that starts with "I forgot to open it" has a hole no amount of
+   reconciling can fill honestly. */
+
+export const getAutostart = () => call<boolean>("get_autostart", {});
+
+export const setAutostart = (enabled: boolean) => call<boolean>("set_autostart", { enabled });
+
+/* ─── kinds of work, and the work report ────────────────────────────────── */
+
+export const getTaskCategories = () => call<TaskCategoryRow[]>("get_task_categories", {});
+
+export const createTaskCategory = (name: string, colour?: string) =>
+  call<TaskCategoryRow>("create_task_category", { name, colour: colour ?? null });
+
+export const updateTaskCategory = (id: string, name?: string, colour?: string) =>
+  call<TaskCategoryRow>("update_task_category", {
+    id,
+    name: name ?? null,
+    colour: colour ?? null,
+  });
+
+/** Returns how many tasks were freed. Their time is untouched. */
+export const deleteTaskCategory = (id: string) => call<number>("delete_task_category", { id });
+
+export const setTaskCategory = (taskId: string, categoryId: string | null) =>
+  call<void>("set_task_category", { taskId, categoryId });
+
+/** All five work reports for one date's day, ISO week, or calendar month. */
+export const getWorkReport = (date: LocalDate, period: WorkPeriod, tz: string) =>
+  call<WorkReport>("get_work_report", { date, period, tz });
 
 /* ─── Focus wallpapers ──────────────────────────────────────────────────
    The renderer holds file *names*, never paths. Rust joins each name to the

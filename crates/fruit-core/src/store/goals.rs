@@ -58,14 +58,15 @@ fn map_goal(r: &Row) -> rusqlite::Result<GoalRow> {
         subject_name: String::new(),
         direction: GoalDirection::parse(&direction).unwrap_or(GoalDirection::AtLeast),
         target_sec: r.get(4)?,
-        applies_days: r.get(5)?,
-        starts_week: r.get(6)?,
-        ends_week: r.get(7)?,
+        period: r.get(5)?,
+        applies_days: r.get(6)?,
+        starts_week: r.get(7)?,
+        ends_week: r.get(8)?,
     })
 }
 
 const GOAL_COLS: &str =
-    "id, subject_kind, subject_id, direction, target_sec, applies_days, starts_week, ends_week";
+    "id, subject_kind, subject_id, direction, target_sec, period, applies_days, starts_week, ends_week";
 
 /// The wording a metric goal is displayed with. In Rust because the renderer
 /// re-deriving it would be a second list, drifting the day either changed.
@@ -148,6 +149,16 @@ impl Store {
         }
         self.check_subject(kind, &input.subject_id)?;
 
+        // A goal's period is part of its identity (migration 0013): a daily and
+        // a weekly target on the same subject are two coherent claims, so only
+        // a same-period goal is closed when a new one is set.
+        let period = input.period.as_deref().unwrap_or("week");
+        if !matches!(period, "day" | "week" | "month") {
+            return Err(AppError::invalid(format!(
+                "'{period}' isn't a goal period. Use day, week or month."
+            )));
+        }
+
         let week = iso_week(today)?;
         let now = self.now();
         let tx = self.conn.transaction()?;
@@ -155,21 +166,23 @@ impl Store {
         // every other "the record keeps what it was told" rule here.
         tx.execute(
             "UPDATE goal SET ends_week = ?3, updated_at = ?4
-              WHERE subject_kind = ?1 AND subject_id = ?2 AND ends_week IS NULL",
-            params![kind.as_str(), input.subject_id, week, now],
+              WHERE subject_kind = ?1 AND subject_id = ?2 AND period = ?5
+                AND ends_week IS NULL",
+            params![kind.as_str(), input.subject_id, week, now, period],
         )?;
         let id = new_id();
         tx.execute(
             "INSERT INTO goal
-               (id, subject_kind, subject_id, direction, target_sec, applies_days,
+               (id, subject_kind, subject_id, direction, target_sec, period, applies_days,
                 starts_week, device_id, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?9)",
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)",
             params![
                 id,
                 kind.as_str(),
                 input.subject_id,
                 direction.as_str(),
                 input.target_sec,
+                period,
                 applies,
                 week,
                 self.device_id,
@@ -454,7 +467,17 @@ impl Store {
         let (applicable, elapsed, left) = week_shape(from, today, goal.applies_days)?;
         // The future is never a shortfall: expected is pro-rated over the days
         // that have *happened*, so Monday morning expects nothing.
-        let expected_sec = if applicable > 0 {
+        //
+        // A **daily** goal is deliberately exempt from the pro-rating. There is
+        // no honest way to spread six hours of work across a day — nobody works
+        // a uniform 25% of every hour — so pro-rating within the day would
+        // report "behind" at 09:40 to someone who is simply not finished yet.
+        // That is the same mistake as calling a fresh August "6% accounted",
+        // which this codebase already refuses to make elsewhere. A daily goal
+        // expects its full target by the end of the day and nothing before it.
+        let expected_sec = if goal.period == "day" {
+            0
+        } else if applicable > 0 {
             (goal.target_sec as f64 * (elapsed as f64 / applicable as f64)).round() as i64
         } else {
             0
@@ -628,6 +651,7 @@ mod tests {
             NewGoal {
                 subject_kind: Some(GoalSubject::Metric),
                 subject_id: metric.into(),
+                period: None,
                 direction: Some(direction),
                 target_sec: hours * 3600,
                 applies_days: None,
@@ -711,6 +735,7 @@ mod tests {
             NewGoal {
                 subject_kind: Some(GoalSubject::Metric),
                 subject_id: metric::ALL_WORK.into(),
+                period: None,
                 direction: Some(GoalDirection::AtLeast),
                 target_sec: 10 * 3600,
                 applies_days: Some(0b0011111),
@@ -757,6 +782,7 @@ mod tests {
                 NewGoal {
                     subject_kind: Some(GoalSubject::Metric),
                     subject_id: id.into(),
+                period: None,
                     direction: Some(GoalDirection::AtLeast),
                     target_sec: target,
                     applies_days: days,
@@ -855,6 +881,7 @@ mod tests {
             NewGoal {
                 subject_kind: Some(c.subject_kind),
                 subject_id: c.subject_id.clone(),
+                period: None,
                 direction: Some(c.direction),
                 target_sec: c.suggested_sec,
                 applies_days: None,

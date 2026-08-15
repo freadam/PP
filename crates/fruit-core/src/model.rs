@@ -115,6 +115,10 @@ pub struct TaskRow {
     /// Derived from `time_session`, like everything else about tracked time.
     pub first_session_at: Option<Millis>,
     pub last_session_at: Option<Millis>,
+    /// What kind of work this is — "Coding", "Meeting" (migration 0013). One
+    /// per task, which is what makes the split in the work report add to the
+    /// total exactly once.
+    pub category_id: Option<String>,
     pub created_at: Millis,
     pub updated_at: Millis,
 }
@@ -1093,6 +1097,11 @@ pub struct GoalRow {
     pub subject_name: String,
     pub direction: GoalDirection,
     pub target_sec: i64,
+    /// `day` | `week` | `month` (migration 0013). A daily and a weekly target
+    /// on the same subject are not a contradiction — "6h a day, and no more
+    /// than 32h a week" is a coherent pair — so the period is part of a goal's
+    /// identity, not a display detail.
+    pub period: String,
     /// Bitmask, Monday = 1 … Sunday = 64.
     pub applies_days: i64,
     pub starts_week: String,
@@ -1104,6 +1113,9 @@ pub struct GoalRow {
 pub struct NewGoal {
     pub subject_kind: Option<GoalSubject>,
     pub subject_id: String,
+    /// `day` | `week` | `month`. Defaults to `week`, which is what every goal
+    /// written before migration 0013 was.
+    pub period: Option<String>,
     pub direction: Option<GoalDirection>,
     pub target_sec: i64,
     pub applies_days: Option<i64>,
@@ -1554,6 +1566,109 @@ pub struct ImportSummary {
     pub blocks: i64,
     pub sessions: i64,
     pub skipped: i64,
+}
+
+// ─── kinds of work (migration 0013) ────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskCategoryRow {
+    pub id: String,
+    pub name: String,
+    pub colour: String,
+    pub sort_rank: f64,
+    /// Shipped rather than typed. Cleared the moment the user renames it.
+    pub is_builtin: bool,
+    /// Live tasks carrying this category, so a delete can say what it frees.
+    pub task_count: i64,
+    pub created_at: Millis,
+    pub updated_at: Millis,
+}
+
+// ─── the work report (migration 0013) ──────────────────────────────────
+
+/// The five work reports, over one range, in one round trip.
+///
+/// One bundle rather than five commands because they are always read together
+/// and they share a range: five calls would mean five range parses, five
+/// timezone resolutions, and five chances for the panels on one screen to
+/// disagree about which week it is.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkReport {
+    pub from: String,
+    pub to: String,
+    pub tz: String,
+    /// `day` | `week` | `month` — what the caller asked for, echoed back so the
+    /// renderer never has to re-derive which button is pressed.
+    pub period: String,
+    /// Confirmed work in the range, and the daily target it is measured
+    /// against when one is set.
+    pub total_work_sec: i64,
+    pub target_sec: Option<i64>,
+    /// Days in the range on which the daily target applied and was met. `None`
+    /// when there is no daily target — "0 of 0 days met" is not a fact.
+    pub target_days_met: Option<i64>,
+    pub target_days_applicable: Option<i64>,
+    /// One entry per local date in the range, oldest first. Always complete —
+    /// a day with no work is a zero, never a missing point, or the graph draws
+    /// a straight line through a week off.
+    pub days: Vec<WorkDay>,
+    pub by_category: Vec<WorkSlice>,
+    pub by_project: Vec<WorkSlice>,
+    pub focus: FocusSummary,
+    pub apps: Vec<AppUsage>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkDay {
+    pub date: String,
+    pub work_sec: i64,
+    /// Whether the daily target applied on this weekday, so the graph can draw
+    /// the target line only where it means something.
+    pub target_applies: bool,
+    pub focus_sec: i64,
+}
+
+/// A named share of the work total. Used for both the category and project
+/// splits, because they are the same shape and the same chart.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkSlice {
+    /// `None` is the uncategorised / no-project bucket, which is always shown.
+    /// Hiding it would make the percentages add to less than the total and
+    /// leave the user unable to find the time that went missing.
+    pub id: Option<String>,
+    pub name: String,
+    pub colour: String,
+    pub seconds: i64,
+    pub share: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusSummary {
+    pub sessions: i64,
+    /// What the sessions were *plotted* for.
+    pub planned_sec: i64,
+    /// What was actually tracked against them. The pair is the point: a focus
+    /// session is an intention, and the gap between the two is the same drift
+    /// the rest of the app is built around.
+    pub tracked_sec: i64,
+    pub longest_sec: i64,
+    pub completed: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppUsage {
+    pub app_id: String,
+    pub name: String,
+    pub seconds: i64,
+    pub share: f64,
+    /// The verdict stamped on the spans at write time — never recomputed here.
+    pub category: Option<String>,
 }
 
 /// What `reset_all_data` removed. Counted *before* the delete, because the

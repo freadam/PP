@@ -15,8 +15,10 @@ import type {
   ConnectorStatus,
   IntegrityReport,
   MatchKind,
+  GoalRow,
   ObservationCategory,
   ResetSummary,
+  TaskCategoryRow,
 } from "../lib/types";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -70,6 +72,253 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </div>
     </div>
   );
+}
+
+/**
+ * Launch at login.
+ *
+ * Coverage, not convenience. Observation only records while Fruit is running,
+ * so a morning that starts with "I forgot to open it" leaves a hole no amount
+ * of reconciling can honestly fill — and 90%-of-waking-hours, the number the
+ * whole product is measured by, is unreachable without this.
+ *
+ * A login launch starts to the tray. A tracker that puts a window on top of
+ * whatever you opened your machine to do is a tracker whose autostart gets
+ * turned off within a week.
+ */
+function StartAtLogin() {
+  const run = useApp((s) => s.run);
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void ipc
+      .getAutostart()
+      .then(setEnabled)
+      .catch(() => setEnabled(null));
+  }, []);
+
+  return (
+    <Field
+      label="Start with Windows"
+      hint="Fruit opens to the tray when you log in and begins observing straight away — no window, no focus stolen. This is what makes a day's record complete: nothing is recorded while the app is closed, and a morning you forgot to open it is a gap that cannot be reconciled honestly afterwards."
+    >
+      {enabled === null ? (
+        <span className="caption">
+          Not available in browser preview — this writes a real startup entry.
+        </span>
+      ) : (
+        <Switch
+          checked={enabled}
+          label="Start Fruit when you log in"
+          onChange={async (next) => {
+            const now = await run(() => ipc.setAutostart(next), "Couldn't change that.");
+            if (now !== null) setEnabled(now);
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
+/** Monday = 1 … Sunday = 64, the bitmask `goal.applies_days` uses. */
+const WEEKDAYS = [
+  { bit: 1, label: "M" },
+  { bit: 2, label: "T" },
+  { bit: 4, label: "W" },
+  { bit: 8, label: "T" },
+  { bit: 16, label: "F" },
+  { bit: 32, label: "S" },
+  { bit: 64, label: "S" },
+];
+
+/**
+ * A daily work target — "at least six hours, on a weekday".
+ *
+ * A goal with `period: "day"`, so it reuses the whole goal machinery rather
+ * than becoming a second kind of target with its own progress rules.
+ *
+ * The day mask is the part that stops this being annoying. A flat seven-day
+ * target reports you two days behind every Monday morning because you did not
+ * work at the weekend, which teaches you to ignore it. And unlike the weekly
+ * goals, a daily one is **not** pro-rated through the day: there is no honest
+ * way to spread six hours across the hours of a day, so it expects its whole
+ * target by the end and nothing before it.
+ */
+function DailyWorkTarget() {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const [target, setTarget] = useState<GoalRow | null>(null);
+  const [hours, setHours] = useState("6");
+  const [days, setDays] = useState(0b0011111);
+  const [loaded, setLoaded] = useState(false);
+
+  const load = async () => {
+    const goals = await ipc.getGoals(false).catch(() => null);
+    setLoaded(true);
+    if (!goals) return;
+    const live = goals.find((g) => g.period === "day" && g.subjectId === "allWork") ?? null;
+    setTarget(live);
+    if (live) {
+      setHours(String(Math.round((live.targetSec / 3600) * 100) / 100));
+      setDays(live.appliesDays);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const save = async () => {
+    const value = Number(hours);
+    if (!Number.isFinite(value) || value <= 0 || value > 24) {
+      toast("A daily target has to be between 0 and 24 hours.", { tone: "danger" });
+      return;
+    }
+    const saved = await run(
+      () =>
+        ipc.setGoal(
+          {
+            subjectKind: "metric",
+            subjectId: "allWork",
+            period: "day",
+            direction: "atLeast",
+            targetSec: Math.round(value * 3600),
+            appliesDays: days,
+          },
+          fmt.today(),
+        ),
+      "Couldn't save that target.",
+    );
+    if (saved) {
+      setTarget(saved);
+      toast(`Daily work target set to ${fmt.duration(saved.targetSec)}.`);
+    }
+  };
+
+  return (
+    <Field
+      label="Daily work target"
+      hint="Reports → Work measures each day against this, and the graph draws it as a line across the days it applies to. Only days that have already happened count towards 'met' — a Friday that has not arrived is not a day you failed. It is not pro-rated through the day either: there is no honest way to spread six hours across the hours of a morning, so it expects the whole target by the end and nothing before it."
+    >
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <input
+          type="number"
+          min="0.5"
+          max="24"
+          step="0.5"
+          value={hours}
+          aria-label="Hours of work a day"
+          onChange={(e) => setHours(e.target.value)}
+          style={{ width: 80 }}
+        />
+        <span className="caption">hours a day, on</span>
+        <div className="segmented" role="group" aria-label="Days the target applies to">
+          {WEEKDAYS.map((d, i) => (
+            <button
+              key={i}
+              className="btn"
+              aria-pressed={(days & d.bit) !== 0}
+              aria-label={`${["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][i]}`}
+              // At least one day, always: a target that applies to no day is a
+              // row in the database and nothing on any screen.
+              onClick={() => setDays((v) => (v ^ d.bit) || d.bit)}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+        <button className="btn btn-primary" onClick={() => void save()}>
+          {target ? "Update" : "Set target"}
+        </button>
+      </div>
+      {loaded && !target && (
+        <span className="caption">
+          No daily target yet. Reports → Work shows the hours either way; a target adds the line
+          and the "3 of 5 days met" reading.
+        </span>
+      )}
+    </Field>
+  );
+}
+
+/**
+ * Kinds of work — "Coding", "Design", "Meeting".
+ *
+ * One per task, which is the whole reason the split in Reports → Work adds to
+ * the total exactly once. Tags stay for slicing; this is for grouping.
+ *
+ * Deleting frees rather than destroys: the tasks become uncategorised and not
+ * one second of recorded time moves. The confirmation says how many tasks it
+ * will free, because "delete Meeting" is a different decision when the answer
+ * is 2 than when it is 60.
+ */
+function WorkKinds() {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const [cats, setCats] = useState<TaskCategoryRow[]>([]);
+  const [name, setName] = useState("");
+
+  const load = async () => {
+    const rows = await ipc.getTaskCategories().catch(() => null);
+    if (rows) setCats(rows);
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  return (
+    <Field
+      label="Kinds of work"
+      hint="What a task is, as opposed to what it is for. One per task, so the split in Reports → Work adds up to the total exactly once — that is the difference between this and a tag. Deleting one frees its tasks rather than deleting them, and no recorded time moves."
+    >
+      <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
+        {cats.map((c) => (
+          <span key={c.id} className="tag" style={{ borderColor: c.colour }}>
+            <span className="swatch" style={{ background: c.colour }} aria-hidden="true" />
+            {c.name}
+            {c.taskCount > 0 && <span className="micro data">{c.taskCount}</span>}
+            <button
+              className="btn micro"
+              aria-label={`Delete the ${c.name} kind of work`}
+              onClick={async () => {
+                const freed = await run(
+                  () => ipc.deleteTaskCategory(c.id),
+                  "Couldn't delete that.",
+                );
+                if (freed === null) return;
+                toast(
+                  freed > 0
+                    ? `Removed ${c.name}. ${freed} ${freed === 1 ? "task is" : "tasks are"} now uncategorised; their time is untouched.`
+                    : `Removed ${c.name}.`,
+                );
+                void load();
+              }}
+            >
+              Remove
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <input
+          value={name}
+          placeholder="Another kind of work…"
+          aria-label="New kind of work"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && name.trim() && void add()}
+        />
+        <button className="btn" disabled={!name.trim()} onClick={() => void add()}>
+          Add
+        </button>
+      </div>
+    </Field>
+  );
+
+  async function add() {
+    const created = await run(() => ipc.createTaskCategory(name.trim()), "Couldn't add that.");
+    if (!created) return;
+    setName("");
+    void load();
+  }
 }
 
 /**
@@ -548,6 +797,12 @@ export function Settings() {
         <Field label="Backups" hint="A VACUUM INTO snapshot on launch if the newest is over 24h old; 7 daily kept. Storing the database in Dropbox, iCloud or OneDrive is a known corruption path — don't.">
           <span className="caption">Managed automatically.</span>
         </Field>
+      </Section>
+
+      <Section title="Work">
+        <StartAtLogin />
+        <DailyWorkTarget />
+        <WorkKinds />
       </Section>
 
       <Section title="Focus">

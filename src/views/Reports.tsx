@@ -34,10 +34,15 @@ import { METRIC } from "../lib/types";
 import { DriftBar } from "../components/DriftRail";
 import { Empty } from "../components/chrome";
 import { WeekReportPanel } from "../components/WeekReportCard";
+import { WorkReports } from "./WorkReports";
 
 type Horizon = "week" | "month";
 
 export function Reports() {
+  /* Two tabs, not one longer page. "How is the month going" and "how many
+     hours did I work on what" are different questions asked at different
+     moments, and stacking eight panels would bury both. */
+  const [tab, setTab] = useState<"overview" | "work">("overview");
   const horizon = useApp((s) => s.reportHorizon);
   const setHorizon = useApp((s) => s.setReportHorizon);
   const go = useApp((s) => s.go);
@@ -59,31 +64,50 @@ export function Reports() {
   return (
     <div className="view-pad scroll-y">
       <div className="context-bar">
-        <h1 className="display">{month?.label ?? monthKey}</h1>
-        <button className="btn" aria-label="Previous month" onClick={() => shift(-1)}>
-          ‹
-        </button>
-        <button className="btn" onClick={() => setMonthKey(fmt.today().slice(0, 7))}>
-          This month
-        </button>
-        <button className="btn" aria-label="Next month" onClick={() => shift(1)}>
-          ›
-        </button>
-        <div className="segmented" role="group" aria-label="Horizon">
-          <button className="btn" onClick={() => go("day")} title="The Day screen is the day horizon">
-            Day
-          </button>
-          {(["week", "month"] as Horizon[]).map((h) => (
-            <button
-              key={h}
-              className="btn"
-              aria-pressed={horizon === h}
-              onClick={() => setHorizon(h)}
-            >
-              {h === "week" ? "Week" : "Month"}
+        <h1 className="display">{tab === "work" ? "Work" : month?.label ?? monthKey}</h1>
+        <div className="segmented" role="group" aria-label="Report">
+          {(["overview", "work"] as const).map((t) => (
+            <button key={t} className="btn" aria-pressed={tab === t} onClick={() => setTab(t)}>
+              {t === "overview" ? "Overview" : "Work"}
             </button>
           ))}
         </div>
+        {/* The month and horizon controls belong to Overview. The Work tab
+            carries its own period switcher, and leaving these on screen beside
+            it would put two range controls on one bar with only one of them
+            connected to what you are looking at. */}
+        {tab === "overview" && (
+          <>
+            <button className="btn" aria-label="Previous month" onClick={() => shift(-1)}>
+              ‹
+            </button>
+            <button className="btn" onClick={() => setMonthKey(fmt.today().slice(0, 7))}>
+              This month
+            </button>
+            <button className="btn" aria-label="Next month" onClick={() => shift(1)}>
+              ›
+            </button>
+            <div className="segmented" role="group" aria-label="Horizon">
+              <button
+                className="btn"
+                onClick={() => go("day")}
+                title="The Day screen is the day horizon"
+              >
+                Day
+              </button>
+              {(["week", "month"] as Horizon[]).map((h) => (
+                <button
+                  key={h}
+                  className="btn"
+                  aria-pressed={horizon === h}
+                  onClick={() => setHorizon(h)}
+                >
+                  {h === "week" ? "Week" : "Month"}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <span className="grow" />
         <button className="btn" onClick={() => go("import")}>
           Import a workbook
@@ -93,7 +117,13 @@ export function Reports() {
         </button>
       </div>
 
-      {horizon === "month" ? <MonthDashboard month={month} /> : <WeekReports />}
+      {tab === "work" ? (
+        <WorkReports />
+      ) : horizon === "month" ? (
+        <MonthDashboard month={month} />
+      ) : (
+        <WeekReports />
+      )}
     </div>
   );
 }
