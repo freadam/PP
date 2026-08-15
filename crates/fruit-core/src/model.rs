@@ -430,6 +430,13 @@ pub struct ManualSession {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionPatch {
+    /// Move this record to a different task.
+    ///
+    /// The commonest correction there is: the interval is right, the hour is
+    /// right, and it was filed against the wrong thing. Reassigning rather than
+    /// deleting-and-re-adding keeps the row's id, its note and its contribution
+    /// mode, so a fix costs one field instead of retyping the record.
+    pub task_id: Option<String>,
     pub started_at: Option<Millis>,
     pub ended_at: Option<Millis>,
     #[serde(default, with = "double_option")]

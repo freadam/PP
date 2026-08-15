@@ -18,6 +18,7 @@ use fruit_core::clock::SystemClock;
 use fruit_core::db::IntegrityReport;
 use fruit_core::model::*;
 use fruit_core::parser::{parse, DateOrder, ParseCtx};
+use fruit_core::wallpaper::WallpaperFolder;
 use fruit_core::xlsx::WorkbookInspection;
 use fruit_core::store::{
     IcsImportSummary, IdleReport, SeriesScope, ACTIVITY_ENABLED, ACTIVITY_PAUSED,
@@ -339,6 +340,74 @@ fn pick_ics_file(app: AppHandle) -> Res<Option<PathBuf>> {
         .add_filter("Calendar", &["ics"])
         .blocking_pick_file()
         .and_then(|f| f.into_path().ok()))
+}
+
+// ─── Focus wallpapers ──────────────────────────────────────────────────
+//
+// Three thin commands over `fruit_core::wallpaper`, which holds the rules —
+// including the containment check that stops `read_wallpaper` from becoming an
+// arbitrary-file-read primitive in a webview. The renderer never sees or sends
+// a path: it names the folder it was given and a file inside it.
+
+/// The folder Focus draws from. Created on first ask, with a README beside it.
+///
+/// Defaults to `<app data>/wallpapers` so the feature works without a setting,
+/// and honours `focus.wallpaperDir` when the user has pointed it elsewhere.
+fn wallpaper_dir(app: &AppHandle, state: &State<'_, AppState>) -> PathBuf {
+    let configured = with(state, |s| s.get_setting("focus.wallpaperDir"))
+        .ok()
+        .flatten()
+        .and_then(|v| v.as_str().map(PathBuf::from))
+        .filter(|p| !p.as_os_str().is_empty());
+    match configured {
+        Some(dir) => dir,
+        // Only the default folder is created for you. A configured path that
+        // has gone missing — an unplugged drive, a renamed folder — is reported
+        // as empty rather than silently recreated somewhere the user did not
+        // choose.
+        None => fruit_core::wallpaper::ensure_dir(&data_dir(app))
+            .unwrap_or_else(|_| data_dir(app).join("wallpapers")),
+    }
+}
+
+#[tauri::command]
+fn get_wallpapers(app: AppHandle, state: State<'_, AppState>) -> Res<WallpaperFolder> {
+    let dir = wallpaper_dir(&app, &state);
+    Ok(WallpaperFolder {
+        items: fruit_core::wallpaper::list(&dir)?,
+        dir: dir.display().to_string(),
+    })
+}
+
+#[tauri::command]
+fn read_wallpaper(app: AppHandle, state: State<'_, AppState>, name: String) -> Res<String> {
+    let dir = wallpaper_dir(&app, &state);
+    Ok(fruit_core::wallpaper::read(&dir, &name)?)
+}
+
+/// Let the user point Focus at a different folder. Returns the chosen path, or
+/// `None` if they cancelled — which is not a failure.
+#[tauri::command]
+fn pick_wallpaper_dir(app: AppHandle) -> Res<Option<PathBuf>> {
+    use tauri_plugin_dialog::DialogExt;
+    Ok(app
+        .dialog()
+        .file()
+        .blocking_pick_folder()
+        .and_then(|f| f.into_path().ok()))
+}
+
+/// Open the wallpaper folder in the system file manager. The whole feature is
+/// "put your own pictures here", so getting *there* has to be one click.
+#[tauri::command]
+fn reveal_wallpaper_dir(app: AppHandle, state: State<'_, AppState>) -> Res<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = wallpaper_dir(&app, &state);
+    let _ = std::fs::create_dir_all(&dir);
+    app.opener()
+        .reveal_item_in_dir(&dir)
+        .map_err(|e| AppError::invalid(format!("Couldn't open that folder ({e}).")))?;
+    Ok(())
 }
 
 // ─── activity (§3.5, P2) ───────────────────────────────────────────────
@@ -1237,6 +1306,10 @@ pub fn run() {
             get_rrule_presets,
             import_ics,
             pick_ics_file,
+            get_wallpapers,
+            read_wallpaper,
+            pick_wallpaper_dir,
+            reveal_wallpaper_dir,
             get_activity_settings,
             set_activity_setting,
             get_activity_day,

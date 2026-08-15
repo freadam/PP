@@ -767,6 +767,20 @@ export interface ResetSummary {
   backupPath: string | null;
 }
 
+/** One image in the Focus wallpaper folder. `name` is the handle every
+ *  wallpaper command takes — the renderer is never given a path. */
+export interface Wallpaper {
+  name: string;
+  label: string;
+  bytes: number;
+}
+
+export interface WallpaperFolder {
+  /** Display text, so Settings can say where to put files. Not accepted back. */
+  dir: string;
+  items: Wallpaper[];
+}
+
 export type CollisionPolicy = "overlap" | "push" | "shrink";
 export type IdleActionKind = "keep" | "discard" | "assignToBreak";
 export type RecoveryActionKind = "trimToHeartbeat" | "keepAll" | "discard";

@@ -1481,6 +1481,17 @@ select {
 .focus[data-bg="night"] {
   background: radial-gradient(120% 90% at 50% 20%, #1c1a2b 0%, #0b0b0b 66%);
 }
+/* A photograph from the user's own folder, drawn to cover. `background-image`
+   is set inline (it is a data URI, so it cannot live in a stylesheet); this
+   supplies everything about how it is drawn. The gradient stays underneath as
+   the ground, so a picture with transparency or a slow decode never flashes
+   white on the one screen whose whole job is to be calm. */
+.focus[data-photo="true"] {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 /* Every gradient ships with a validated scrim, so the clock holds 4.5:1
    wherever it lands on the field. */
 .focus::before {
@@ -1489,6 +1500,16 @@ select {
   inset: 0;
   background: rgb(0 0 0 / 0.3);
   pointer-events: none;
+}
+/* A photograph needs more scrim than a gradient does, and it needs it weighted
+   towards the centre where the clock is: a gradient's brightness is known and
+   validated, a holiday snap's is not. Without this the 64px clock lands on
+   whatever happened to be in the middle of the picture, and "mostly readable"
+   is not a contrast standard. */
+.focus[data-photo="true"]::before {
+  background:
+    radial-gradient(60% 50% at 50% 45%, rgb(0 0 0 / 0.62) 0%, rgb(0 0 0 / 0.34) 100%),
+    rgb(0 0 0 / 0.22);
 }
 .focus-inner {
   position: relative;
@@ -1858,7 +1879,15 @@ select {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
-  overflow: hidden;
+  /* `overflow-x` only. This carried a bare `overflow: hidden` to clip the
+     table's corners to the radius, and because it is declared after the
+     `.scroll-y` utility the element also carries, it silently won the cascade
+     and turned off vertical scrolling — while `scrollIntoView` went on
+     scrolling the container to the current hour, so the view opened at 09:00
+     with the whole morning unreachable above it. Any non-`visible` value
+     clips to the border box, so `hidden` on one axis buys the same rounded
+     corners without touching the other. */
+  overflow-x: hidden;
 }
 .day-table {
   width: 100%;

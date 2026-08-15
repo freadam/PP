@@ -788,6 +788,92 @@ fn d6_export_import_round_trips_exactly() {
     assert_eq!(fresh.export_json(TZ).unwrap()["tasks"], before["tasks"]);
 }
 
+/// Reassigning a record to a different task — the commonest correction there
+/// is, and the one the Day view had no control for.
+#[test]
+fn a_session_can_be_moved_to_another_task() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 9, 0));
+    let wrong = task(&mut store, "Filed against this by mistake");
+    let right = task(&mut store, "Where it actually belongs");
+    let b = block(&mut store, &wrong.id, at(2025, 7, 30, 9, 0), 60);
+
+    store.start_timer(&wrong.id, Some(&b.id)).unwrap();
+    clock.advance(40 * 60_000);
+    let session = store
+        .timer_state()
+        .unwrap()
+        .session
+        .expect("a running session");
+    store.stop_timer().unwrap();
+    let session = store
+        .set_session_contribution(&session.id, Some(Contribution::Attend))
+        .unwrap();
+
+    let moved = store
+        .update_session(
+            &session.id,
+            SessionPatch {
+                task_id: Some(right.id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+    assert_eq!(moved.task_id, right.id);
+    // The row survives the move: same id, and the contribution mode the user
+    // chose deliberately is still there. That is the whole reason this is a
+    // reassignment rather than a delete plus a re-add.
+    assert_eq!(moved.id, session.id);
+    assert_eq!(moved.contribution, Some(Contribution::Attend));
+    assert_eq!(moved.elapsed_sec, session.elapsed_sec);
+
+    // The block belonged to the *old* task. `block_tracked` sums every session
+    // carrying a block's id, so leaving it attached would credit the new task's
+    // minutes to the old task's plot and hang a drift rail on a block nobody
+    // worked. It detaches.
+    assert_eq!(moved.block_id, None);
+
+    // And the minutes moved with it, in both directions.
+    let tasks = store.get_tasks(TaskQuery::default()).unwrap();
+    let find = |id: &str| tasks.rows.iter().find(|t| t.id == id).unwrap().tracked_sec;
+    assert_eq!(find(&wrong.id), 0);
+    assert_eq!(find(&right.id), session.elapsed_sec);
+
+    // A block that *does* belong to the destination task is kept, because there
+    // is nothing to misattribute.
+    let b2 = block(&mut store, &right.id, at(2025, 7, 30, 14, 0), 60);
+    store
+        .update_session(
+            &moved.id,
+            SessionPatch {
+                block_id: Some(Some(b2.id.clone())),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let again = store
+        .update_session(
+            &moved.id,
+            SessionPatch {
+                task_id: Some(right.id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(again.block_id, Some(b2.id));
+
+    // A task that does not exist is refused rather than written.
+    assert!(store
+        .update_session(
+            &moved.id,
+            SessionPatch {
+                task_id: Some("01890000-0000-7000-8000-000000000000".into()),
+                ..Default::default()
+            },
+        )
+        .is_err());
+}
+
 /// The testing reset: everything the user recorded goes, the built-in taxonomy
 /// and the configuration stay, and the database is left in a state the app can
 /// keep running against rather than one that needs a restart.

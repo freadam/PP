@@ -690,6 +690,37 @@ impl Store {
                 patch.is_confirmed.unwrap_or(true) as i64
             ],
         )?;
+        if let Some(task_id) = &patch.task_id {
+            validate_id(task_id, "task")?;
+            let exists: i64 = tx.query_row(
+                "SELECT COUNT(*) FROM task WHERE id = ?1 AND deleted_at IS NULL",
+                [task_id],
+                |r| r.get(0),
+            )?;
+            if exists == 0 {
+                return Err(AppError::invalid("That task doesn't exist."));
+            }
+            tx.execute(
+                "UPDATE time_session SET task_id = ?2, updated_at = ?3 WHERE id = ?1",
+                params![id, task_id, now],
+            )?;
+            // A block belongs to a task, and `block_tracked` sums every session
+            // carrying its id — so a session moved to task B while still
+            // attached to task A's block would credit B's minutes to A's plot
+            // and put a drift rail on a block nobody worked. Moving to a
+            // different task detaches the block unless the block is the new
+            // task's own.
+            if task_id != &current.task_id {
+                tx.execute(
+                    "UPDATE time_session
+                        SET block_id = NULL, updated_at = ?2
+                      WHERE id = ?1
+                        AND block_id IS NOT NULL
+                        AND block_id NOT IN (SELECT id FROM scheduled_block WHERE task_id = ?3)",
+                    params![id, now, task_id],
+                )?;
+            }
+        }
         if let Some(block_id) = &patch.block_id {
             tx.execute(
                 "UPDATE time_session SET block_id = ?2, updated_at = ?3 WHERE id = ?1",

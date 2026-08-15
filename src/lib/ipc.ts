@@ -34,6 +34,7 @@ import type {
   IdleActionKind,
   IntegrityReport,
   ResetSummary,
+  WallpaperFolder,
   LocalDate,
   Millis,
   NewTask,
@@ -263,7 +264,15 @@ export const addSession = (input: {
 
 export const updateSession = (
   id: string,
-  patch: { startedAt?: Millis; endedAt?: Millis; blockId?: string | null; isConfirmed?: boolean },
+  patch: {
+    /** Move the record to a different task. Keeps the row, its note and its
+     *  contribution mode; detaches a block belonging to the old task. */
+    taskId?: string;
+    startedAt?: Millis;
+    endedAt?: Millis;
+    blockId?: string | null;
+    isConfirmed?: boolean;
+  },
 ) => call<SessionRow>("update_session", { id, p: patch });
 
 export const deleteSession = (id: string) => call<UndoToken>("delete_session", { id });
@@ -288,6 +297,20 @@ export const runIntegrityCheck = () => call<IntegrityReport>("run_integrity_chec
 
 /** Empties the database of everything the user recorded. Snapshots first. */
 export const resetAllData = () => call<ResetSummary>("reset_all_data", {});
+
+/* ─── Focus wallpapers ──────────────────────────────────────────────────
+   The renderer holds file *names*, never paths. Rust joins each name to the
+   configured folder and refuses anything that resolves outside it, so
+   `readWallpaper` cannot be turned into a general file read. */
+
+export const getWallpapers = () => call<WallpaperFolder>("get_wallpapers", {});
+
+/** One wallpaper as a `data:` URI, ready for a CSS background. */
+export const readWallpaper = (name: string) => call<string>("read_wallpaper", { name });
+
+export const pickWallpaperDir = () => call<string | null>("pick_wallpaper_dir", {});
+
+export const revealWallpaperDir = () => call<void>("reveal_wallpaper_dir", {});
 
 export const rebuildCaches = () => call<void>("rebuild_caches", {});
 

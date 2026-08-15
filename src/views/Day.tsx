@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useApp } from "../store/app";
+import { useApp, undoableDelete } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
 import { CONTRIBUTIONS } from "../lib/types";
@@ -706,6 +706,39 @@ function IntervalDetail({
     if (next) await reload();
   };
 
+  const moveArea = async (lifeAreaId: string) => {
+    if (owner.kind !== "life" || lifeAreaId === owner.areaId) return;
+    const next = await run(
+      () => ipc.updateLifeEntry(owner.entryId, { lifeAreaId }),
+      "Couldn't move that to a different area.",
+    );
+    if (next) await reload();
+  };
+
+  /**
+   * Give the interval back.
+   *
+   * The record is deleted and the time returns to unaccounted, which is the
+   * honest end state: the app no longer claims to know what those minutes were.
+   * It is *not* a special "unassign" — Fruit has one way to say "nothing is
+   * known here", and it is the same empty state a never-touched hour has.
+   *
+   * Undoable, like every other delete, because unlike the Settings reset this
+   * one destroys a single row and can be put straight back.
+   */
+  const clear = async () => {
+    const token =
+      owner.kind === "work"
+        ? await run(() => ipc.deleteSession(owner.sessionId), "Couldn't clear that interval.")
+        : owner.kind === "life"
+          ? await run(() => ipc.deleteLifeEntry(owner.entryId), "Couldn't clear that interval.")
+          : null;
+    if (!token) return;
+    undoableDelete(`Cleared ${fmt.clock(segment.from)}–${fmt.clock(segment.to)}`, token);
+    onClose();
+    await reload();
+  };
+
   const convert = async (lifeAreaId: string) => {
     if (owner.kind !== "work") return;
     const moved = await run(
@@ -756,6 +789,14 @@ function IntervalDetail({
             <button className="fake-input" onClick={() => void openDetail(owner.taskId)}>
               {owner.taskTitle}
             </button>
+            {/* Reassignment lives here rather than behind a delete-and-re-add:
+                the interval is right, the hour is right, and only the thing it
+                was filed against is wrong. That is the commonest correction on
+                this screen and it used to have no control at all — the task
+                was rendered read-only, so the only way out was to fill the slot
+                again with Replace ticked, which is unreachable from a slot that
+                already has a record. */}
+            <MoveToTask sessionId={owner.sessionId} currentTaskId={owner.taskId} onDone={reload} />
           </div>
           <div className="field">
             <label>Contribution</label>
@@ -794,18 +835,41 @@ function IntervalDetail({
       )}
 
       {(owner.kind === "work" || owner.kind === "life") && (
-        <SplitControl segment={segment} onDone={reload} />
+        <>
+          <SplitControl segment={segment} onDone={reload} />
+          <div className="field">
+            <label>Clear</label>
+            <button className="btn" onClick={() => void clear()}>
+              Give this interval back
+            </button>
+            <span className="caption">
+              Deletes the record and returns the time to unaccounted — the same state an hour
+              nobody has touched is in. Undoable.
+            </span>
+          </div>
+        </>
       )}
 
       {owner.kind === "life" && (
         <>
           <div className="field">
             <label>Life area</label>
-            <div className="fake-input">
-              <i className="swatch" style={{ background: owner.areaColour }} aria-hidden="true" />
-              {owner.areaName}
-              {owner.isPrivate && " · private"}
-            </div>
+            {/* A select, not a caption. The core has taken `lifeAreaId` on
+                `update_life_entry` since the table existed; this panel just
+                never offered it, so a walk filed under the wrong area could be
+                split and repeated but not corrected. */}
+            <select
+              value={owner.areaId}
+              aria-label="Life area"
+              onChange={(e) => void moveArea(e.target.value)}
+            >
+              {areas.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            {owner.isPrivate && <span className="caption">Private · nothing is recorded about it.</span>}
           </div>
           {owner.label && (
             <div className="field">
@@ -852,6 +916,109 @@ function IntervalDetail({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Move a recorded session to a different task.
+ *
+ * A filter plus a list rather than a `<select>`, because the backlog is
+ * hundreds of tasks long and a native select has no search. It is the same
+ * control the fill dialog uses to choose a task in the first place, so
+ * "record this against X" and "no, it was Y" are the same gesture.
+ *
+ * Collapsed until asked for. This sits directly under the task name, and an
+ * always-open list of forty tasks would bury the four fields below it.
+ */
+function MoveToTask({
+  sessionId,
+  currentTaskId,
+  onDone,
+}: {
+  sessionId: string;
+  currentTaskId: string;
+  onDone: () => Promise<void>;
+}) {
+  const run = useApp((s) => s.run);
+  const toast = useApp((s) => s.toast);
+  const backlog = useApp((s) => s.backlog);
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState("");
+
+  const tasks = useMemo(() => {
+    const needle = filter.trim().toLowerCase();
+    return (backlog?.tasks ?? [])
+      .filter((t) => t.id !== currentTaskId)
+      .filter((t) => !needle || t.title.toLowerCase().includes(needle))
+      .slice(0, 30);
+  }, [backlog, filter, currentTaskId]);
+
+  const move = async (taskId: string, title: string) => {
+    const next = await run(
+      () => ipc.updateSession(sessionId, { taskId }),
+      "Couldn't move that to another task.",
+    );
+    if (!next) return;
+    setOpen(false);
+    setFilter("");
+    // Said out loud, because the block quietly detaches when the destination is
+    // a different task and a silent change to the drift rail is the kind of
+    // thing that gets reported as a bug three days later.
+    toast(
+      next.blockId
+        ? `Moved to ${title}.`
+        : `Moved to ${title}. It is no longer counted against a plotted block.`,
+    );
+    await onDone();
+  };
+
+  if (!open) {
+    return (
+      <button className="btn btn-quiet" onClick={() => setOpen(true)}>
+        Move to another task…
+      </button>
+    );
+  }
+
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <div className="row">
+        <input
+          autoFocus
+          className="grow"
+          value={filter}
+          placeholder="Filter tasks…"
+          aria-label="Filter tasks"
+          onChange={(e) => setFilter(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        />
+        <button className="btn" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
+      <div className="area-grid" role="listbox" aria-label="Move to task">
+        {tasks.map((t) => (
+          <button
+            key={t.id}
+            className="btn"
+            role="option"
+            aria-selected={false}
+            onClick={() => void move(t.id, t.title)}
+          >
+            <span className="grow" style={{ textAlign: "left" }}>
+              {t.title}
+            </span>
+          </button>
+        ))}
+      </div>
+      {tasks.length === 0 && (
+        <p className="caption">
+          {backlog
+            ? "No other task matches that. Clear the filter, or create the task first — a session has to belong to something."
+            : "Tasks aren't available in browser preview."}
+        </p>
+      )}
+    </div>
   );
 }
 

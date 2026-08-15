@@ -73,6 +73,91 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /**
+ * Focus-mode wallpapers.
+ *
+ * Fruit ships no photographs. It has no licence to redistribute anyone's, and a
+ * bundled folder of "beautiful wallpapers" would mean putting other people's
+ * work inside a paid binary. So the folder is what ships: created on first ask,
+ * with a README in it explaining what to drop there and what reads well behind
+ * a clock. Everything in it is yours, read from your disk, with no network call.
+ *
+ * The folder path is shown rather than hidden, and "Open the folder" is the
+ * primary action — the whole feature is "put your own pictures here", so
+ * getting there has to be one click rather than a hunt through AppData.
+ */
+function FocusWallpapers({
+  dir,
+  onPick,
+}: {
+  dir: string | undefined;
+  onPick: (key: string, value: unknown) => Promise<void>;
+}) {
+  const run = useApp((s) => s.run);
+  const [folder, setFolder] = useState<{ dir: string; count: number } | null>(null);
+
+  const load = async () => {
+    const f = await ipc.getWallpapers().catch(() => null);
+    if (f) setFolder({ dir: f.dir, count: f.items.length });
+  };
+  useEffect(() => {
+    void load();
+    // Re-read when the configured folder changes, so the count below is never
+    // the previous folder's.
+  }, [dir]);
+
+  return (
+    <Field
+      label="Wallpapers"
+      hint="Focus mode draws one of these behind the clock instead of a phase gradient — press W in Focus, or the Photo button. Fruit ships no pictures of its own: it has no licence to redistribute photographs, so the folder starts empty and what goes in it is yours. jpg, png, webp, avif and gif, up to 16MB each. Nothing is downloaded and nothing leaves this machine."
+    >
+      <div className="row" style={{ flexWrap: "wrap" }}>
+        <button
+          className="btn btn-primary"
+          onClick={async () => {
+            const ok = await run(() => ipc.revealWallpaperDir(), "Couldn't open that folder.");
+            if (ok !== null) await load();
+          }}
+        >
+          Open the folder
+        </button>
+        <button
+          className="btn"
+          onClick={async () => {
+            const picked = await run(() => ipc.pickWallpaperDir(), "Couldn't open the picker.");
+            if (!picked) return; // cancelled is not a failure
+            await onPick("focus.wallpaperDir", picked);
+            await load();
+          }}
+        >
+          Use a different folder…
+        </button>
+        {dir && (
+          <button
+            className="btn"
+            onClick={async () => {
+              await onPick("focus.wallpaperDir", null);
+              await load();
+            }}
+          >
+            Back to the default
+          </button>
+        )}
+      </div>
+      {folder && (
+        <span className="caption">
+          {/* Named, not counted-and-hidden. "0 pictures" beside a path is a
+              complete answer; "no wallpapers found" is not. */}
+          <span className="data">{folder.dir}</span> ·{" "}
+          {folder.count === 0
+            ? "no pictures yet"
+            : `${folder.count} picture${folder.count === 1 ? "" : "s"}`}
+        </span>
+      )}
+    </Field>
+  );
+}
+
+/**
  * The testing reset — empties the database of everything you ever recorded, so
  * a run can start from nothing.
  *
@@ -463,6 +548,10 @@ export function Settings() {
         <Field label="Backups" hint="A VACUUM INTO snapshot on launch if the newest is over 24h old; 7 daily kept. Storing the database in Dropbox, iCloud or OneDrive is a known corruption path — don't.">
           <span className="caption">Managed automatically.</span>
         </Field>
+      </Section>
+
+      <Section title="Focus">
+        <FocusWallpapers dir={settings["focus.wallpaperDir"] as string | undefined} onPick={put} />
       </Section>
 
       <Section title="Testing">
