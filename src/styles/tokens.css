@@ -216,8 +216,13 @@
   --raised-active: #4a4a4a;
   --sunken: #232323;
   --hatch: #303030;
-  --line: #383838;
-  --rule: #2b2b2b;
+  --line: #3d3d3d;
+  /* Deliberately *not* #2b2b2b, which is what `--raised` is. The two were the
+     same value, and any divider drawn on a raised band was therefore invisible
+     — the today column header in the Planner rendered as a smear with no edges
+     at all, and every sticky table header lost its bottom rule. A rule has to
+     be able to sit on the surface it divides. */
+  --rule: #333333;
   --line-strong: #525252;
 
   --strong: #f8f8f8;

@@ -720,8 +720,16 @@ select {
   align-items: baseline;
   gap: var(--s-6);
 }
+/* The header above today's column. A 2px accent rather than a fill alone: the
+   fill was `--raised`, which in dark mode was the same value as `--rule`, so
+   the cell's own left border and the rule under the row both vanished into it
+   and the header read as a smear with no edges. */
 .dayname[data-today="true"] {
-  background: var(--raised);
+  background: color-mix(in srgb, var(--plot) 9%, var(--surface));
+  box-shadow: inset 0 2px 0 var(--plot);
+}
+.dayname[data-today="true"] .num {
+  color: var(--plot);
 }
 .dayname .num {
   color: var(--strong);
@@ -778,13 +786,22 @@ select {
   border-left: 1px solid var(--rule);
   min-width: 0;
 }
-/* Today is the column you came for, so it is the one that is *not* quiet:
-   the past columns recede to the subtle surface and today keeps the white. */
+/* Today is the column you came for.
+   This said `background: var(--surface)` — the same colour as the scroll
+   container behind it — so today was tinted with the exact shade of the ground
+   and was invisible. It only *looked* marked when a past column happened to sit
+   beside it; open a span that starts today and nothing was distinguishable at
+   all. It now carries a real tint, in the hue this app already uses for the
+   plan, and the dayname above carries a 2px accent so the marking never rests
+   on colour alone. */
 .day-col[data-today="true"] {
-  background: var(--surface);
+  background: color-mix(in srgb, var(--plot) 7%, var(--surface));
 }
+/* Recede, which means *darker* on a dark ground. This used `--subtle`, which
+   is lighter than the surface in dark mode, so past columns read as lifted —
+   the opposite of what they mean. */
 .day-col[data-past="true"] {
-  background: var(--subtle);
+  background: color-mix(in srgb, var(--ink) 55%, var(--surface));
 }
 
 /* The now cursor is a hairline with a gutter indicator, minute-aligned. It
