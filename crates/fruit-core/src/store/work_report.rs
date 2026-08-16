@@ -56,6 +56,8 @@ impl Store {
         // set of SQL, so a figure and the average it is compared against can
         // never be arrived at two different ways.
         report.baseline = self.baseline_for(from, period, tz)?;
+        // Written last, because several of them are about the comparison.
+        report.findings = findings_for(&report);
         Ok(report)
     }
 
@@ -143,6 +145,7 @@ impl Store {
             target_days_met: met,
             target_days_applicable: applicable,
             baseline: None,
+            findings: Vec::new(),
             days,
         })
     }
@@ -592,6 +595,213 @@ fn score_for(
         value,
         components,
         scored: true,
+    }
+}
+
+/// The report, read back to you in sentences.
+///
+/// Each finding names the figure it came from, so it can be checked against the
+/// panel beside it rather than taken on trust. They state facts and stop: this
+/// app does not tell you what to do about your own week, because it does not
+/// know what your week was for.
+///
+/// Nothing is emitted from a quantity that was not measured. A period with no
+/// baseline gets no comparison findings at all rather than a comparison against
+/// zero, which is the failure mode that makes generated prose worthless.
+fn findings_for(r: &WorkReport) -> Vec<Finding> {
+    let mut out = Vec::new();
+    let worked: Vec<&WorkDay> = r.days.iter().filter(|d| d.work_sec > 0).collect();
+    if worked.is_empty() {
+        return out;
+    }
+    let hm = |sec: i64| format!("{}h {:02}m", sec / 3600, (sec % 3600) / 60);
+    let period_word = match r.period.as_str() {
+        "day" => "day",
+        "month" => "month",
+        _ => "week",
+    };
+
+    // ── against the baseline ──────────────────────────────────────────
+    if let Some(b) = &r.baseline {
+        if b.total_work_sec > 0 {
+            let diff = r.total_work_sec - b.total_work_sec;
+            let pct = (diff as f64 / b.total_work_sec as f64 * 100.0).round() as i64;
+            // Under a tenth either way is noise, and calling it a trend would
+            // teach you to ignore the ones that are not.
+            if pct.abs() >= 10 {
+                out.push(Finding {
+                    id: "total-vs-baseline".into(),
+                    headline: format!(
+                        "You worked {} {} than your typical {period_word}",
+                        hm(diff.abs()),
+                        if diff > 0 { "more" } else { "less" }
+                    ),
+                    detail: format!(
+                        "{} this {period_word} against an average of {} over the last {}. That is {}{pct}%.",
+                        hm(r.total_work_sec),
+                        hm(b.total_work_sec),
+                        if b.periods == 1 {
+                            "period".to_string()
+                        } else {
+                            format!("{} periods", b.periods)
+                        },
+                        if diff > 0 { "+" } else { "−" }
+                    ),
+                    tone: "neutral".into(),
+                });
+            }
+        }
+    }
+
+    // ── against the target ────────────────────────────────────────────
+    if let (Some(target), Some(met), Some(applicable)) =
+        (r.target_sec, r.target_days_met, r.target_days_applicable)
+    {
+        if applicable > 0 {
+            let missed = applicable - met;
+            out.push(Finding {
+                id: "target".into(),
+                headline: if missed == 0 {
+                    format!("Every day hit the {} target", hm(target))
+                } else {
+                    format!(
+                        "{missed} of {applicable} days fell short of the {} target",
+                        hm(target)
+                    )
+                },
+                detail: format!(
+                    "Counted over the {applicable} {} the target applied to and that have already happened. Days still to come are not counted as missed.",
+                    if applicable == 1 { "day" } else { "days" }
+                ),
+                tone: if missed == 0 { "good" } else { "neutral" }.into(),
+            });
+        }
+    }
+
+    // ── the span against the total ────────────────────────────────────
+    //
+    // The one reading that needs two numbers to exist at all, and the one most
+    // likely to surprise: a ten-hour span holding six hours of work is a long
+    // day and a normal amount of work, and neither figure says so alone.
+    let spans: Vec<(i64, i64)> = worked
+        .iter()
+        .filter_map(|d| Some((d.first_at? , d.last_at?)))
+        .collect();
+    if !spans.is_empty() {
+        let span_sec: i64 = spans.iter().map(|(a, b)| (b - a) / 1000).sum();
+        let gap = span_sec - r.total_work_sec;
+        if span_sec > 0 && gap > 1800 {
+            let pct = (r.total_work_sec as f64 / span_sec as f64 * 100.0).round() as i64;
+            out.push(Finding {
+                id: "span-density".into(),
+                headline: format!("{pct}% of the time between starting and stopping was recorded work"),
+                detail: format!(
+                    "{} of work inside a {} span, so {} went to something else — breaks, life, or time nobody accounted for. The Day view is where that becomes specific.",
+                    hm(r.total_work_sec),
+                    hm(span_sec),
+                    hm(gap)
+                ),
+                tone: "neutral".into(),
+            });
+        }
+    }
+
+    // ── the longest day ───────────────────────────────────────────────
+    if let Some(longest) = worked.iter().max_by_key(|d| d.work_sec) {
+        let mean = r.total_work_sec / worked.len() as i64;
+        // Only worth saying when one day genuinely dominates. Half again as
+        // long as the average, and more than an hour clear of it.
+        if worked.len() > 1
+            && longest.work_sec as f64 > mean as f64 * 1.5
+            && longest.work_sec - mean > 3600
+        {
+            out.push(Finding {
+                id: "longest-day".into(),
+                headline: format!(
+                    "{} carried {}% of the {period_word}'s work",
+                    // The weekday, not the ISO date. "Sunday carried 46%" is a
+                    // sentence; "2026-08-16 carried 46%" is a log line.
+                    weekday_name(&longest.date),
+                    (longest.work_sec as f64 / r.total_work_sec as f64 * 100.0).round() as i64
+                ),
+                detail: format!(
+                    "{} on that day against an average of {} across the {} days worked.",
+                    hm(longest.work_sec),
+                    hm(mean),
+                    worked.len()
+                ),
+                tone: "watch".into(),
+            });
+        }
+    }
+
+    // ── when the work happened ────────────────────────────────────────
+    let total_hours: i64 = r.by_hour.iter().sum();
+    if total_hours > 0 {
+        let late: i64 = r.by_hour[18..].iter().sum();
+        let early: i64 = r.by_hour[..7].iter().sum();
+        let pct = |x: i64| (x as f64 / total_hours as f64 * 100.0).round() as i64;
+        if pct(late) >= 20 {
+            out.push(Finding {
+                id: "late-work".into(),
+                headline: format!("{}% of the work happened after 18:00", pct(late)),
+                detail: format!("{} of it, across the {period_word}.", hm(late)),
+                tone: "watch".into(),
+            });
+        } else if pct(early) >= 20 {
+            out.push(Finding {
+                id: "early-work".into(),
+                headline: format!("{}% of the work happened before 07:00", pct(early)),
+                detail: format!("{} of it, across the {period_word}.", hm(early)),
+                tone: "neutral".into(),
+            });
+        }
+    }
+
+    // ── what it cannot tell you, and why ──────────────────────────────
+    //
+    // The most useful finding a report can offer is often the one about its own
+    // blind spot. An uncategorised week means every split on this screen is one
+    // grey bar, and saying so is more use than drawing it.
+    let named: i64 = r
+        .by_category
+        .iter()
+        .filter(|s| s.id.is_some())
+        .map(|s| s.seconds)
+        .sum();
+    if r.total_work_sec > 0 && named * 2 < r.total_work_sec {
+        out.push(Finding {
+            id: "uncategorised".into(),
+            headline: format!(
+                "{}% of the work has no kind on it",
+                ((r.total_work_sec - named) as f64 / r.total_work_sec as f64 * 100.0).round() as i64
+            ),
+            detail: "The split by kind of work cannot say anything useful until tasks carry one. A task's kind is on its detail panel; the list is in Settings → Work.".into(),
+            tone: "watch".into(),
+        });
+    }
+
+    if r.focus.sessions == 0 && r.total_work_sec > 2 * 3600 {
+        out.push(Finding {
+            id: "no-focus".into(),
+            headline: "None of this work was inside a focus session".into(),
+            detail: format!(
+                "{} recorded, none of it plotted in advance. A focus session plots the length you intend, which is what makes the overrun visible afterwards.",
+                hm(r.total_work_sec)
+            ),
+            tone: "neutral".into(),
+        });
+    }
+
+    out
+}
+
+/// "2026-08-16" → "Sunday". Falls back to the date itself if it will not parse,
+/// which is better than a finding with a blank where its subject should be.
+fn weekday_name(date: &str) -> String {
+    match parse_date(date) {
+        Ok(d) => d.weekday().to_string(),
+        Err(_) => date.to_string(),
     }
 }
 

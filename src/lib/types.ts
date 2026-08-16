@@ -821,6 +821,16 @@ export interface WorkReport {
    *  there is not enough history — reported rather than papered over. */
   baseline: WorkBaseline | null;
   score: WorkScore;
+  /** The report read back in sentences, generated in Rust so the renderer
+   *  never re-derives a rule. Empty when there is nothing to say. */
+  findings: Finding[];
+}
+
+export interface Finding {
+  id: string;
+  headline: string;
+  detail: string;
+  tone: "neutral" | "good" | "watch";
 }
 
 export interface WorkBaseline {

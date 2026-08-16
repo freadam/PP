@@ -1633,6 +1633,30 @@ pub struct WorkReport {
     /// periods it actually had.
     pub baseline: Option<WorkBaseline>,
     pub score: WorkScore,
+    /// Sentences, generated from the figures above.
+    ///
+    /// A dashboard makes you do the reading; a report does the reading for you
+    /// and shows its working. Every finding here names the number it came from,
+    /// so it can be checked against the panel beside it.
+    ///
+    /// They state facts and stop. Rize's equivalent ends "Consider taking this
+    /// week lightly if possible" — this app does not tell you what to do about
+    /// your own week, because it does not know what your week was for.
+    pub findings: Vec<Finding>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Finding {
+    /// Stable, so the renderer can key on it without matching prose.
+    pub id: String,
+    /// The claim, in one line.
+    pub headline: String,
+    /// Where the number came from, and what it is measured against.
+    pub detail: String,
+    /// `neutral` | `good` | `watch`. Never the only carrier — the headline
+    /// says the thing, and the tone only decides which rule it gets.
+    pub tone: String,
 }
 
 /// What the last few comparable periods looked like, so every headline figure

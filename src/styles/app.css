@@ -2360,6 +2360,78 @@ select {
   color: var(--faint);
 }
 
+/* The report, read back in sentences. A left rule carries the tone; the
+   headline carries the meaning, so the rule is never the only signal. */
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+}
+.finding {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--s-12);
+  box-shadow: inset 2px 0 0 var(--line-strong);
+}
+.finding > strong {
+  color: var(--strong);
+  font-weight: var(--w-medium);
+}
+.finding[data-tone="good"] {
+  box-shadow: inset 2px 0 0 var(--done);
+}
+/* `watch`, not `bad`. Nothing on this screen is a failure — a long Thursday is
+   a fact about Thursday, and the app does not know what it was for. */
+.finding[data-tone="watch"] {
+  box-shadow: inset 2px 0 0 var(--track-graphic);
+}
+
+/* Over and under the target, around a centre line. */
+.divchart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-8);
+}
+.divrow {
+  display: grid;
+  grid-template-columns: 34px 1fr 78px;
+  align-items: center;
+  gap: var(--s-8);
+}
+.divtrack {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: var(--r-bar);
+  background: var(--sunken);
+  overflow: hidden;
+}
+/* The zero line — the target itself. */
+.divtrack > u {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line-strong);
+}
+.divtrack > i {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 2px;
+  background: var(--plot);
+  border-radius: 0 var(--r-pill) var(--r-pill) 0;
+}
+.divtrack > i[data-over="true"] {
+  background: var(--done);
+}
+.divtrack > i:not([data-over="true"]) {
+  border-radius: var(--r-pill) 0 0 var(--r-pill);
+}
+
 /* The score ring. One conic gradient; the numeral inside is the reading, so
    nothing here depends on being able to judge an angle. */
 .gauge {

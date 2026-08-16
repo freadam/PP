@@ -953,7 +953,7 @@ fn the_work_report_compares_against_history_and_shows_its_arithmetic() {
     let report = store.get_work_report("2025-08-04", "week", TZ).unwrap();
     assert_eq!(report.total_work_sec, 4 * 3600);
 
-    let base = report.baseline.expect("four prior weeks all had work in them");
+    let base = report.baseline.clone().expect("four prior weeks all had work in them");
     assert_eq!(base.periods, 4);
     assert_eq!(base.total_work_sec, 2 * 3600);
 
@@ -999,6 +999,49 @@ fn the_work_report_compares_against_history_and_shows_its_arithmetic() {
     assert_eq!(empty.score.rating, "Not scored");
     // …and it has no baseline either, rather than a fabricated one.
     assert!(empty.baseline.is_none());
+    // …and says nothing at all, rather than generating prose about a week that
+    // did not happen. Findings invented from absent data are worse than none.
+    assert!(empty.findings.is_empty());
+
+    // The findings read the figures back. This week doubled the baseline, so
+    // the comparison is stated with both numbers in it.
+    let by_id = |r: &WorkReport, id: &str| {
+        r.findings.iter().find(|f| f.id == id).cloned()
+    };
+    let total = by_id(&report, "total-vs-baseline").expect("4h against a 2h baseline is a finding");
+    assert!(total.headline.contains("more"), "{}", total.headline);
+    assert!(total.detail.contains("4h 00m") && total.detail.contains("2h 00m"));
+
+    // No target, no target finding — rather than one measured against zero.
+    assert!(by_id(&report, "target").is_none());
+
+    // The longest day is named by its weekday. "Monday carried 100%" is a
+    // sentence; "2025-08-04 carried 100%" is a log line.
+    if let Some(longest) = by_id(&report, "longest-day") {
+        assert!(longest.headline.starts_with("Mon"), "{}", longest.headline);
+    }
+
+    // Nothing was categorised and nothing was a focus session, and the report
+    // says both. A blind spot named is worth more than a chart of one colour.
+    assert!(by_id(&report, "uncategorised").is_some());
+    assert!(by_id(&report, "no-focus").is_some());
+
+    // A change under a tenth is noise and is not reported as a trend — calling
+    // it one would teach the reader to ignore the findings that matter.
+    let (mut quiet, clock2) = store_at(at(2025, 7, 7, 9, 0));
+    let q = task(&mut quiet, "Steady");
+    for week in 0..5 {
+        clock2.set(at(2025, 7, 7, 9, 0) + week * 7 * 86_400_000);
+        quiet.start_timer(&q.id, None).unwrap();
+        clock2.advance(2 * 3_600_000);
+        quiet.stop_timer().unwrap();
+    }
+    let steady = quiet.get_work_report("2025-08-04", "week", TZ).unwrap();
+    assert_eq!(steady.baseline.as_ref().unwrap().total_work_sec, 2 * 3600);
+    assert!(
+        steady.findings.iter().all(|f| f.id != "total-vs-baseline"),
+        "an identical week is not a trend"
+    );
 }
 
 /// A category is a taxonomy, so deleting one frees its tasks rather than

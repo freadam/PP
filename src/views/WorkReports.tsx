@@ -109,9 +109,11 @@ export function WorkReports() {
       ) : (
         <>
           <Headline report={report} />
+          <FindingsPanel report={report} />
           <div className="report-grid">
             <ScorePanel report={report} />
             <WorkHours report={report} />
+            <AgainstTarget report={report} />
             <DonutPanel
               title="By kind of work"
               slices={report.byCategory}
@@ -130,6 +132,101 @@ export function WorkReports() {
         </>
       )}
     </div>
+  );
+}
+
+/* ─── what the numbers say ───────────────────────────────────────────────
+   The report, read back in sentences. Generated in Rust so the rules live in
+   one place; this only draws them.
+
+   Each finding states a fact and stops. Rize's equivalent ends "Consider
+   taking this week lightly if possible" — Fruit does not tell you what to do
+   about your own week, because it does not know what your week was for. */
+
+function FindingsPanel({ report }: { report: WorkReport }) {
+  if (report.findings.length === 0) return null;
+  return (
+    <section className="panel findings">
+      <h3>What this {report.period} says</h3>
+      {report.findings.map((f) => (
+        <div className="finding" key={f.id} data-tone={f.tone}>
+          <strong>{f.headline}</strong>
+          <span className="caption">{f.detail}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/* ─── over and under the target ──────────────────────────────────────────
+   A diverging chart around a zero line: how far each day landed above or
+   below the daily target.
+
+   Deliberately not a second copy of the hours chart. "Six hours on Tuesday"
+   and "an hour under on Tuesday" are the same datum and different readings,
+   and the second is the one you act on. It only exists when a target does —
+   a deviation from nothing is not a quantity. */
+
+function AgainstTarget({ report }: { report: WorkReport }) {
+  const target = report.targetSec;
+  if (target === null) {
+    return (
+      <section className="panel">
+        <h3>Against the target</h3>
+        <p className="caption">
+          No daily work target set, so there is nothing to measure a deviation from. Settings →
+          Work sets one.
+        </p>
+      </section>
+    );
+  }
+
+  const days = report.days.filter((d) => d.targetApplies);
+  if (days.length === 0) {
+    return (
+      <section className="panel">
+        <h3>Against the target</h3>
+        <p className="caption">The target applies to no day in this range.</p>
+      </section>
+    );
+  }
+
+  const deltas = days.map((d) => ({ date: d.date, diff: d.workSec - target }));
+  const scale = Math.max(...deltas.map((d) => Math.abs(d.diff)), 1800);
+  const over = deltas.filter((d) => d.diff > 0);
+  const under = deltas.filter((d) => d.diff < 0);
+
+  return (
+    <section className="panel">
+      <h3>Against the target</h3>
+      <div className="divchart">
+        {deltas.map((d) => (
+          <div className="divrow" key={d.date}>
+            <span className="micro">{fmt.weekdayShort(d.date)}</span>
+            <span className="divtrack" aria-hidden="true">
+              <u />
+              <i
+                data-over={d.diff > 0 || undefined}
+                style={
+                  d.diff >= 0
+                    ? { left: "50%", width: `${(d.diff / scale) * 50}%` }
+                    : { right: "50%", width: `${(-d.diff / scale) * 50}%` }
+                }
+              />
+            </span>
+            <span className="micro data">
+              {d.diff === 0 ? "on target" : `${d.diff > 0 ? "+" : "−"}${fmt.duration(Math.abs(d.diff))}`}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="caption">
+        <span className="data">{over.length}</span> {over.length === 1 ? "day" : "days"} over,{" "}
+        <span className="data">{under.length}</span> under, against{" "}
+        <span className="data">{fmt.duration(target)}</span> a day. A day under the target is not a
+        failed day — it is a day that went somewhere else, and the Day view says where.
+      </p>
+    </section>
   );
 }
 
