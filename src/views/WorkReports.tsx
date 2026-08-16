@@ -1,23 +1,37 @@
 /**
- * The work reports — five questions over one range.
+ * The work reports — what the period held, and how it compares.
  *
- * *How many hours did I work? On what kind of work? On which projects? How much
- * of it was deliberate? What was actually on screen?*
+ * *How many hours? Against what target? When in the day? On what kind of work?
+ * On which projects? How much was deliberate? What was actually on screen?*
  *
- * Every panel except the last reads **confirmed** work. Observed time is not
- * work until somebody says it was, and a work-hours graph that quietly included
- * "Chrome was in front" would be the exact dishonesty this app exists to avoid.
- * The apps panel is the one that reports observation, and it says so on screen
- * rather than in a tooltip.
+ * # Every figure carries its change
  *
- * All five come from one `get_work_report` call, so the panels on this screen
+ * A number on its own is nearly useless — "8h 37m" is neither good nor bad
+ * until you know last month was 7h 10m. So every headline reads against the
+ * previous four comparable periods, and where there is no history to compare
+ * against the panel says so instead of drawing an arrow it cannot justify.
+ *
+ * # Confirmed work only
+ *
+ * Every panel except the last reads the *confirmed* record. Observed time is
+ * not work until somebody says it was, and a work-hours graph that quietly
+ * included "Chrome was in front" would be the exact dishonesty this app exists
+ * to avoid. The apps panel is the one that reports observation, and it says so
+ * on screen rather than in a tooltip.
+ *
+ * All of it comes from one `get_work_report` call, so the panels on this screen
  * can never disagree about which week it is.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
-import type { WorkPeriod, WorkReport, WorkSlice } from "../lib/types";
+import type {
+  ScoreComponent,
+  WorkPeriod,
+  WorkReport,
+  WorkSlice,
+} from "../lib/types";
 
 const PERIODS: { key: WorkPeriod; label: string }[] = [
   { key: "day", label: "Day" },
@@ -94,63 +108,224 @@ export function WorkReports() {
         </p>
       ) : (
         <>
-          <WorkHours report={report} />
-          <SplitPanel
-            title="By kind of work"
-            slices={report.byCategory}
-            total={report.totalWorkSec}
-            empty="No categorised work in this range. Settings → Kinds of work sets the list; a task's category is on its detail panel."
-          />
-          <SplitPanel
-            title="By project"
-            slices={report.byProject}
-            total={report.totalWorkSec}
-            empty="No work recorded against a project in this range."
-          />
-          <FocusPanel report={report} />
-          <AppsPanel report={report} />
+          <Headline report={report} />
+          <div className="report-grid">
+            <ScorePanel report={report} />
+            <WorkHours report={report} />
+            <DonutPanel
+              title="By kind of work"
+              slices={report.byCategory}
+              empty="No categorised work in this range. Settings → Work sets the list; a task's kind is on its detail panel."
+            />
+            <DayShape report={report} />
+            <HourHistogram report={report} />
+            <DonutPanel
+              title="By project"
+              slices={report.byProject}
+              empty="No work recorded against a project in this range."
+            />
+            <FocusPanel report={report} />
+            <AppsPanel report={report} />
+          </div>
         </>
       )}
     </div>
   );
 }
 
-/**
- * Hours worked per day, against the daily target.
- *
- * The target is a line across the chart rather than a number in a corner, so
- * "which days missed it" is a glance instead of five subtractions. It is drawn
- * only across the days it applies to — a Mon–Fri target that appeared to run
- * through Sunday would report a shortfall on a day off.
- */
-function WorkHours({ report }: { report: WorkReport }) {
-  const max = Math.max(
-    report.targetSec ?? 0,
-    ...report.days.map((d) => d.workSec),
-    3600,
+/* ─── the change language ────────────────────────────────────────────────
+   One component for "this figure, against the baseline". Arrows are paired
+   with a signed number and a word, never used alone, and "up" is not assumed
+   to be good — `good` says which direction the reading favours, and where
+   neither direction is better it is left out and the delta is stated flat. */
+
+function Delta({
+  now,
+  was,
+  periods,
+  good,
+  format = fmt.duration,
+}: {
+  now: number;
+  was: number | undefined;
+  periods: number | undefined;
+  good?: "up" | "down";
+  format?: (n: number) => string;
+}) {
+  if (was === undefined || periods === undefined) {
+    return (
+      <span className="caption">
+        {/* Said, not hidden. An absent comparison is a fact about your history,
+            and an arrow invented to fill the space would be worse than a gap. */}
+        no earlier period to compare with yet
+      </span>
+    );
+  }
+  const diff = now - was;
+  const pct = was > 0 ? Math.round((diff / was) * 100) : null;
+  const dir = diff === 0 ? "flat" : diff > 0 ? "up" : "down";
+  const tone = !good || dir === "flat" ? "flat" : dir === good ? "good" : "poor";
+  return (
+    <span className="delta" data-tone={tone}>
+      <span aria-hidden="true">{dir === "flat" ? "→" : dir === "up" ? "↑" : "↓"}</span>
+      <span className="data">
+        {diff > 0 ? "+" : diff < 0 ? "−" : ""}
+        {format(Math.abs(diff))}
+        {pct !== null && pct !== 0 && ` · ${Math.abs(pct)}%`}
+      </span>
+      <span className="caption">
+        vs. {periods === 1 ? "the previous period" : `the last ${periods}`}
+      </span>
+    </span>
   );
+}
+
+/** The three numbers worth reading first, each against its baseline. */
+function Headline({ report }: { report: WorkReport }) {
+  const b = report.baseline ?? undefined;
+  const worked = report.days.filter((d) => d.workSec > 0);
+  const dayLength = worked.length ? Math.round(report.totalWorkSec / worked.length) : 0;
+
+  return (
+    <div className="cards report-cards">
+      <div className="card">
+        <span className="micro">Work</span>
+        <strong>{fmt.duration(report.totalWorkSec)}</strong>
+        <Delta now={report.totalWorkSec} was={b?.totalWorkSec} periods={b?.periods} />
+      </div>
+      <div className="card">
+        <span className="micro">Average working day</span>
+        <strong>{fmt.duration(dayLength)}</strong>
+        <Delta now={dayLength} was={b?.dayLengthSec} periods={b?.periods} />
+      </div>
+      <div className="card">
+        <span className="micro">In a focus session</span>
+        <strong>{fmt.duration(report.focus.trackedSec)}</strong>
+        <Delta
+          now={report.focus.trackedSec}
+          was={b?.focusSec}
+          periods={b?.periods}
+          good="up"
+        />
+      </div>
+      <div className="card">
+        <span className="micro">Days worked</span>
+        <strong>{worked.length}</strong>
+        <span className="caption">of {report.days.length} in the range</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── the score ──────────────────────────────────────────────────────────
+   One number, four inputs, and the arithmetic printed underneath.
+
+   Rize ships a focus-quality score derived from twenty-plus attributes and
+   shows none of them. A score you cannot open is a score you cannot argue
+   with, and this app's whole position is that a figure you cannot audit is a
+   figure you do not believe. So every component is on screen with its value,
+   its weight and the sentence it came from — and the panel says out loud that
+   the weights are a judgement rather than a measurement. */
+
+function ScorePanel({ report }: { report: WorkReport }) {
+  const s = report.score;
+  const b = report.baseline ?? undefined;
+  const [open, setOpen] = useState(false);
+
+  if (!s.scored) {
+    return (
+      <section className="panel">
+        <h3>Score</h3>
+        <p className="caption">
+          Nothing was recorded in this range, so there is nothing to score. A zero here would be a
+          verdict on a week you may simply have been away for.
+        </p>
+      </section>
+    );
+  }
+
+  // A ring drawn with one conic gradient. The numeral inside is the reading;
+  // the ring is the decoration, so nothing depends on reading an angle.
+  return (
+    <section className="panel">
+      <h3>Score</h3>
+      <div className="row" style={{ gap: 20, alignItems: "center", flexWrap: "wrap" }}>
+        <span
+          className="gauge"
+          style={{ "--pct": `${s.value}%` } as React.CSSProperties}
+          aria-hidden="true"
+        >
+          <b className="data">{s.value}</b>
+        </span>
+        <span className="stack" style={{ gap: 2 }}>
+          <strong className="display">{s.rating}</strong>
+          <span className="caption">
+            <span className="data">{s.value}</span> out of 100
+          </span>
+          <Delta
+            now={s.value}
+            was={b?.score}
+            periods={b?.periods}
+            good="up"
+            format={(n) => String(Math.round(n))}
+          />
+        </span>
+      </div>
+
+      <button className="btn btn-quiet" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        {open ? "Hide the arithmetic" : "Show the arithmetic"}
+      </button>
+
+      {open && (
+        <>
+          <div className="bars" style={{ marginTop: 8 }}>
+            {s.components.map((c: ScoreComponent) => (
+              <div className="bar-row" key={c.label}>
+                <span className="micro">{c.label}</span>
+                <span className="bar" aria-label={`${c.label}: ${c.value} of 100`}>
+                  <i style={{ width: `${c.value}%`, background: "var(--plot)" }} />
+                </span>
+                <span className="micro data">{c.value}</span>
+                <span className="caption data">×{c.weight.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="caption">
+            {s.components.map((c) => `${c.label}: ${c.detail}`).join(" · ")}.
+          </p>
+          <p className="caption">
+            {s.components
+              .map((c) => `${c.value} × ${c.weight.toFixed(2)}`)
+              .join(" + ")}{" "}
+            = <span className="data">{s.value}</span>. The four weights are a judgement, not a
+            measurement — they are here so you can disagree with them rather than with the score.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+/* ─── hours per day, against the target ──────────────────────────────── */
+
+function WorkHours({ report }: { report: WorkReport }) {
+  const max = Math.max(report.targetSec ?? 0, ...report.days.map((d) => d.workSec), 3600);
   const today = fmt.today();
 
   return (
     <section className="panel">
-      <h3>Work hours</h3>
-      <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
-        <span>
-          <strong className="display">{fmt.duration(report.totalWorkSec)}</strong>{" "}
-          <span className="caption">confirmed in this {report.period}</span>
-        </span>
-        {report.targetSec !== null && report.targetDaysApplicable !== null && (
-          <span className="caption">
-            Target <span className="data">{fmt.duration(report.targetSec)}</span> a day ·{" "}
-            <span className="data">
-              {report.targetDaysMet} of {report.targetDaysApplicable}
-            </span>{" "}
-            {report.targetDaysApplicable === 1 ? "day" : "days"} met
-            {/* Only days that have *happened* are counted. A Friday that has not
-                arrived is not a day you failed to work six hours on. */}
-          </span>
-        )}
-      </div>
+      <h3>Work hours by day</h3>
+      {report.targetSec !== null && report.targetDaysApplicable !== null && (
+        <p className="caption">
+          Target <span className="data">{fmt.duration(report.targetSec)}</span> a day ·{" "}
+          <span className="data">
+            {report.targetDaysMet} of {report.targetDaysApplicable}
+          </span>{" "}
+          {report.targetDaysApplicable === 1 ? "day" : "days"} met.
+          {/* Only days that have happened are counted. A Friday that has not
+              arrived is not a day you failed to work six hours on. */}
+        </p>
+      )}
 
       <div className="workbars" aria-hidden="true">
         {report.days.map((d) => {
@@ -164,7 +339,6 @@ function WorkHours({ report }: { report: WorkReport }) {
               title={`${d.date} · ${fmt.duration(d.workSec)}`}
             >
               <i style={{ height: `${(d.workSec / max) * 100}%` }} data-met={met || undefined} />
-              {/* The target line, drawn only where the target applies. */}
               {report.targetSec !== null && d.targetApplies && (
                 <b style={{ bottom: `${(report.targetSec / max) * 100}%` }} />
               )}
@@ -182,7 +356,7 @@ function WorkHours({ report }: { report: WorkReport }) {
       <p className="caption">
         {report.days
           .filter((d) => d.workSec > 0)
-          .map((d) => `${d.date} ${fmt.duration(d.workSec)}`)
+          .map((d) => `${fmt.weekdayShort(d.date)} ${fmt.duration(d.workSec)}`)
           .join(" · ") || "Nothing recorded in this range."}
       </p>
     </section>
@@ -198,26 +372,162 @@ function barLabel(date: string, count: number): string {
   return day === 1 || day % 5 === 0 ? String(day) : "";
 }
 
-/**
- * A named split of the work total — the same component for kinds of work and
- * for projects, because it is the same question asked of a different column.
- *
- * The uncategorised bucket is always shown. Hiding it would make the shares add
- * to less than the total with nothing on screen explaining where the rest went,
- * which is the one thing a report must never do.
- */
-function SplitPanel({
+/* ─── the shape of the working day ───────────────────────────────────────
+   One bar per day, drawn on a 24-hour axis from when work first started to
+   when it last stopped.
+
+   This is the panel a total cannot replace. Six hours between 09:00 and 15:00
+   and six hours between 09:00 and 23:00 are the same figure everywhere else in
+   this report and very different days, and only the span says which one you
+   had. */
+
+function DayShape({ report }: { report: WorkReport }) {
+  const rows = report.days.filter((d) => d.firstAt !== null && d.lastAt !== null);
+  if (rows.length === 0) {
+    return (
+      <section className="panel">
+        <h3>The shape of the day</h3>
+        <p className="caption">No work recorded in this range, so there is no day to draw.</p>
+      </section>
+    );
+  }
+
+  const minuteOf = (ms: number) => {
+    const d = new Date(ms);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+  // The axis covers only the hours actually used, rounded out to the hour, so a
+  // 09:00–17:00 week is not drawn as eight thin bars inside a mostly empty day.
+  const starts = rows.map((d) => minuteOf(d.firstAt!));
+  const ends = rows.map((d) => minuteOf(d.lastAt!));
+  const lo = Math.max(0, Math.floor(Math.min(...starts) / 60) * 60 - 60);
+  const hi = Math.min(1440, Math.ceil(Math.max(...ends) / 60) * 60 + 60);
+  const span = Math.max(60, hi - lo);
+  const ticks: number[] = [];
+  for (let m = Math.ceil(lo / 120) * 120; m <= hi; m += 120) ticks.push(m);
+
+  return (
+    <section className="panel">
+      <h3>The shape of the day</h3>
+      <p className="caption">
+        When work started and stopped. The bar is the span, not the total — a gap inside it is time
+        that went somewhere else.
+      </p>
+      <div className="spanchart">
+        {rows.map((d) => {
+          const from = minuteOf(d.firstAt!);
+          const to = minuteOf(d.lastAt!);
+          return (
+            <div className="spanrow" key={d.date}>
+              <span className="micro">{fmt.weekdayShort(d.date)}</span>
+              <span className="spantrack" aria-hidden="true">
+                {ticks.map((m) => (
+                  <u key={m} style={{ left: `${((m - lo) / span) * 100}%` }} />
+                ))}
+                <i
+                  style={{
+                    left: `${((from - lo) / span) * 100}%`,
+                    width: `${(Math.max(1, to - from) / span) * 100}%`,
+                  }}
+                />
+              </span>
+              <span className="caption data">
+                {clockOf(d.firstAt!)}–{clockOf(d.lastAt!)}
+              </span>
+              <span className="micro data">{fmt.duration(d.workSec)}</span>
+            </div>
+          );
+        })}
+        <div className="spanrow spanaxis micro" aria-hidden="true">
+          <span />
+          <span className="spantrack">
+            {ticks.map((m) => (
+              <em key={m} style={{ left: `${((m - lo) / span) * 100}%` }}>
+                {String(Math.floor(m / 60)).padStart(2, "0")}
+              </em>
+            ))}
+          </span>
+          <span />
+          <span />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function clockOf(ms: number): string {
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/* ─── when in the day the work happens ───────────────────────────────── */
+
+function HourHistogram({ report }: { report: WorkReport }) {
+  const max = Math.max(...report.byHour, 1);
+  const peak = report.byHour.indexOf(max);
+  const total = report.byHour.reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+
+  // Before 12:00, and after 18:00 — the two readings people actually want out
+  // of a histogram like this.
+  const morning = report.byHour.slice(0, 12).reduce((a, b) => a + b, 0);
+  const evening = report.byHour.slice(18).reduce((a, b) => a + b, 0);
+
+  return (
+    <section className="panel">
+      <h3>When the work happens</h3>
+      <div className="hourbars" aria-hidden="true">
+        {report.byHour.map((sec, h) => (
+          <span
+            key={h}
+            className="hourbar"
+            data-peak={h === peak || undefined}
+            title={`${String(h).padStart(2, "0")}:00 · ${fmt.duration(sec)}`}
+          >
+            <i style={{ height: `${(sec / max) * 100}%` }} />
+          </span>
+        ))}
+      </div>
+      <div className="hourbar-labels micro" aria-hidden="true">
+        {report.byHour.map((_, h) => (
+          <span key={h}>{h % 6 === 0 ? String(h).padStart(2, "0") : ""}</span>
+        ))}
+      </div>
+      <p className="caption">
+        Busiest hour is <span className="data">{String(peak).padStart(2, "0")}:00</span> with{" "}
+        <span className="data">{fmt.duration(max)}</span>.{" "}
+        <span className="data">{Math.round((morning / total) * 100)}%</span> of the work happened
+        before noon, <span className="data">{Math.round((evening / total) * 100)}%</span> after
+        18:00.
+      </p>
+    </section>
+  );
+}
+
+/* ─── a named split, as a ring and a list ────────────────────────────────
+   The ring is the proportion at a glance; the list is the reading. The
+   uncategorised bucket is always shown — hiding it would make the shares add
+   to less than the total with nothing on screen explaining where the rest
+   went, which is the one thing a report must never do. */
+
+function DonutPanel({
   title,
   slices,
-  total,
   empty,
 }: {
   title: string;
   slices: WorkSlice[];
-  total: number;
   empty: string;
 }) {
-  const accounted = useMemo(() => slices.reduce((n, s) => n + s.seconds, 0), [slices]);
+  const gradient = useMemo(() => {
+    let at = 0;
+    const stops = slices.map((s) => {
+      const from = at;
+      at += s.share * 100;
+      return `${s.colour} ${from}% ${at}%`;
+    });
+    return stops.length ? `conic-gradient(${stops.join(",")})` : undefined;
+  }, [slices]);
 
   return (
     <section className="panel">
@@ -225,16 +535,9 @@ function SplitPanel({
       {slices.length === 0 ? (
         <p className="caption">{empty}</p>
       ) : (
-        <>
-          <span className="day-bar" aria-hidden="true">
-            {slices.map((s) => (
-              <i
-                key={s.id ?? "none"}
-                style={{ width: `${s.share * 100}%`, background: s.colour }}
-              />
-            ))}
-          </span>
-          <div className="bars">
+        <div className="donut-row">
+          <span className="donut" style={{ background: gradient }} aria-hidden="true" />
+          <div className="bars grow">
             {slices.map((s) => (
               <div className="bar-row" key={s.id ?? "none"}>
                 <span className="micro">
@@ -249,15 +552,7 @@ function SplitPanel({
               </div>
             ))}
           </div>
-          {/* Said out loud rather than left to arithmetic: the split has to
-              account for the total exactly once, and if it ever does not, the
-              screen should be the thing that tells you. */}
-          {accounted !== total && (
-            <p className="caption">
-              These add to {fmt.duration(accounted)} of {fmt.duration(total)} recorded.
-            </p>
-          )}
-        </>
+        </div>
       )}
     </section>
   );
@@ -273,6 +568,7 @@ function SplitPanel({
  */
 function FocusPanel({ report }: { report: WorkReport }) {
   const f = report.focus;
+  const b = report.baseline ?? undefined;
   return (
     <section className="panel">
       <h3>Focus sessions</h3>
@@ -284,13 +580,26 @@ function FocusPanel({ report }: { report: WorkReport }) {
       ) : (
         <>
           <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
-            <span>
-              <strong className="display">{f.sessions}</strong>{" "}
+            <span className="stack" style={{ gap: 2 }}>
+              <strong className="display">{f.sessions}</strong>
               <span className="caption">{f.sessions === 1 ? "session" : "sessions"}</span>
+              <Delta
+                now={f.sessions}
+                was={b?.focusSessions}
+                periods={b?.periods}
+                good="up"
+                format={(n) => String(Math.round(n))}
+              />
             </span>
-            <span>
-              <strong className="display">{fmt.duration(f.trackedSec)}</strong>{" "}
+            <span className="stack" style={{ gap: 2 }}>
+              <strong className="display">{fmt.duration(f.trackedSec)}</strong>
               <span className="caption">tracked</span>
+            </span>
+            <span className="stack" style={{ gap: 2 }}>
+              <strong className="display">
+                {fmt.duration(Math.round(f.trackedSec / Math.max(1, f.sessions)))}
+              </strong>
+              <span className="caption">average session</span>
             </span>
           </div>
           <div className="bars">
@@ -318,8 +627,8 @@ function FocusPanel({ report }: { report: WorkReport }) {
           </div>
           <p className="caption">
             Longest <span className="data">{fmt.duration(f.longestSec)}</span> ·{" "}
-            <span className="data">{f.completed}</span> ran the full length they were plotted for.
-            A session cut short because the work finished is not a failure.
+            <span className="data">{f.completed}</span> ran the full length they were plotted for. A
+            session cut short because the work finished is not a failure.
           </p>
         </>
       )}

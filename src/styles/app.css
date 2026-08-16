@@ -2314,6 +2314,195 @@ select {
   border-color: transparent var(--track-graphic) transparent transparent;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Reports → Work
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Two columns where there is room, one below the 1200px tier. The panels are
+   independent readings, so they tile rather than stack into a single column
+   nobody scrolls to the bottom of. */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: var(--s-12);
+  align-items: start;
+}
+.report-grid .panel {
+  margin: 0;
+}
+
+.report-cards {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: var(--s-12);
+}
+.report-cards .card {
+  gap: var(--s-4);
+}
+
+/* The change reading. An arrow *and* a signed number *and* a word — never the
+   arrow alone, and never colour alone. `data-tone` says whether the direction
+   is the favourable one, and is absent where neither direction is better. */
+.delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  font-size: var(--t-caption);
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.delta[data-tone="good"] {
+  color: var(--done);
+}
+.delta[data-tone="poor"] {
+  color: var(--over);
+}
+.delta .caption {
+  color: var(--faint);
+}
+
+/* The score ring. One conic gradient; the numeral inside is the reading, so
+   nothing here depends on being able to judge an angle. */
+.gauge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  flex: none;
+  border-radius: 50%;
+  background: conic-gradient(var(--plot) var(--pct, 0%), var(--sunken) 0);
+}
+.gauge::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+.gauge > b {
+  position: relative;
+  font-size: 1.75rem;
+  font-weight: var(--w-semibold);
+  color: var(--strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A share ring beside its own list. Same idea as the gauge: the ring is the
+   proportion at a glance, the list is the fact. */
+.donut-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-16);
+}
+.donut {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sunken);
+}
+.donut::before {
+  content: "";
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+/* The shape of the working day: one row per day on a shared 24-hour axis. */
+.spanchart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin-top: var(--s-8);
+}
+.spanrow {
+  display: grid;
+  grid-template-columns: 34px 1fr 84px 52px;
+  align-items: center;
+  gap: var(--s-8);
+}
+.spantrack {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: var(--r-bar);
+  background: var(--sunken);
+  overflow: hidden;
+}
+.spantrack > i {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  min-width: 2px;
+  border-radius: var(--r-pill);
+  background: var(--track-graphic);
+}
+/* Two-hourly gridlines, so a bar can be read against the clock rather than
+   only against the other bars. */
+.spantrack > u {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  opacity: 0.7;
+}
+.spanaxis .spantrack {
+  height: auto;
+  background: none;
+  overflow: visible;
+}
+.spanaxis em {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-style: normal;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* When in the day the work happens — 24 columns, one per hour. */
+.hourbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 90px;
+  margin: var(--s-12) 0 var(--s-4);
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--line);
+}
+.hourbar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.hourbar > i {
+  display: block;
+  width: 100%;
+  min-height: 1px;
+  border-radius: var(--r-bar) var(--r-bar) 0 0;
+  background: var(--plot);
+  opacity: 0.75;
+}
+/* The busiest hour, which the caption also names in words. */
+.hourbar[data-peak="true"] > i {
+  opacity: 1;
+  background: var(--strong);
+}
+.hourbar-labels {
+  display: flex;
+  gap: 2px;
+  color: var(--faint);
+}
+.hourbar-labels > span {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+}
+
 /* ─── Work hours, one column per day ─────────────────────────────────────
    A column chart rather than the line the month dashboard uses: a line implies
    a continuous quantity between the points, and there is no such thing as
@@ -2884,6 +3073,14 @@ select {
 /* 992–1199px — "Reduce peripheral width; begin hiding less important row
    fields; maintain 48px chrome." */
 @media (max-width: 1199px) {
+  /* The report panels tile two-up above this tier and stack below it, and the
+     four headline cards go two-up rather than shrinking past legibility. */
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+  .report-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
   /* The day table has five columns and a detail panel. Below this tier the
      panel would squeeze the grid past legibility, so it drops out and
      selection opens nothing rather than opening something unreadable. */

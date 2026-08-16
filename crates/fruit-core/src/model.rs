@@ -1618,6 +1618,74 @@ pub struct WorkReport {
     pub by_project: Vec<WorkSlice>,
     pub focus: FocusSummary,
     pub apps: Vec<AppUsage>,
+
+    /// Confirmed work by hour of local day, 0–23, summed across the range.
+    ///
+    /// The one chart that answers "*when* do I actually work", which no total
+    /// can. A week whose hours are identical to last week's but shifted three
+    /// hours later is a different week, and this is the only place that shows.
+    pub by_hour: Vec<i64>,
+    /// The same range over the previous four comparable periods, averaged.
+    ///
+    /// `None` when there is not enough history — and that is reported rather
+    /// than papered over. A "vs. average" arrow computed from one prior week is
+    /// noise wearing the costume of a trend, so the baseline states how many
+    /// periods it actually had.
+    pub baseline: Option<WorkBaseline>,
+    pub score: WorkScore,
+}
+
+/// What the last few comparable periods looked like, so every headline figure
+/// can say whether it is up or down.
+///
+/// Averaged over periods **with something recorded in them**. A week you did
+/// not use Fruit is silence, not a zero, and averaging it in would manufacture
+/// a downward trend out of a holiday — the same rule the goal calibration
+/// already applies.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkBaseline {
+    /// How many prior periods actually contributed. Shown, not hidden: "vs. the
+    /// last 2 weeks" and "vs. the last 4" are different claims.
+    pub periods: i64,
+    pub total_work_sec: i64,
+    pub focus_sec: i64,
+    pub focus_sessions: i64,
+    pub score: i64,
+    /// Average length of a working day, over days with any work in them.
+    pub day_length_sec: i64,
+}
+
+/// One legible number for how the period went, and the arithmetic behind it.
+///
+/// Rize ships a "focus quality score" derived from twenty-plus attributes and
+/// shows none of them. A score you cannot open is a score you cannot argue
+/// with, and this app's whole position is that a figure you cannot audit is a
+/// figure you do not believe — so this one has four inputs, each of which is
+/// reported with its own value and weight, and the panel prints the sum.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkScore {
+    /// 0–100.
+    pub value: i64,
+    /// A word, so the number is never the only carrier.
+    pub rating: String,
+    pub components: Vec<ScoreComponent>,
+    /// False when there was nothing to score. A score of 0 for a week you were
+    /// on holiday is a verdict the app has no business delivering.
+    pub scored: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScoreComponent {
+    pub label: String,
+    /// What this input scored, 0–100.
+    pub value: i64,
+    /// Its share of the total, 0–1.
+    pub weight: f64,
+    /// The sentence that says where the number came from.
+    pub detail: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1629,6 +1697,16 @@ pub struct WorkDay {
     /// the target line only where it means something.
     pub target_applies: bool,
     pub focus_sec: i64,
+    /// When work first started and last stopped on this day, local ms.
+    ///
+    /// The *span* of the working day, which is a different fact from its
+    /// length: six hours between 09:00 and 15:00 and six hours between 09:00
+    /// and 23:00 are the same total and very different days.
+    pub first_at: Option<Millis>,
+    pub last_at: Option<Millis>,
+    /// Confirmed non-work life time, so the day bar can show what the rest of
+    /// the day went to rather than implying the remainder was idle.
+    pub life_sec: i64,
 }
 
 /// A named share of the work total. Used for both the category and project

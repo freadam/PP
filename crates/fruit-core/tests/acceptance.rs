@@ -933,6 +933,74 @@ fn the_work_report_answers_all_five_questions() {
     assert_eq!((december.from.as_str(), december.to.as_str()), ("2025-12-01", "2025-12-31"));
 }
 
+/// The analytics the report is built on: the hour histogram, the day span, the
+/// four-period baseline, and the score's arithmetic.
+#[test]
+fn the_work_report_compares_against_history_and_shows_its_arithmetic() {
+    let (mut store, clock) = store_at(at(2025, 7, 7, 8, 0));
+    let t = task(&mut store, "The work");
+
+    // Four prior weeks with two hours on the Monday of each, then this week
+    // with four. The baseline should read 2h and this week should read 4h.
+    for week in 0..5 {
+        let monday = at(2025, 7, 7, 9, 0) + week * 7 * 86_400_000;
+        clock.set(monday);
+        store.start_timer(&t.id, None).unwrap();
+        clock.advance(if week == 4 { 4 * 3_600_000 } else { 2 * 3_600_000 });
+        store.stop_timer().unwrap();
+    }
+
+    let report = store.get_work_report("2025-08-04", "week", TZ).unwrap();
+    assert_eq!(report.total_work_sec, 4 * 3600);
+
+    let base = report.baseline.expect("four prior weeks all had work in them");
+    assert_eq!(base.periods, 4);
+    assert_eq!(base.total_work_sec, 2 * 3600);
+
+    // The hour histogram splits at hour boundaries and sums to the total, so a
+    // session crossing an hour is counted in both — for the minutes it spent in
+    // each, once.
+    assert_eq!(report.by_hour.len(), 24);
+    assert_eq!(report.by_hour.iter().sum::<i64>(), report.total_work_sec);
+    assert_eq!(report.by_hour[9], 3600, "09:00–10:00 is a full hour");
+    assert_eq!(report.by_hour[12], 3600, "…and so is 12:00–13:00");
+    assert_eq!(report.by_hour[13], 0, "work stopped at 13:00");
+
+    // The span of the day, which is a different fact from its length.
+    let monday = report.days.iter().find(|d| d.date == "2025-08-04").unwrap();
+    assert_eq!(monday.work_sec, 4 * 3600);
+    assert!(monday.first_at.is_some() && monday.last_at.is_some());
+    assert_eq!(
+        (monday.last_at.unwrap() - monday.first_at.unwrap()) / 1000,
+        4 * 3600
+    );
+
+    // The score is a weighted sum of components that are each reported, so the
+    // panel can print the arithmetic rather than asking to be trusted.
+    assert!(report.score.scored);
+    let summed: f64 = report
+        .score
+        .components
+        .iter()
+        .map(|c| c.value as f64 * c.weight)
+        .sum();
+    assert_eq!(report.score.value, summed.round() as i64);
+    assert_eq!(
+        report.score.components.iter().map(|c| c.weight).sum::<f64>(),
+        1.0,
+        "the weights have to be a whole"
+    );
+    assert!(!report.score.rating.is_empty());
+
+    // A period with nothing in it is *not scored*, rather than scored zero. A
+    // 0/100 for a week on holiday is a verdict the app has no business giving.
+    let empty = store.get_work_report("2024-01-08", "week", TZ).unwrap();
+    assert!(!empty.score.scored);
+    assert_eq!(empty.score.rating, "Not scored");
+    // …and it has no baseline either, rather than a fabricated one.
+    assert!(empty.baseline.is_none());
+}
+
 /// A category is a taxonomy, so deleting one frees its tasks rather than
 /// destroying them — and never touches the time recorded against them.
 #[test]

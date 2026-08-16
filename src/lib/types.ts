@@ -814,6 +814,40 @@ export interface WorkReport {
   byProject: WorkSlice[];
   focus: FocusSummary;
   apps: AppUsage[];
+  /** Confirmed work by hour of local day, 0–23. Answers "*when* do I work",
+   *  which no total can. Sums to `totalWorkSec`. */
+  byHour: number[];
+  /** The same range over the previous four comparable periods. `null` when
+   *  there is not enough history — reported rather than papered over. */
+  baseline: WorkBaseline | null;
+  score: WorkScore;
+}
+
+export interface WorkBaseline {
+  /** How many prior periods contributed. "vs. the last 2" and "vs. the last 4"
+   *  are different claims, so the count is shown. */
+  periods: number;
+  totalWorkSec: number;
+  focusSec: number;
+  focusSessions: number;
+  score: number;
+  dayLengthSec: number;
+}
+
+export interface WorkScore {
+  value: number;
+  rating: string;
+  components: ScoreComponent[];
+  /** False when there was nothing to score. A 0/100 for a week on holiday is a
+   *  verdict the app has no business delivering. */
+  scored: boolean;
+}
+
+export interface ScoreComponent {
+  label: string;
+  value: number;
+  weight: number;
+  detail: string;
 }
 
 export interface WorkDay {
@@ -821,6 +855,11 @@ export interface WorkDay {
   workSec: number;
   targetApplies: boolean;
   focusSec: number;
+  /** When work first started and last stopped. The *span* of the day, a
+   *  different fact from its length. */
+  firstAt: Millis | null;
+  lastAt: Millis | null;
+  lifeSec: number;
 }
 
 /** A named share of the work total — the same shape for categories and
