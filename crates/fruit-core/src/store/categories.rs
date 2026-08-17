@@ -903,6 +903,45 @@ mod tests {
         );
     }
 
+    /// **The real Chrome case.** With the connector running, one stretch of
+    /// browsing produces *two* rows: the foreground observer's `chrome.exe`
+    /// with no domain, and the connector's `chrome.exe` carrying the site. The
+    /// reader subtracts the overlap so the site is what you see — and labelling
+    /// the site has to clear the row underneath it too, or the time comes
+    /// straight back as unlabelled browser time.
+    #[test]
+    fn labelling_a_site_also_clears_the_browser_span_underneath_it() {
+        let (mut s, clock) = store();
+        let start = clock.now();
+
+        // The foreground observer sees Chrome for the whole half hour…
+        observe(&mut s, &clock, "chrome.exe", None, 30);
+        // …and the connector reports the site over the same half hour.
+        clock.set(start);
+        observe(&mut s, &clock, "chrome.exe", Some("wiki.example"), 30);
+
+        let rows = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        assert_eq!(
+            rows.iter().map(|r| r.match_value.as_str()).collect::<Vec<_>>(),
+            ["wiki.example"],
+            "the reader shows the site, not the browser under it"
+        );
+
+        let study = named(&s, "Study");
+        s.set_activity_rule(MatchKind::Domain, "wiki.example", &study)
+            .unwrap();
+
+        // The site is labelled and gone from the list — and, the part that
+        // matters, no `chrome.exe` row has appeared in its place.
+        let after = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        assert!(
+            after.is_empty(),
+            "labelling the site left {:?} behind",
+            after.iter().map(|r| (&r.match_kind, &r.match_value, r.seconds)).collect::<Vec<_>>()
+        );
+        assert_eq!(totals(&s), [("Study".to_string(), 30 * 60)]);
+    }
+
     /// Deleting a label must not delete the observation it was on. The time
     /// returns to unlabelled and reappears on the list, rather than vanishing.
     #[test]

@@ -139,11 +139,20 @@ export function Activity() {
             rows={unlabelled}
             cats={cats}
             titlesOn={status.settings.titlesEnabled}
-            // Domains switched on is necessary but not sufficient: the extension
-            // has to be delivering. A span that actually carries a site is the
-            // only proof of that, so it is what the notice keys on.
-            connected={
-              status.settings.domainsEnabled && (day?.spans.some((s) => s.domain) ?? false)
+            // Why sites are missing, rather than whether they are. There are
+            // four reasons and they need different actions from the user;
+            // asserting the wrong one sends them to a screen where everything
+            // already looks correct.
+            siteState={
+              !status.settings.enabled
+                ? "activityOff"
+                : status.settings.paused
+                  ? "paused"
+                  : !status.settings.domainsEnabled
+                    ? "domainsOff"
+                    : (day?.spans.some((s) => s.domain) ?? false)
+                      ? "ok"
+                      : "notDelivering"
             }
             onDone={reload}
           />
@@ -415,17 +424,62 @@ function isBrowser(appId: string): boolean {
   return BROWSERS.includes(name);
 }
 
+/**
+ * Why the browser is one row rather than a list of sites.
+ *
+ * Four separate causes, each needing a different action. The notice used to
+ * assert one of them — "the extension is not connected" — whatever the real
+ * reason was, which is the worst possible failure for a diagnostic: someone
+ * whose extension *is* connected follows the instruction, finds the screen
+ * already correct, and concludes the feature is broken.
+ *
+ * Recording a site is gated on three switches and a delivery, and only the
+ * last of those is the extension.
+ */
+type SiteState = "ok" | "activityOff" | "paused" | "domainsOff" | "notDelivering";
+
+const SITE_REASON: Record<SiteState, React.ReactNode> = {
+  ok: null,
+  activityOff: (
+    <>
+      Activity recording is off, so nothing is being observed at all. Settings → Activity turns
+      it on.
+    </>
+  ),
+  paused: (
+    <>
+      Activity is <b>paused</b>, so nothing new is being recorded. Resume it in Settings →
+      Activity or from the indicator in the top bar.
+    </>
+  ),
+  domainsOff: (
+    <>
+      Recording <b>which site</b> is a separate switch from recording which application, and it
+      is off — which is the default, because the sites you visit are more revealing than the
+      programs you run. Settings → Activity → <b>Track websites</b> turns it on. Having the
+      extension connected is not enough on its own; both are needed.
+    </>
+  ),
+  notDelivering: (
+    <>
+      Sites are switched on, but nothing has arrived from the browser yet. That is the
+      extension's half: Settings → Activity → <b>Browser extension</b> shows whether it is
+      connected.
+    </>
+  ),
+};
+
 function Unlabelled({
   rows,
   cats,
   titlesOn,
-  connected,
+  siteState,
   onDone,
 }: {
   rows: UnlabelledRow[];
   cats: ObservationCategory[];
   titlesOn: boolean;
-  connected: boolean;
+  siteState: SiteState;
   onDone: () => void;
 }) {
   const run = useApp((s) => s.run);
@@ -469,17 +523,15 @@ function Unlabelled({
         every stretch of it that had no label — so it leaves this list. Anything already
         carrying a label keeps it.
       </p>
-      {browserRows.length > 0 && !connected && (
+      {browserRows.length > 0 && siteState !== "ok" && (
         <p className="caption">
           <b>
             {browserRows.map((r) => r.matchValue).join(", ")} appears as one application, not
             as the sites inside it.
           </b>{" "}
-          Fruit can only see which window is in front; which <i>tab</i> takes the browser
-          extension, and it is not connected yet. Until it is, labelling{" "}
-          {browserRows[0]!.matchValue} labels <i>all</i> browsing at once — expand it and
-          label the stretches individually instead, or set the sites up in advance under
-          Settings → Labels. Settings → Activity → <b>Browser extension</b> connects it.
+          {SITE_REASON[siteState]} Until then, labelling {browserRows[0]!.matchValue} labels{" "}
+          <i>all</i> browsing at once — expand it and label the stretches individually
+          instead, or set the sites up in advance under Settings → Labels.
         </p>
       )}
       <div className="stack" style={{ gap: 8 }}>

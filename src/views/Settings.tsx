@@ -867,7 +867,28 @@ function ConnectorInstall({ enabled }: { enabled: boolean }) {
     }
   };
 
-  if (!enabled) return null;
+  // Shown even when websites are off, and saying why.
+  //
+  // This used to `return null`, which produced the worst possible dead end:
+  // the Activity view told people to go to Settings → Activity → Browser
+  // extension, and the section was not on the screen when they got there —
+  // because it was hidden behind the very switch they had not turned on. A
+  // control that vanishes is a control the user concludes does not exist.
+  if (!enabled) {
+    return (
+      <Field
+        label="Browser extension"
+        hint="Chrome and Edge only. Fruit cannot see a tab's domain without it — an application sampler sees chrome.exe and nothing more."
+      >
+        <p className="caption">
+          Turn on <b>Track websites</b> above first. The extension and the switch are both
+          needed: the switch decides whether Fruit may store a domain at all, and the
+          extension is what supplies one. With the switch off, a connected extension records
+          nothing.
+        </p>
+      </Field>
+    );
+  }
 
   return (
     <Field
