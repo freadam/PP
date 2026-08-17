@@ -444,7 +444,31 @@ impl Store {
     ///
     /// Passing `None` returns the span to unlabelled, which puts it back on the
     /// uncategorised list rather than silently filing it as Other.
-    pub fn set_span_category(&mut self, span_id: i64, category_id: Option<&str>) -> Result<()> {
+    /// Label one stretch of observation — the "that visit only" buttons.
+    ///
+    /// # Why this is not `UPDATE … WHERE id = ?`
+    ///
+    /// The id the list hands out does **not** identify the stretch the user
+    /// clicked, because the reader reshapes rows on the way out:
+    ///
+    /// * `apply_min_span` **merges** adjacent same-subject spans across the
+    ///   gaps left by dropped short observation, and the merged span keeps only
+    ///   the *first* row's id. Labelling by that id alone would clear three
+    ///   minutes of eighteen — the stretch would stay on the list with most of
+    ///   its time still unlabelled, and the totals would move by a fraction of
+    ///   what the screen said.
+    /// * `dedupe_browser_overlap` **splits** an app span into the pieces a
+    ///   domain span does not cover, and every piece carries the original id.
+    ///
+    /// So the id is a *handle* to a stretch, not a primary key for it. This
+    /// resolves the handle back through the same reader the list was built
+    /// from — never a second implementation of the merge — and labels every row
+    /// the stretch was made of.
+    ///
+    /// Returns the seconds that moved, so the caller can say so. A label that
+    /// silently moves less time than the row it was clicked on is the failure
+    /// this signature exists to make visible.
+    pub fn set_span_category(&mut self, span_id: i64, category_id: Option<&str>) -> Result<i64> {
         let counts_as = match category_id {
             Some(id) => {
                 validate_id(id, "category")?;
@@ -460,14 +484,57 @@ impl Store {
             }
             None => None,
         };
+
+        let (row_from, row_to, app_id, domain): (Millis, Millis, String, Option<String>) = self
+            .conn
+            .query_row(
+                "SELECT started_at, ended_at, app_id, domain FROM activity_span WHERE id = ?1",
+                [span_id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .map_err(|_| AppError::invalid("That interval no longer exists."))?;
+
+        // Resolve the handle back to the stretch. A day either side is ample —
+        // the merge only ever joins spans separated by less than the short-span
+        // floor, so a stretch cannot outrun its own row by more than that.
+        const MARGIN_MS: Millis = 24 * 3_600_000;
+        let (from, to) = self
+            .observed_spans(row_from - MARGIN_MS, row_to + MARGIN_MS)?
+            .into_iter()
+            .filter(|s| s.id == span_id)
+            // A split row yields several pieces sharing one id; take the whole
+            // extent they cover, which is the row itself. Over-labelling a row
+            // the user pointed at is the existing behaviour and the safe half of
+            // the trade — under-labelling is the one that looks broken.
+            .fold(None, |acc: Option<(Millis, Millis)>, s| {
+                Some(match acc {
+                    Some((a, b)) => (a.min(s.started_at), b.max(s.ended_at)),
+                    None => (s.started_at, s.ended_at),
+                })
+            })
+            .unwrap_or((row_from, row_to));
+
+        // Same subject, inside the stretch. `IS` rather than `=` so a NULL
+        // domain matches a NULL domain — with `=` every browser stretch, which
+        // is exactly the case this was reported on, would match nothing at all.
+        let moved: i64 = self.conn.query_row(
+            "SELECT COALESCE(SUM((MIN(ended_at, ?3) - MAX(started_at, ?2)) / 1000), 0)
+               FROM activity_span
+              WHERE app_id = ?1 AND domain IS ?4
+                AND started_at < ?3 AND ended_at > ?2",
+            params![app_id, from, to, domain],
+            |r| r.get(0),
+        )?;
         let n = self.conn.execute(
-            "UPDATE activity_span SET category_id = ?2, category = ?3 WHERE id = ?1",
-            params![span_id, category_id, counts_as],
+            "UPDATE activity_span SET category_id = ?5, category = ?6
+              WHERE app_id = ?1 AND domain IS ?4
+                AND started_at < ?3 AND ended_at > ?2",
+            params![app_id, from, to, domain, category_id, counts_as],
         )?;
         if n == 0 {
             return Err(AppError::invalid("That interval no longer exists."));
         }
-        Ok(())
+        Ok(moved)
     }
 
     // ─── what has no label yet ─────────────────────────────────────────
@@ -940,6 +1007,63 @@ mod tests {
             after.iter().map(|r| (&r.match_kind, &r.match_value, r.seconds)).collect::<Vec<_>>()
         );
         assert_eq!(totals(&s), [("Study".to_string(), 30 * 60)]);
+    }
+
+    /// **Labelling one stretch labels the whole stretch.**
+    ///
+    /// The reader drops observation under the short-span floor and merges what
+    /// is left across the gap, so several rows can arrive as one stretch
+    /// carrying the first row's id. Labelling by that id alone would clear a
+    /// fraction of what the screen said — the stretch would stay on the list
+    /// and the totals would barely move.
+    #[test]
+    fn labelling_a_stretch_labels_every_row_it_was_merged_from() {
+        let (mut s, clock) = store();
+        // Two separate runs of the editor with a sub-floor glance at Chrome
+        // between them. The reader drops the glance and merges the two runs.
+        observe(&mut s, &clock, "code.exe", None, 3);
+        clock.advance(60_000);
+        observe(&mut s, &clock, "code.exe", None, 3);
+
+        let rows = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        let code = rows.iter().find(|r| r.match_value == "code.exe").unwrap();
+        let stretch = &code.stretches[0];
+
+        let study = named(&s, "Study");
+        let moved = s.set_span_category(stretch.id, Some(&study)).unwrap();
+
+        // Everything the stretch covered moved, and it reports how much — a
+        // label that quietly moves less than the row it was clicked on is the
+        // failure the return value exists to make visible.
+        assert!(moved >= 6 * 60, "only {moved}s moved");
+        assert!(
+            !s.get_unlabelled(DATE, DATE, "UTC", 10)
+                .unwrap()
+                .iter()
+                .any(|r| r.match_value == "code.exe"),
+            "the stretch should have left the list"
+        );
+    }
+
+    /// A browser stretch has a NULL domain, and `domain = NULL` is never true in
+    /// SQL. Matching with `=` instead of `IS` would make labelling one Chrome
+    /// stretch move nothing at all — the exact shape of the report this came
+    /// from — so it gets its own test rather than riding on the one above.
+    #[test]
+    fn labelling_a_stretch_with_no_domain_still_moves_its_time() {
+        let (mut s, clock) = store();
+        observe(&mut s, &clock, "chrome.exe", None, 8);
+
+        let rows = s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap();
+        let chrome = rows.iter().find(|r| r.match_value == "chrome.exe").unwrap();
+        let study = named(&s, "Study");
+        let moved = s
+            .set_span_category(chrome.stretches[0].id, Some(&study))
+            .unwrap();
+
+        assert_eq!(moved, 8 * 60);
+        assert_eq!(totals(&s), [("Study".to_string(), 8 * 60)]);
+        assert!(s.get_unlabelled(DATE, DATE, "UTC", 10).unwrap().is_empty());
     }
 
     /// Deleting a label must not delete the observation it was on. The time

@@ -489,12 +489,22 @@ function Unlabelled({
   if (rows.length === 0) return null;
 
   /** One interval, no rule — the YouTube-lecture case. */
-  const labelOne = async (spanId: number, categoryId: string) => {
-    const ok = await run(
+  const labelOne = async (spanId: number, categoryId: string, seconds: number) => {
+    const moved = await run(
       () => ipc.setSpanCategory(spanId, categoryId),
       "Couldn't label that interval.",
     );
-    if (ok !== null) onDone();
+    if (moved === null) return;
+    const name = cats.find((c) => c.id === categoryId)?.name ?? "that";
+    // Says how much moved rather than letting the figures change quietly — and
+    // says so out loud when it is less than the stretch you clicked, which is
+    // what a labelling bug looks like from the outside.
+    toast(
+      moved >= seconds
+        ? `${fmt.duration(moved)} → ${name}.`
+        : `${fmt.duration(moved)} of ${fmt.duration(seconds)} → ${name}. The rest of that stretch already carries a label.`,
+    );
+    onDone();
   };
 
   const label = async (row: UnlabelledRow, categoryId: string) => {
@@ -592,7 +602,7 @@ function Unlabelled({
                       <CategoryPicker
                         cats={cats}
                         current={st.categoryId}
-                        onPick={(id) => void labelOne(st.id, id)}
+                        onPick={(id) => void labelOne(st.id, id, st.seconds)}
                       />
                     </div>
                   ))}

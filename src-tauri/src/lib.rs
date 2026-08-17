@@ -668,11 +668,12 @@ fn delete_activity_rule(state: State<'_, AppState>, id: String) -> Res<()> {
 /// Relabels one observed interval without touching any rule — the YouTube case:
 /// Distraction by default, and *this* video was a lecture.
 #[tauri::command]
+/// Returns the seconds that moved, so the toast can say so.
 fn set_span_category(
     state: State<'_, AppState>,
     span_id: i64,
     category_id: Option<String>,
-) -> Res<()> {
+) -> Res<i64> {
     with(&state, |s| {
         s.set_span_category(span_id, category_id.as_deref())
     })

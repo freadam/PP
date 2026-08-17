@@ -465,8 +465,11 @@ export const deleteActivityRule = (id: string) => call<void>("delete_activity_ru
  * The YouTube case: Distraction by default, and *this* video was a lecture.
  * Fruit never sees the URL or the page title, so only you can say.
  */
+/** Labels the whole stretch the id belongs to, and returns the seconds that
+ *  moved — a label that quietly moves less than the row it was clicked on is
+ *  the failure this return value exists to surface. */
 export const setSpanCategory = (spanId: number, categoryId: string | null) =>
-  call<void>("set_span_category", { spanId, categoryId });
+  call<number>("set_span_category", { spanId, categoryId });
 
 export const getUnlabelled = (from: LocalDate, to: LocalDate, tz: string, limit = 12) =>
   call<UnlabelledRow[]>("get_unlabelled", { from, to, tz, limit });
