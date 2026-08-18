@@ -1824,6 +1824,145 @@ fn keeping_an_idle_span_rejoins_the_segment() {
     assert_eq!(sessions[0].elapsed_sec, 30 * 60);
 }
 
+/// Keeping an idle span, then **carrying on working**.
+///
+/// The existing keep test stops the timer immediately afterwards. The real app
+/// ticks once a second and the session runs on for a while, which is the shape
+/// a user actually produces — and the shape a report of "the start and end are
+/// right but the duration is wrong" points at.
+#[test]
+fn a_kept_idle_span_survives_the_ticks_that_follow_it() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 11, 33));
+    let t = task(&mut store, "Adey - ATI");
+    store.start_timer(&t.id, None).unwrap();
+
+    // Seven minutes of work, then fourteen idle.
+    clock.advance(7 * 60_000);
+    let last_input = clock.now();
+    clock.advance(14 * 60_000);
+    store.tick(Some(IdleReport { last_input_at: last_input })).unwrap();
+    assert_eq!(store.timer_state().unwrap().phase, TimerPhase::IdleChallenge);
+
+    let kept = store.resolve_idle(IdleAction::Keep).unwrap();
+    assert_eq!(kept.elapsed_sec, 21 * 60, "the whole span counts");
+
+    // …and then the app goes on ticking, as it does every second in real use.
+    for _ in 0..12 {
+        clock.advance(5_000);
+        store.tick(None).unwrap();
+    }
+    assert_eq!(
+        store.timer_state().unwrap().elapsed_sec,
+        22 * 60,
+        "a minute of ticks after the keep, on top of the twenty-one"
+    );
+
+    store.stop_timer().unwrap();
+    let sessions = store.get_task_detail(&t.id).unwrap().sessions;
+    assert_eq!(sessions.len(), 1, "kept means one interval, not two");
+    let s = &sessions[0];
+    // The reported failure: endpoints right, duration wrong. Assert both, and
+    // assert they agree — a session whose elapsed does not match its own span
+    // is the thing the screenshot showed.
+    assert_eq!(s.elapsed_sec, 22 * 60);
+    assert_eq!(
+        (s.ended_at.unwrap() - s.started_at) / 1000,
+        s.elapsed_sec,
+        "a kept span means the record is continuous, so the two must agree"
+    );
+}
+
+/// **Keeping a span that outlasted what was counted inside it.**
+///
+/// The rollback that opens the challenge is `(run_ms - idle_ms).max(0)`, and a
+/// clamp is not reversible by addition. `idle_ms` is wall time since the last
+/// input; the accumulator only holds what the *monotonic* clock counted. A
+/// laptop on modern standby naps in short bursts — each divergence too small to
+/// read as a suspend, so no burst trips the sleep branch — and over a quarter of
+/// an hour the two drift a long way apart. `idle_ms` then exceeds everything
+/// ever counted, the clamp throws the excess away, and the old
+/// `run_ms += pending_ms` could not give it back.
+///
+/// The session read with **correct endpoints and a short duration**, which is
+/// exactly what a kept span must never do, and exactly how it was reported.
+#[test]
+fn keeping_a_span_longer_than_what_was_counted_returns_all_of_it() {
+    let (mut store, clock) = store_at(at(2025, 7, 30, 11, 33));
+    let t = task(&mut store, "Adey - ATI");
+    store.start_timer(&t.id, None).unwrap();
+
+    // Seven minutes of real work.
+    clock.advance(7 * 60_000);
+    let last_input = clock.now();
+
+    // Fourteen minutes of the machine dozing: twenty-eight naps of half a
+    // minute each, every one of them under the sixty-second suspend threshold,
+    // with a tick between so no single divergence is ever large enough to be
+    // read as a sleep. Wall time runs on; almost nothing is counted.
+    for _ in 0..28 {
+        clock.sleep(30_000);
+        store.tick(None).unwrap();
+    }
+
+    store.tick(Some(IdleReport { last_input_at: last_input })).unwrap();
+    assert_eq!(
+        store.timer_state().unwrap().phase,
+        TimerPhase::IdleChallenge,
+        "fourteen minutes without input is an idle challenge"
+    );
+
+    let kept = store.resolve_idle(IdleAction::Keep).unwrap();
+    assert_eq!(
+        kept.elapsed_sec,
+        21 * 60,
+        "keeping means the whole span counts, not whatever survived the clamp"
+    );
+
+    store.stop_timer().unwrap();
+    let sessions = store.get_task_detail(&t.id).unwrap().sessions;
+    assert_eq!(sessions.len(), 1, "kept means one interval, not two");
+    assert_eq!(sessions[0].elapsed_sec, 21 * 60);
+    assert_eq!(
+        (sessions[0].ended_at.unwrap() - sessions[0].started_at) / 1000,
+        sessions[0].elapsed_sec,
+        "a kept span is continuous, so its duration must match its own endpoints"
+    );
+}
+
+/// The other half of the reprieve.
+///
+/// A challenge closes its segment without deleting it, so that keeping the span
+/// has a row to reopen. Answering anything else ends the reprieve: an interval
+/// with nothing counted in it is noise, and must not survive in the Sessions
+/// tab just because it was once the subject of a question.
+#[test]
+fn a_challenged_segment_with_nothing_in_it_is_not_kept_by_refusing_it() {
+    for action in [IdleAction::Discard, IdleAction::AssignToBreak] {
+        let (mut store, clock) = store_at(at(2025, 7, 30, 11, 33));
+        let t = task(&mut store, "Adey - ATI");
+        store.start_timer(&t.id, None).unwrap();
+
+        // The machine dozes from the moment the timer starts, so the segment
+        // ends up holding no counted time at all.
+        let last_input = clock.now();
+        for _ in 0..28 {
+            clock.sleep(30_000);
+            store.tick(None).unwrap();
+        }
+        store.tick(Some(IdleReport { last_input_at: last_input })).unwrap();
+        assert_eq!(store.timer_state().unwrap().phase, TimerPhase::IdleChallenge);
+
+        store.resolve_idle(action).unwrap();
+        store.stop_timer().unwrap();
+
+        let sessions = store.get_task_detail(&t.id).unwrap().sessions;
+        assert!(
+            sessions.iter().all(|s| s.elapsed_sec > 0),
+            "{action:?} left an empty interval behind: {sessions:?}"
+        );
+    }
+}
+
 /// Start and stop both take the wall clock, so a session's endpoints are the
 /// times a person would recognise — never a figure derived from the counter.
 #[test]

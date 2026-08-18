@@ -54,6 +54,26 @@ pub struct TimerRuntime {
     /// The span awaiting a keep/discard decision.
     pending_span: Option<(Millis, Millis)>,
     pending_ms: i64,
+    /// What the two accumulators must read if the span is **kept**.
+    ///
+    /// Keeping means the segment is *continuous*: it covers wall time from the
+    /// moment it started to now, with nothing subtracted. So these are computed
+    /// from the segment's own start rather than by adding the pending span onto
+    /// whatever the accumulator happens to hold.
+    ///
+    /// That distinction is the whole bug. The accumulator counts on the
+    /// monotonic clock, and `idle_ms` is wall time since the last input — on a
+    /// laptop that naps through the idle stretch in bursts too short to read as
+    /// a suspend, the two drift a long way apart. The rollback
+    /// `(run_ms - idle_ms).max(0)` then clamps at zero, and `run_ms +=
+    /// pending_ms` cannot return what the clamp ate. The session came out with
+    /// correct endpoints and a duration short by the difference, which is
+    /// exactly what a kept span must never do.
+    restore_run_ms: i64,
+    restore_segment_ms: i64,
+    /// The row a challenge closed but declined to delete, so that answering
+    /// anything other than "keep" can still clear it if it turned out empty.
+    challenge_session_id: Option<String>,
     recovery_session_id: Option<String>,
     pomodoro: Option<PomodoroState>,
     /// §6.5: elapsed never decreases *while running*. A user-authorised trim
@@ -76,6 +96,9 @@ impl Default for TimerRuntime {
             last_heartbeat: 0,
             pending_span: None,
             pending_ms: 0,
+            restore_run_ms: 0,
+            restore_segment_ms: 0,
+            challenge_session_id: None,
             recovery_session_id: None,
             pomodoro: None,
             floor_sec: 0,
@@ -191,6 +214,27 @@ impl Store {
     /// A segment with nothing counted in it is deleted rather than kept: an
     /// empty interval in the Sessions tab is noise, not a record.
     fn close_segment(&mut self, end: Millis) -> Result<()> {
+        self.close_segment_inner(end, true)
+    }
+
+    /// Closes the segment but never deletes the row, for the two paths that
+    /// raise an idle challenge.
+    ///
+    /// An empty segment is normally deleted — an interval with nothing counted
+    /// in it is noise, not a record. But a challenge is a *pending question*,
+    /// and keeping the span means reopening the very row that was closed. If
+    /// the trim clamped the counter to zero the row would already be gone, and
+    /// `reopen_last_segment` would have to invent a replacement starting where
+    /// the idle began — so a kept span came back with the right duration on the
+    /// wrong endpoints, having quietly dropped everything before the idle.
+    ///
+    /// The row survives until the user answers. Discarding closes it properly.
+    fn close_segment_for_challenge(&mut self, end: Millis) -> Result<()> {
+        self.timer.challenge_session_id = self.timer.session_id.clone();
+        self.close_segment_inner(end, false)
+    }
+
+    fn close_segment_inner(&mut self, end: Millis, may_delete: bool) -> Result<()> {
         let Some(id) = self.timer.session_id.take() else {
             return Ok(());
         };
@@ -198,7 +242,7 @@ impl Store {
         let elapsed_sec = self.timer.segment_ms / 1000;
 
         let tx = self.conn.transaction()?;
-        if elapsed_sec <= 0 {
+        if elapsed_sec <= 0 && may_delete {
             tx.execute("DELETE FROM time_session WHERE id = ?1", [&id])?;
         } else {
             tx.execute(
@@ -382,7 +426,8 @@ impl Store {
             // "wrong data" a meeting-shaped sleep used to produce.
             let slept_from = now - divergence;
             self.timer.pause(mono);
-            self.close_segment(self.timer.last_heartbeat.max(slept_from))?;
+            self.arm_keep(now);
+            self.close_segment_for_challenge(self.timer.last_heartbeat.max(slept_from))?;
             self.timer.pending_span = Some((slept_from, now));
             self.timer.pending_ms = divergence;
             self.timer.phase = TimerPhase::IdleChallenge;
@@ -399,10 +444,13 @@ impl Store {
                 // is rolled back first; then the segment closes at the last
                 // input, which is the last instant the record can vouch for.
                 self.timer.pause(mono);
+                // Armed *before* the trim, and from the segment's own start
+                // rather than from the accumulator — see `restore_run_ms`.
+                self.arm_keep(now);
                 self.timer.run_ms = (self.timer.run_ms - idle_ms).max(0);
                 self.timer.segment_ms = (self.timer.segment_ms - idle_ms).max(0);
                 self.timer.floor_sec = 0; // an authorised trim resets the floor
-                self.close_segment(report.last_input_at)?;
+                self.close_segment_for_challenge(report.last_input_at)?;
                 self.timer.pending_span = Some((report.last_input_at, now));
                 self.timer.pending_ms = idle_ms;
                 self.timer.phase = TimerPhase::IdleChallenge;
@@ -444,7 +492,6 @@ impl Store {
         }
         let now = self.now();
         let mono = self.clock.mono_ms();
-        let pending = self.timer.pending_ms;
 
         match action {
             // The span counts after all: reopen the segment that was closed at
@@ -452,30 +499,84 @@ impl Store {
             // one continuous interval rather than a suspicious pair.
             IdleAction::Keep => {
                 // Reopen first: closing the segment banked its counted time
-                // into the row and zeroed the runtime figure, so the reopen has
-                // to restore it before the kept span is added on top.
+                // into the row and zeroed the runtime figure. Then put the
+                // accumulators back to exactly what they read before the trim,
+                // rather than adding the pending span onto whatever survived
+                // it — see `restore_run_ms`.
                 self.reopen_last_segment()?;
-                self.timer.run_ms += pending;
-                self.timer.segment_ms += pending;
+                self.timer.run_ms = self.timer.restore_run_ms;
+                self.timer.segment_ms = self.timer.restore_segment_ms;
                 self.timer.phase = TimerPhase::Running;
                 self.timer.resume(mono);
             }
             // The honest default. A fresh segment starts now, so the gap is
             // visible in the record as a gap.
             IdleAction::Discard => {
+                self.drop_empty_challenge_row()?;
                 self.open_segment(now)?;
             }
             IdleAction::AssignToBreak => {
+                self.drop_empty_challenge_row()?;
                 self.timer.phase = TimerPhase::Break;
             }
         }
+        self.timer.challenge_session_id = None;
         self.timer.pending_span = None;
         self.timer.pending_ms = 0;
+        self.timer.restore_run_ms = 0;
+        self.timer.restore_segment_ms = 0;
         self.timer.last_wall = now;
         self.timer.last_mono = mono;
         self.timer.last_heartbeat = now;
         self.timer.floor_sec = (self.timer.run_elapsed_ms(mono) / 1000).max(0);
         self.timer_state()
+    }
+
+    /// Works out what keeping the span would mean, before the segment closes.
+    ///
+    /// Keeping makes the segment continuous, so it must end up covering wall
+    /// time from where it started to `now`. Whatever the accumulator is short
+    /// of that — because the monotonic clock stood still while the machine
+    /// dozed — is added to the run as well, since the run contains the segment.
+    ///
+    /// Reading the segment's start from the row rather than tracking it in the
+    /// runtime keeps one source of truth for when it began: the record.
+    fn arm_keep(&mut self, now: Millis) {
+        let started_at: Option<Millis> = self.timer.session_id.as_ref().and_then(|id| {
+            self.conn
+                .query_row(
+                    "SELECT started_at FROM time_session WHERE id = ?1",
+                    [id],
+                    |r| r.get(0),
+                )
+                .ok()
+        });
+        let full_segment_ms = match started_at {
+            Some(start) => (now - start).max(self.timer.segment_ms),
+            // No open segment to measure. Falling back to what is counted keeps
+            // this a no-op rather than a guess.
+            None => self.timer.segment_ms,
+        };
+        self.timer.restore_segment_ms = full_segment_ms;
+        self.timer.restore_run_ms = self.timer.run_ms + (full_segment_ms - self.timer.segment_ms);
+    }
+
+    /// Clears the row a challenge held open, once the answer says it is not
+    /// wanted.
+    ///
+    /// `close_segment_for_challenge` skips the usual delete so that keeping the
+    /// span has a row to reopen. Every other answer means the reprieve is over:
+    /// if nothing was counted in it, it goes, exactly as an ordinary close
+    /// would have left it.
+    fn drop_empty_challenge_row(&mut self) -> Result<()> {
+        let Some(id) = self.timer.challenge_session_id.take() else {
+            return Ok(());
+        };
+        self.conn.execute(
+            "DELETE FROM time_session WHERE id = ?1 AND elapsed_sec <= 0 AND ended_at IS NOT NULL",
+            [&id],
+        )?;
+        Ok(())
     }
 
     /// Undoes the most recent split for this run, for `IdleAction::Keep`.
