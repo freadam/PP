@@ -1236,6 +1236,16 @@ select {
   margin-left: var(--s-4);
 }
 
+/* A project that came from the list you are standing in rather than from
+   something you typed. Outlined instead of filled, because a filled chip is
+   this parser's way of saying "these characters matched" — and no characters
+   did. The word is carried in the text, not the border: the outline is the
+   second encoding, never the only one. */
+.chip[data-inherited="true"] {
+  background: transparent;
+  border: 1px dashed currentColor;
+}
+
 /* ─── Timer chip & pomodoro ──────────────────────────────────────────── */
 
 .timer-chip {

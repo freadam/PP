@@ -46,11 +46,18 @@ export function PlannerBacklog() {
     setCapture("");
     // The full grammar, not a bare title: `~45m #dev !!` all work here, because
     // there is one parser and it lives in Rust.
+    //
+    // Which means passing what it parsed. This used to take the estimate, the
+    // date and the priority and drop the project and the tags on the floor, so
+    // typing `#dev` here stripped `#dev` from the title and then filed the task
+    // under nothing — the one bar whose comment promised otherwise.
     const parsed = await run(() => ipc.parseCapture(title, fmt.tz()));
     await run(
       () =>
         ipc.createTask({
           title: parsed?.title ?? title,
+          projectId: parsed?.projectId ?? null,
+          tags: parsed?.tags ?? [],
           estimateSec: parsed?.estimateSec ?? null,
           dueDate: parsed?.dueDate ?? null,
           priority: parsed?.priority ?? 0,

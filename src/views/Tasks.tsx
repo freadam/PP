@@ -74,6 +74,21 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * The project you are looking at, when you are looking at one.
+   *
+   * Capturing into a filtered list and having the task land in Inbox means it
+   * vanishes from the list you just typed into — the filter hides it. So a
+   * selected project is where new tasks go.
+   *
+   * Resolving the filter against the real projects is also what rules out the
+   * two values that are not projects: `null` for All tasks and `"inbox"` for
+   * Inbox. Both find nothing here, and both mean "no project", which is right.
+   */
+  const projectFilter = useApp((s) => s.projectFilter);
+  const projects = useApp((s) => s.projects);
+  const inherited = projects.find((p) => p.id === projectFilter) ?? null;
+
   useEffect(() => {
     if (!text.trim()) {
       setPreview(null);
@@ -90,6 +105,10 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
     };
   }, [text]);
 
+  /* A typed `#project` wins over the one you are standing in: it is an
+     instruction, and the filter is only a context. */
+  const landsIn = preview?.projectId ? preview.projectName : (inherited?.name ?? null);
+
   const submit = async () => {
     if (!preview || !preview.title.trim()) return;
     const { run, refresh, pushUndo, toast } = useApp.getState();
@@ -99,7 +118,7 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
       () =>
         ipc.createTask({
           title: preview.title,
-          projectId: preview.projectId,
+          projectId: preview.projectId ?? inherited?.id ?? null,
           estimateSec: preview.estimateSec,
           dueDate: preview.dueDate,
           dueAt: preview.dueAt,
@@ -121,7 +140,7 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
         inputRef.current?.focus();
       },
     });
-    toast(`Added "${created.title}"`, {
+    toast(landsIn ? `Added "${created.title}" to ${landsIn}` : `Added "${created.title}"`, {
       action: { label: "Undo", run: () => void useApp.getState().undo() },
     });
     setText("");
@@ -136,8 +155,12 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
         ref={inputRef}
         id="capture-input"
         value={text}
-        placeholder="Capture a task — Fix login bug #work ~45m !! ^tomorrow 9am"
-        aria-label="Quick capture"
+        placeholder={
+          inherited
+            ? `Capture into ${inherited.name} — Fix login bug ~45m !! ^tomorrow 9am`
+            : "Capture a task — Fix login bug #work ~45m !! ^tomorrow 9am"
+        }
+        aria-label={inherited ? `Quick capture into ${inherited.name}` : "Quick capture"}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") void submit();
@@ -155,6 +178,14 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
               {c.display}
             </span>
           ))}
+          {/* The project nobody typed. A chip that looks exactly like a parsed
+              one would claim the text says something it does not, so this is
+              marked as inherited and reads as a place, not a match. */}
+          {!preview.projectId && inherited && (
+            <span className="chip micro" data-kind="project" data-inherited="true">
+              in {inherited.name}
+            </span>
+          )}
           {preview.projectCreates && (
             <span className="caption">
               <span className="kbd">Enter</span> also creates #{preview.projectName}
