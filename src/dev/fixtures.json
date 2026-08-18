@@ -64,7 +64,7 @@
     ],
     "correlations": [
       {
-        "blockId": "01a01457-1cac-77d3-b90a-856fd71f2cae",
+        "blockId": "01a014dc-7497-7882-8b66-fef6438a4962",
         "durationSec": 3600,
         "startsAt": 1787040000000,
         "title": "Refactor auth module",
@@ -84,7 +84,7 @@
         ]
       },
       {
-        "blockId": "01a01457-1cb5-7043-bfc0-19677bef74ae",
+        "blockId": "01a014dc-74a1-7ed0-a127-1a5375718481",
         "durationSec": 900,
         "startsAt": 1787040000000,
         "title": "Daily stand-up",
@@ -96,7 +96,7 @@
         ]
       },
       {
-        "blockId": "01a01457-1cae-7543-bdba-a56759036480",
+        "blockId": "01a014dc-749a-7ac0-9160-135b63523b66",
         "durationSec": 3600,
         "startsAt": 1787047200000,
         "title": "Write the migration guide",
@@ -362,7 +362,7 @@
       "excludedDomains": [],
       "excludedTitlePatterns": [],
       "minSpanSec": 120,
-      "nextPurgeAt": 1787134048699,
+      "nextPurgeAt": 1787142787523,
       "paused": false,
       "retentionDays": 90,
       "titlesEnabled": true
@@ -385,7 +385,7 @@
         "key": "today",
         "label": "Today",
         "taskIds": [
-          "01a01457-1caa-7731-b645-c8c9732d8628"
+          "01a014dc-7496-7cb3-b32f-dd929da4b173"
         ]
       },
       {
@@ -401,11 +401,11 @@
         "key": "no-date",
         "label": "No date",
         "taskIds": [
-          "01a01457-1cb0-73a3-8f05-33721e91c0ed",
-          "01a01457-1cb2-7a61-8cd6-c693485bf758",
-          "01a01457-1cab-7370-9cbd-8de7b5b6c282",
-          "01a01457-1cac-77d3-b90a-8580f7e211e6",
-          "01a01457-1cb4-7501-88ff-74386479cd07"
+          "01a014dc-749c-73a2-a104-790f818ef713",
+          "01a014dc-749e-7d02-8d1f-78504304d5b8",
+          "01a014dc-7497-7882-8b66-fee3432c0a88",
+          "01a014dc-7498-7cb1-9cef-4fdc192dc8cb",
+          "01a014dc-74a0-7293-b94e-6aee91c40b43"
         ]
       },
       {
@@ -421,12 +421,12 @@
         "key": "done",
         "label": "Completed",
         "taskIds": [
-          "01a01457-1cb3-7a70-823a-ffc68bc43750",
-          "01a01457-1cb2-7a61-8cd6-c6ab79f05bfe",
-          "01a01457-1cb1-7491-92d0-d4eea99af4bb",
-          "01a01457-1caf-7c40-9ad5-799014d6fccf",
-          "01a01457-1cae-7543-bdba-a54fa3aae5a4",
-          "01a01457-1cad-7560-9eee-22ee6d14e64f"
+          "01a014dc-749f-75e3-b7dc-60eebbc20f14",
+          "01a014dc-749e-7d02-8d1f-78644ceaeca8",
+          "01a014dc-749d-7131-a379-0e3637572791",
+          "01a014dc-749b-7fe1-8020-0aea0ee60f26",
+          "01a014dc-749a-7ac0-9160-1333326b25cb",
+          "01a014dc-7498-7cb1-9cef-4ffc022c3c99"
         ]
       }
     ],
@@ -434,19 +434,19 @@
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648432,
+        "createdAt": 1787056387228,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 900,
         "firstSessionAt": null,
-        "id": "01a01457-1cb0-73a3-8f05-33721e91c0ed",
+        "id": "01a014dc-749c-73a2-a104-790f818ef713",
         "isRollover": false,
         "isScheduled": true,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 3,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 7168.0,
         "status": "open",
         "subtaskDone": 0,
@@ -454,30 +454,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cae-7543-bdba-a554dd09a65d",
+            "id": "01a014dc-749a-7ac0-9160-13407c6ecacd",
             "name": "writing"
           }
         ],
         "title": "Fix the DST off-by-one",
         "trackedSec": 0,
-        "updatedAt": 1787047648432
+        "updatedAt": 1787056387228
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648426,
+        "createdAt": 1787056387222,
         "dueAt": 1787068800000,
         "dueDate": null,
         "energy": null,
         "estimateSec": 900,
         "firstSessionAt": null,
-        "id": "01a01457-1caa-7731-b645-c8c9732d8628",
+        "id": "01a014dc-7496-7cb3-b32f-dd929da4b173",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 2,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 1024.0,
         "status": "open",
         "subtaskDone": 0,
@@ -485,30 +485,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1caa-7731-b645-c8db431cba31",
+            "id": "01a014dc-7497-7882-8b66-feda08a915eb",
             "name": "welcome"
           }
         ],
         "title": "Read the 60-second guide",
         "trackedSec": 0,
-        "updatedAt": 1787047648426
+        "updatedAt": 1787056387222
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648434,
+        "createdAt": 1787056387230,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": null,
         "firstSessionAt": null,
-        "id": "01a01457-1cb2-7a61-8cd6-c693485bf758",
+        "id": "01a014dc-749e-7d02-8d1f-78504304d5b8",
         "isRollover": true,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 2,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 9216.0,
         "status": "open",
         "subtaskDone": 0,
@@ -516,30 +516,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+            "id": "01a014dc-7499-7351-af58-681caf12a105",
             "name": "dev"
           }
         ],
         "title": "Rewrite the sync layer",
         "trackedSec": 0,
-        "updatedAt": 1787047648434
+        "updatedAt": 1787056387230
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648427,
+        "createdAt": 1787056387223,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 3600,
         "firstSessionAt": 1787040000000,
-        "id": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+        "id": "01a014dc-7497-7882-8b66-fee3432c0a88",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1787044440000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 2048.0,
         "status": "open",
         "subtaskDone": 0,
@@ -547,30 +547,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1caa-7731-b645-c8db431cba31",
+            "id": "01a014dc-7497-7882-8b66-feda08a915eb",
             "name": "welcome"
           }
         ],
         "title": "Refactor auth module",
         "trackedSec": 4440,
-        "updatedAt": 1787047648427
+        "updatedAt": 1787056387223
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648428,
+        "createdAt": 1787056387224,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 120,
         "firstSessionAt": null,
-        "id": "01a01457-1cac-77d3-b90a-8580f7e211e6",
+        "id": "01a014dc-7498-7cb1-9cef-4fdc192dc8cb",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 3072.0,
         "status": "open",
         "subtaskDone": 0,
@@ -578,24 +578,24 @@
         "tags": [],
         "title": "Delete this project when you're done",
         "trackedSec": 0,
-        "updatedAt": 1787047648428
+        "updatedAt": 1787056387224
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648436,
+        "createdAt": 1787056387232,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": null,
         "firstSessionAt": 1786975200000,
-        "id": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "id": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1787054400000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 12288.0,
         "status": "open",
         "subtaskDone": 0,
@@ -603,24 +603,24 @@
         "tags": [],
         "title": "Production firefight",
         "trackedSec": 12060,
-        "updatedAt": 1787047648436
+        "updatedAt": 1787056387232
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648436,
-        "createdAt": 1787047648435,
+        "completedAt": 1787056387232,
+        "createdAt": 1787056387231,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 1800,
         "firstSessionAt": 1786968000000,
-        "id": "01a01457-1cb3-7a70-823a-ffc68bc43750",
+        "id": "01a014dc-749f-75e3-b7dc-60eebbc20f14",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1786969500000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 11264.0,
         "status": "done",
         "subtaskDone": 0,
@@ -628,24 +628,24 @@
         "tags": [],
         "title": "Reply to the RFC thread",
         "trackedSec": 1500,
-        "updatedAt": 1787047648436
+        "updatedAt": 1787056387232
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648435,
-        "createdAt": 1787047648434,
+        "completedAt": 1787056387231,
+        "createdAt": 1787056387230,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 1800,
         "firstSessionAt": 1786968000000,
-        "id": "01a01457-1cb2-7a61-8cd6-c6ab79f05bfe",
+        "id": "01a014dc-749e-7d02-8d1f-78644ceaeca8",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1786969500000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 10240.0,
         "status": "done",
         "subtaskDone": 0,
@@ -653,24 +653,24 @@
         "tags": [],
         "title": "Fix the flaky test",
         "trackedSec": 1500,
-        "updatedAt": 1787047648435
+        "updatedAt": 1787056387231
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648434,
-        "createdAt": 1787047648433,
+        "completedAt": 1787056387230,
+        "createdAt": 1787056387229,
         "dueAt": null,
         "dueDate": "2026-08-18",
         "energy": null,
         "estimateSec": 1800,
         "firstSessionAt": 1787306400000,
-        "id": "01a01457-1cb1-7491-92d0-d4eea99af4bb",
+        "id": "01a014dc-749d-7131-a379-0e3637572791",
         "isRollover": false,
         "isScheduled": true,
         "lastSessionAt": 1787306880000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 8192.0,
         "status": "done",
         "subtaskDone": 0,
@@ -678,30 +678,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+            "id": "01a014dc-7499-7351-af58-681caf12a105",
             "name": "dev"
           }
         ],
         "title": "Answer support mail",
         "trackedSec": 480,
-        "updatedAt": 1787047648434
+        "updatedAt": 1787056387230
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648432,
-        "createdAt": 1787047648431,
+        "completedAt": 1787056387228,
+        "createdAt": 1787056387227,
         "dueAt": null,
         "dueDate": "2026-08-18",
         "energy": null,
         "estimateSec": 1800,
         "firstSessionAt": 1787140800000,
-        "id": "01a01457-1caf-7c40-9ad5-799014d6fccf",
+        "id": "01a014dc-749b-7fe1-8020-0aea0ee60f26",
         "isRollover": false,
         "isScheduled": true,
         "lastSessionAt": 1787141700000,
         "parentId": null,
         "priority": 3,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 6144.0,
         "status": "done",
         "subtaskDone": 0,
@@ -709,30 +709,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+            "id": "01a014dc-7499-7351-af58-681caf12a105",
             "name": "dev"
           }
         ],
         "title": "Review the drift rail spec",
         "trackedSec": 900,
-        "updatedAt": 1787047648432
+        "updatedAt": 1787056387228
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648431,
-        "createdAt": 1787047648430,
+        "completedAt": 1787056387227,
+        "createdAt": 1787056387226,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 3600,
         "firstSessionAt": 1787047200000,
-        "id": "01a01457-1cae-7543-bdba-a54fa3aae5a4",
+        "id": "01a014dc-749a-7ac0-9160-1333326b25cb",
         "isRollover": false,
-        "isScheduled": true,
+        "isScheduled": false,
         "lastSessionAt": 1787050800000,
         "parentId": null,
         "priority": 1,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 5120.0,
         "status": "done",
         "subtaskDone": 0,
@@ -740,30 +740,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cae-7543-bdba-a554dd09a65d",
+            "id": "01a014dc-749a-7ac0-9160-13407c6ecacd",
             "name": "writing"
           }
         ],
         "title": "Write the migration guide",
         "trackedSec": 3600,
-        "updatedAt": 1787047648431
+        "updatedAt": 1787056387227
       },
       {
         "categoryId": null,
-        "completedAt": 1787047648430,
-        "createdAt": 1787047648429,
+        "completedAt": 1787056387225,
+        "createdAt": 1787056387224,
         "dueAt": null,
         "dueDate": "2026-08-18",
         "energy": null,
         "estimateSec": 5400,
         "firstSessionAt": 1786953600000,
-        "id": "01a01457-1cad-7560-9eee-22ee6d14e64f",
+        "id": "01a014dc-7498-7cb1-9cef-4ffc022c3c99",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1786959840000,
         "parentId": null,
         "priority": 2,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 4096.0,
         "status": "done",
         "subtaskDone": 0,
@@ -771,13 +771,13 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+            "id": "01a014dc-7499-7351-af58-681caf12a105",
             "name": "dev"
           }
         ],
         "title": "Refactor the scheduler",
         "trackedSec": 6240,
-        "updatedAt": 1787047648430
+        "updatedAt": 1787056387225
       }
     ]
   },
@@ -848,7 +848,7 @@
     "isReconciled": false,
     "isToday": true,
     "localDate": "2026-08-18",
-    "now": 1787047648661,
+    "now": 1787056387482,
     "segments": [
       {
         "evidence": [],
@@ -856,10 +856,10 @@
         "hasDistraction": false,
         "owner": {
           "areaColour": "#5B6472",
-          "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+          "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
           "areaKind": "rest",
           "areaName": "Sleep/Rest",
-          "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+          "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
           "isPrivate": false,
           "kind": "life",
           "label": "Sleep"
@@ -896,10 +896,10 @@
           "contribution": null,
           "kind": "work",
           "projectColour": "#56C2D6",
-          "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+          "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
           "projectName": "Welcome to Fruit",
-          "sessionId": "01a01457-1cac-77d3-b90a-85708794e072",
-          "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+          "sessionId": "01a014dc-7497-7882-8b66-ff063dd2df78",
+          "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
           "taskTitle": "Refactor auth module"
         },
         "to": 1787044440000
@@ -917,10 +917,10 @@
           "contribution": null,
           "kind": "work",
           "projectColour": "#7E8CF0",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "projectName": "Deep work",
-          "sessionId": "01a01457-1d86-77a2-be8a-0036b72f3e66",
-          "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+          "sessionId": "01a014dc-758b-7e10-9804-afbd1fea5eb5",
+          "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
           "taskTitle": "Production firefight"
         },
         "to": 1787044500000
@@ -947,10 +947,10 @@
           "contribution": null,
           "kind": "work",
           "projectColour": "#7E8CF0",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "projectName": "Deep work",
-          "sessionId": "01a01457-1caf-7c40-9ad5-7988cc9da358",
-          "taskId": "01a01457-1cae-7543-bdba-a54fa3aae5a4",
+          "sessionId": "01a014dc-749a-7ac0-9160-136cd9a28b80",
+          "taskId": "01a014dc-749a-7ac0-9160-1333326b25cb",
           "taskTitle": "Write the migration guide"
         },
         "to": 1787050800000
@@ -968,10 +968,10 @@
           "contribution": null,
           "kind": "work",
           "projectColour": "#7E8CF0",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "projectName": "Deep work",
-          "sessionId": "01a01457-1d86-77a2-be8a-004fa1983c55",
-          "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+          "sessionId": "01a014dc-758c-7aa2-9ca9-b63f39361945",
+          "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
           "taskTitle": "Production firefight"
         },
         "to": 1787051700000
@@ -1005,10 +1005,10 @@
           "contribution": null,
           "kind": "work",
           "projectColour": "#7E8CF0",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "projectName": "Deep work",
-          "sessionId": "01a01457-1d87-74a2-aba0-0efa0796d9a7",
-          "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+          "sessionId": "01a014dc-758c-7aa2-9ca9-b6450d3411a4",
+          "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
           "taskTitle": "Production firefight"
         },
         "to": 1787052600000
@@ -1032,10 +1032,10 @@
         "hasDistraction": false,
         "owner": {
           "areaColour": "#4FA374",
-          "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
           "areaKind": "core",
           "areaName": "Wellbeing",
-          "entryId": "01a01457-1d88-78e1-a49b-26586a3032b0",
+          "entryId": "01a014dc-758d-71c2-840a-21bfad480acc",
           "isPrivate": false,
           "kind": "life",
           "label": "Lunch and a walk"
@@ -1093,10 +1093,10 @@
         "hasDistraction": false,
         "owner": {
           "areaColour": "#4FA374",
-          "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
           "areaKind": "core",
           "areaName": "Wellbeing",
-          "entryId": "01a01457-1d88-78e1-a49b-266e5e326ea5",
+          "entryId": "01a014dc-758e-71d3-9040-d1539c7e0969",
           "isPrivate": true,
           "kind": "life",
           "label": null
@@ -1126,10 +1126,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1151,10 +1151,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1176,10 +1176,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1201,10 +1201,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1226,10 +1226,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1251,10 +1251,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1276,10 +1276,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1301,10 +1301,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1326,10 +1326,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1351,10 +1351,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1376,10 +1376,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1401,10 +1401,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1426,10 +1426,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#5B6472",
-              "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+              "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
               "areaKind": "rest",
               "areaName": "Sleep/Rest",
-              "entryId": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+              "entryId": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
               "isPrivate": false,
               "kind": "life",
               "label": "Sleep"
@@ -1535,7 +1535,7 @@
         "index": 18,
         "plans": [
           {
-            "blockId": "01a01457-1cac-77d3-b90a-856fd71f2cae",
+            "blockId": "01a014dc-7497-7882-8b66-fef6438a4962",
             "driftSec": 840,
             "driftState": "overrun",
             "durationSec": 3600,
@@ -1548,14 +1548,14 @@
             "trackedSec": 4440
           },
           {
-            "blockId": "01a01457-1cb5-7043-bfc0-19677bef74ae",
+            "blockId": "01a014dc-74a1-7ed0-a127-1a5375718481",
             "driftSec": -900,
             "driftState": "notStarted",
             "durationSec": 900,
             "intent": "work",
             "isFixed": true,
             "projectColour": null,
-            "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+            "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
             "startsAt": 1787040000000,
             "title": "Daily stand-up",
             "trackedSec": 0
@@ -1583,10 +1583,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#56C2D6",
-              "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+              "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
               "projectName": "Welcome to Fruit",
-              "sessionId": "01a01457-1cac-77d3-b90a-85708794e072",
-              "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+              "sessionId": "01a014dc-7497-7882-8b66-ff063dd2df78",
+              "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
               "taskTitle": "Refactor auth module"
             },
             "to": 1787044440000
@@ -1600,7 +1600,7 @@
         "index": 19,
         "plans": [
           {
-            "blockId": "01a01457-1cac-77d3-b90a-856fd71f2cae",
+            "blockId": "01a014dc-7497-7882-8b66-fef6438a4962",
             "driftSec": 840,
             "driftState": "overrun",
             "durationSec": 3600,
@@ -1635,10 +1635,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#56C2D6",
-              "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+              "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
               "projectName": "Welcome to Fruit",
-              "sessionId": "01a01457-1cac-77d3-b90a-85708794e072",
-              "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+              "sessionId": "01a014dc-7497-7882-8b66-ff063dd2df78",
+              "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
               "taskTitle": "Refactor auth module"
             },
             "to": 1787044440000
@@ -1682,10 +1682,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#56C2D6",
-              "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+              "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
               "projectName": "Welcome to Fruit",
-              "sessionId": "01a01457-1cac-77d3-b90a-85708794e072",
-              "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+              "sessionId": "01a014dc-7497-7882-8b66-ff063dd2df78",
+              "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
               "taskTitle": "Refactor auth module"
             },
             "to": 1787044440000
@@ -1703,10 +1703,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#7E8CF0",
-              "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+              "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
               "projectName": "Deep work",
-              "sessionId": "01a01457-1d86-77a2-be8a-0036b72f3e66",
-              "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+              "sessionId": "01a014dc-758b-7e10-9804-afbd1fea5eb5",
+              "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
               "taskTitle": "Production firefight"
             },
             "to": 1787044500000
@@ -1738,7 +1738,7 @@
         "index": 22,
         "plans": [
           {
-            "blockId": "01a01457-1cae-7543-bdba-a56759036480",
+            "blockId": "01a014dc-749a-7ac0-9160-135b63523b66",
             "driftSec": 0,
             "driftState": "onEstimate",
             "durationSec": 3600,
@@ -1765,10 +1765,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#7E8CF0",
-              "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+              "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
               "projectName": "Deep work",
-              "sessionId": "01a01457-1caf-7c40-9ad5-7988cc9da358",
-              "taskId": "01a01457-1cae-7543-bdba-a54fa3aae5a4",
+              "sessionId": "01a014dc-749a-7ac0-9160-136cd9a28b80",
+              "taskId": "01a014dc-749a-7ac0-9160-1333326b25cb",
               "taskTitle": "Write the migration guide"
             },
             "to": 1787050800000
@@ -1782,7 +1782,7 @@
         "index": 23,
         "plans": [
           {
-            "blockId": "01a01457-1cae-7543-bdba-a56759036480",
+            "blockId": "01a014dc-749a-7ac0-9160-135b63523b66",
             "driftSec": 0,
             "driftState": "onEstimate",
             "durationSec": 3600,
@@ -1809,10 +1809,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#7E8CF0",
-              "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+              "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
               "projectName": "Deep work",
-              "sessionId": "01a01457-1caf-7c40-9ad5-7988cc9da358",
-              "taskId": "01a01457-1cae-7543-bdba-a54fa3aae5a4",
+              "sessionId": "01a014dc-749a-7ac0-9160-136cd9a28b80",
+              "taskId": "01a014dc-749a-7ac0-9160-1333326b25cb",
               "taskTitle": "Write the migration guide"
             },
             "to": 1787050800000
@@ -1839,10 +1839,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#7E8CF0",
-              "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+              "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
               "projectName": "Deep work",
-              "sessionId": "01a01457-1d86-77a2-be8a-004fa1983c55",
-              "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+              "sessionId": "01a014dc-758c-7aa2-9ca9-b63f39361945",
+              "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
               "taskTitle": "Production firefight"
             },
             "to": 1787051700000
@@ -1864,10 +1864,10 @@
               "contribution": null,
               "kind": "work",
               "projectColour": "#7E8CF0",
-              "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+              "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
               "projectName": "Deep work",
-              "sessionId": "01a01457-1d87-74a2-aba0-0efa0796d9a7",
-              "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+              "sessionId": "01a014dc-758c-7aa2-9ca9-b6450d3411a4",
+              "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
               "taskTitle": "Production firefight"
             },
             "to": 1787052600000
@@ -1912,10 +1912,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#4FA374",
-              "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+              "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
               "areaKind": "core",
               "areaName": "Wellbeing",
-              "entryId": "01a01457-1d88-78e1-a49b-26586a3032b0",
+              "entryId": "01a014dc-758d-71c2-840a-21bfad480acc",
               "isPrivate": false,
               "kind": "life",
               "label": "Lunch and a walk"
@@ -1950,10 +1950,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#4FA374",
-              "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+              "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
               "areaKind": "core",
               "areaName": "Wellbeing",
-              "entryId": "01a01457-1d88-78e1-a49b-26586a3032b0",
+              "entryId": "01a014dc-758d-71c2-840a-21bfad480acc",
               "isPrivate": false,
               "kind": "life",
               "label": "Lunch and a walk"
@@ -2215,10 +2215,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#4FA374",
-              "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+              "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
               "areaKind": "core",
               "areaName": "Wellbeing",
-              "entryId": "01a01457-1d88-78e1-a49b-266e5e326ea5",
+              "entryId": "01a014dc-758e-71d3-9040-d1539c7e0969",
               "isPrivate": true,
               "kind": "life",
               "label": null
@@ -2240,10 +2240,10 @@
             "hasDistraction": false,
             "owner": {
               "areaColour": "#4FA374",
-              "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+              "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
               "areaKind": "core",
               "areaName": "Wellbeing",
-              "entryId": "01a01457-1d88-78e1-a49b-266e5e326ea5",
+              "entryId": "01a014dc-758e-71d3-9040-d1539c7e0969",
               "isPrivate": true,
               "kind": "life",
               "label": null
@@ -2417,7 +2417,7 @@
       ],
       "byArea": [
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+          "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
           "colour": "#5B6472",
           "kind": "rest",
           "monthlyTargetSec": null,
@@ -2425,7 +2425,7 @@
           "seconds": 23400
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
           "colour": "#4FA374",
           "kind": "core",
           "monthlyTargetSec": null,
@@ -2457,13 +2457,13 @@
         {
           "colour": "#7E8CF0",
           "name": "Deep work",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "seconds": 5220
         },
         {
           "colour": "#56C2D6",
           "name": "Welcome to Fruit",
-          "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+          "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
           "seconds": 4440
         }
       ],
@@ -2544,7 +2544,7 @@
       "appliesDays": 31,
       "direction": "atMost",
       "endsWeek": null,
-      "id": "01a01457-1dbb-7661-98f3-752d4e280a3b",
+      "id": "01a014dc-75c3-7c41-a981-e37d63f52334",
       "period": "week",
       "startsWeek": "2026-W34",
       "subjectId": "allWork",
@@ -2556,7 +2556,7 @@
       "appliesDays": 127,
       "direction": "atMost",
       "endsWeek": null,
-      "id": "01a01457-1dbb-7661-98f3-753c0189ac66",
+      "id": "01a014dc-75c3-7c41-a981-e38cb8a3c114",
       "period": "week",
       "startsWeek": "2026-W34",
       "subjectId": "entertainment",
@@ -2568,7 +2568,7 @@
       "appliesDays": 127,
       "direction": "atLeast",
       "endsWeek": null,
-      "id": "01a01457-1dbb-7661-98f3-75486c0fde50",
+      "id": "01a014dc-75c3-7c41-a981-e39317bd8ae5",
       "period": "week",
       "startsWeek": "2026-W34",
       "subjectId": "sleep",
@@ -2581,7 +2581,7 @@
   "get_life_areas": [
     {
       "colour": "#5B6472",
-      "id": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+      "id": "01a014dc-7496-7cb3-b32f-dcec71928673",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "rest",
@@ -2592,7 +2592,7 @@
     },
     {
       "colour": "#8B7FD4",
-      "id": "01a01457-1ca9-7381-a24e-3ccb0efb46a8",
+      "id": "01a014dc-7496-7cb3-b32f-dcf4a290338c",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2603,7 +2603,7 @@
     },
     {
       "colour": "#C2609B",
-      "id": "01a01457-1ca9-7381-a24e-3cdf06917ebe",
+      "id": "01a014dc-7496-7cb3-b32f-dd00380e1410",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2614,7 +2614,7 @@
     },
     {
       "colour": "#4FA374",
-      "id": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+      "id": "01a014dc-7496-7cb3-b32f-dd191021ff82",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2625,7 +2625,7 @@
     },
     {
       "colour": "#3FA8BD",
-      "id": "01a01457-1ca9-7381-a24e-3cf80b4ad445",
+      "id": "01a014dc-7496-7cb3-b32f-dd2d79f811c2",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2636,7 +2636,7 @@
     },
     {
       "colour": "#7FA440",
-      "id": "01a01457-1ca9-7381-a24e-3d0aadaea70a",
+      "id": "01a014dc-7496-7cb3-b32f-dd3a3e333cba",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2647,7 +2647,7 @@
     },
     {
       "colour": "#C98A2E",
-      "id": "01a01457-1ca9-7381-a24e-3d1577ca7dad",
+      "id": "01a014dc-7496-7cb3-b32f-dd4bd565048d",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2658,7 +2658,7 @@
     },
     {
       "colour": "#5B8FC4",
-      "id": "01a01457-1ca9-7381-a24e-3d223966e6b4",
+      "id": "01a014dc-7496-7cb3-b32f-dd538164c208",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2669,7 +2669,7 @@
     },
     {
       "colour": "#56C2D6",
-      "id": "01a01457-1ca9-7381-a24e-3d34ec7dc0fb",
+      "id": "01a014dc-7496-7cb3-b32f-dd67cdb4ce26",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "core",
@@ -2680,7 +2680,7 @@
     },
     {
       "colour": "#C9603F",
-      "id": "01a01457-1ca9-7381-a24e-3d49b9516bc8",
+      "id": "01a014dc-7496-7cb3-b32f-dd706c117574",
       "isArchived": false,
       "isBuiltin": true,
       "kind": "entertainment",
@@ -2696,10 +2696,10 @@
       "areaKind": "rest",
       "areaName": "Sleep/Rest",
       "endedAt": 1787031000000,
-      "id": "01a01457-1d88-78e1-a49b-264d6ae070ce",
+      "id": "01a014dc-758d-71c2-840a-21a7b5b3cc4c",
       "isPrivate": false,
       "label": "Sleep",
-      "lifeAreaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+      "lifeAreaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
       "localDate": "2026-08-17",
       "note": null,
       "rrule": null,
@@ -2712,10 +2712,10 @@
       "areaKind": "rest",
       "areaName": "Sleep/Rest",
       "endedAt": 1787031000000,
-      "id": "01a01457-1d8c-7631-ac70-f53e62ff447f",
+      "id": "01a014dc-7591-7010-bb62-a5fdc0bd8112",
       "isPrivate": false,
       "label": null,
-      "lifeAreaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+      "lifeAreaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
       "localDate": "2026-08-18",
       "note": null,
       "rrule": null,
@@ -2728,10 +2728,10 @@
       "areaKind": "core",
       "areaName": "Wellbeing",
       "endedAt": 1787056200000,
-      "id": "01a01457-1d88-78e1-a49b-26586a3032b0",
+      "id": "01a014dc-758d-71c2-840a-21bfad480acc",
       "isPrivate": false,
       "label": "Lunch and a walk",
-      "lifeAreaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+      "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
       "localDate": "2026-08-18",
       "note": null,
       "rrule": null,
@@ -2744,10 +2744,10 @@
       "areaKind": "core",
       "areaName": "Wellbeing",
       "endedAt": 1787079600000,
-      "id": "01a01457-1d88-78e1-a49b-266e5e326ea5",
+      "id": "01a014dc-758e-71d3-9040-d1539c7e0969",
       "isPrivate": true,
       "label": null,
-      "lifeAreaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+      "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
       "localDate": "2026-08-18",
       "note": null,
       "rrule": null,
@@ -2757,7 +2757,7 @@
     }
   ],
   "get_month": {
-    "accountedRatio": 0.3225560162455065,
+    "accountedRatio": 0.32645706638235567,
     "days": [
       {
         "accountedRatio": 0.3125,
@@ -3319,7 +3319,7 @@
       }
     ],
     "elapsedEmptySec": 1022160,
-    "elapsedSec": 1508848,
+    "elapsedSec": 1517587,
     "findings": [
       {
         "detail": "Worst day: 1h 30m on the 15",
@@ -3371,7 +3371,7 @@
       ],
       "byArea": [
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+          "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
           "colour": "#5B6472",
           "kind": "rest",
           "monthlyTargetSec": null,
@@ -3379,7 +3379,7 @@
           "seconds": 424800
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cdf06917ebe",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd00380e1410",
           "colour": "#C2609B",
           "kind": "core",
           "monthlyTargetSec": 144000,
@@ -3387,7 +3387,7 @@
           "seconds": 14400
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
           "colour": "#4FA374",
           "kind": "core",
           "monthlyTargetSec": 72000,
@@ -3395,7 +3395,7 @@
           "seconds": 14400
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3d49b9516bc8",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd706c117574",
           "colour": "#C9603F",
           "kind": "entertainment",
           "monthlyTargetSec": null,
@@ -3403,7 +3403,7 @@
           "seconds": 10800
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3d223966e6b4",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd538164c208",
           "colour": "#5B8FC4",
           "kind": "core",
           "monthlyTargetSec": null,
@@ -3411,7 +3411,7 @@
           "seconds": 7200
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cf80b4ad445",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd2d79f811c2",
           "colour": "#3FA8BD",
           "kind": "core",
           "monthlyTargetSec": 54000,
@@ -3443,13 +3443,13 @@
         {
           "colour": "#7E8CF0",
           "name": "Deep work",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "seconds": 16740
         },
         {
           "colour": "#56C2D6",
           "name": "Welcome to Fruit",
-          "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+          "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
           "seconds": 4440
         }
       ],
@@ -3473,29 +3473,29 @@
   "get_projects": [
     {
       "colour": "#56C2D6",
-      "createdAt": 1787047648425,
+      "createdAt": 1787056387222,
       "icon": null,
-      "id": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+      "id": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
       "isArchived": false,
       "kind": "personal",
       "name": "Welcome to Fruit",
       "openTaskCount": 3,
       "sortRank": 1024.0,
-      "updatedAt": 1787047648425,
+      "updatedAt": 1787056387222,
       "weekTrackedSec": 4440,
       "weeklyTargetSec": 7200
     },
     {
       "colour": "#7E8CF0",
-      "createdAt": 1787047648428,
+      "createdAt": 1787056387224,
       "icon": null,
-      "id": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+      "id": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
       "isArchived": false,
       "kind": "work",
       "name": "Deep work",
       "openTaskCount": 3,
       "sortRank": 2048.0,
-      "updatedAt": 1787047648428,
+      "updatedAt": 1787056387224,
       "weekTrackedSec": 26280,
       "weeklyTargetSec": 36000
     }
@@ -3508,13 +3508,13 @@
         "split",
         "reviseEstimate"
       ],
-      "blockId": "01a01457-1cac-77d3-b90a-856fd71f2cae",
+      "blockId": "01a014dc-7497-7882-8b66-fef6438a4962",
       "defaultAction": "accept",
       "driftSec": 840,
       "endsAt": 1787043600000,
       "evidence": null,
       "explanation": "Plotted 1h, tracked 1h 14m — 14m over. The estimate is the thing that was wrong, not the work.",
-      "id": "block:01a01457-1cac-77d3-b90a-856fd71f2cae",
+      "id": "block:01a014dc-7497-7882-8b66-fef6438a4962",
       "kind": "overran",
       "plannedSec": 3600,
       "recommendation": "Accepting records what happened. Revising the estimate is what makes the next one better.",
@@ -3522,7 +3522,7 @@
       "startsAt": 1787040000000,
       "suggestedDurationSec": 840,
       "suggestedSlot": 1787122800000,
-      "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+      "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
       "title": "Refactor auth module",
       "trackedSec": 4440
     },
@@ -3533,13 +3533,13 @@
         "markDone",
         "leaveUnscheduled"
       ],
-      "blockId": "01a01457-1cb5-7043-bfc0-19677bef74ae",
+      "blockId": "01a014dc-74a1-7ed0-a127-1a5375718481",
       "defaultAction": "moveToTomorrow",
       "driftSec": -900,
       "endsAt": 1787040900000,
       "evidence": null,
       "explanation": "You plotted 15m and never started it. Nothing was tracked against this block.",
-      "id": "block:01a01457-1cb5-7043-bfc0-19677bef74ae",
+      "id": "block:01a014dc-74a1-7ed0-a127-1a5375718481",
       "kind": "neverStarted",
       "plannedSec": 900,
       "recommendation": "Moving it keeps the intention; dropping it admits the plan was wrong. Both are honest — leaving it is what isn't.",
@@ -3562,15 +3562,15 @@
       "endsAt": 1787044500000,
       "evidence": null,
       "explanation": "1h 15m of work with nothing plotted against it. Real work the plan didn't know about.",
-      "id": "session:01a01457-1d86-77a2-be8a-0036b72f3e66",
+      "id": "session:01a014dc-758b-7e10-9804-afbd1fea5eb5",
       "kind": "unplannedSession",
       "plannedSec": 0,
       "recommendation": "A retroactive block is how the plan learns this kind of work exists.",
-      "sessionId": "01a01457-1d86-77a2-be8a-0036b72f3e66",
+      "sessionId": "01a014dc-758b-7e10-9804-afbd1fea5eb5",
       "startsAt": 1787040000000,
       "suggestedDurationSec": 4500,
       "suggestedSlot": 1787040000000,
-      "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+      "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
       "title": "Production firefight",
       "trackedSec": 4500
     },
@@ -3585,15 +3585,15 @@
       "endsAt": 1787051700000,
       "evidence": null,
       "explanation": "45m of work with nothing plotted against it. Real work the plan didn't know about.",
-      "id": "session:01a01457-1d86-77a2-be8a-004fa1983c55",
+      "id": "session:01a014dc-758c-7aa2-9ca9-b63f39361945",
       "kind": "unplannedSession",
       "plannedSec": 0,
       "recommendation": "A retroactive block is how the plan learns this kind of work exists.",
-      "sessionId": "01a01457-1d86-77a2-be8a-004fa1983c55",
+      "sessionId": "01a014dc-758c-7aa2-9ca9-b63f39361945",
       "startsAt": 1787049000000,
       "suggestedDurationSec": 2700,
       "suggestedSlot": 1787049000000,
-      "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+      "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
       "title": "Production firefight",
       "trackedSec": 2700
     },
@@ -3608,15 +3608,15 @@
       "endsAt": 1787054400000,
       "evidence": null,
       "explanation": "41m of work with nothing plotted against it. Real work the plan didn't know about.",
-      "id": "session:01a01457-1d87-74a2-aba0-0efa0796d9a7",
+      "id": "session:01a014dc-758c-7aa2-9ca9-b6450d3411a4",
       "kind": "unplannedSession",
       "plannedSec": 0,
       "recommendation": "A retroactive block is how the plan learns this kind of work exists.",
-      "sessionId": "01a01457-1d87-74a2-aba0-0efa0796d9a7",
+      "sessionId": "01a014dc-758c-7aa2-9ca9-b6450d3411a4",
       "startsAt": 1787051940000,
       "suggestedDurationSec": 2460,
       "suggestedSlot": 1787051940000,
-      "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+      "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
       "title": "Production firefight",
       "trackedSec": 2460
     },
@@ -3904,7 +3904,7 @@
       {
         "plannedSec": 13500,
         "projectColour": "#7E8CF0",
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "projectName": "Deep work",
         "trackedSec": 26280,
         "weekStart": "2026-08-17"
@@ -3920,7 +3920,7 @@
       {
         "plannedSec": 3600,
         "projectColour": "#56C2D6",
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "projectName": "Welcome to Fruit",
         "trackedSec": 4440,
         "weekStart": "2026-08-17"
@@ -3934,7 +3934,7 @@
       {
         "paceSec": 2057,
         "projectColour": "#56C2D6",
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "projectName": "Welcome to Fruit",
         "targetSec": 7200,
         "trackedSec": 4440
@@ -3942,7 +3942,7 @@
       {
         "paceSec": 10285,
         "projectColour": "#7E8CF0",
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "projectName": "Deep work",
         "targetSec": 36000,
         "trackedSec": 26280
@@ -3986,70 +3986,70 @@
   "get_tags": [
     {
       "colour": null,
-      "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+      "id": "01a014dc-7499-7351-af58-681caf12a105",
       "name": "dev"
     },
     {
       "colour": null,
-      "id": "01a01457-1caa-7731-b645-c8db431cba31",
+      "id": "01a014dc-7497-7882-8b66-feda08a915eb",
       "name": "welcome"
     },
     {
       "colour": null,
-      "id": "01a01457-1cae-7543-bdba-a554dd09a65d",
+      "id": "01a014dc-749a-7ac0-9160-13407c6ecacd",
       "name": "writing"
     }
   ],
   "get_task_categories": [
     {
       "colour": "#0070CC",
-      "createdAt": 1787047648000,
+      "createdAt": 1787056387000,
       "id": "01920000-0000-7000-8000-00000000c001",
       "isBuiltin": true,
       "name": "Coding",
       "sortRank": 1.0,
       "taskCount": 0,
-      "updatedAt": 1787047648000
+      "updatedAt": 1787056387000
     },
     {
       "colour": "#6E399D",
-      "createdAt": 1787047648000,
+      "createdAt": 1787056387000,
       "id": "01920000-0000-7000-8000-00000000c002",
       "isBuiltin": true,
       "name": "Design",
       "sortRank": 2.0,
       "taskCount": 0,
-      "updatedAt": 1787047648000
+      "updatedAt": 1787056387000
     },
     {
       "colour": "#BD3E0C",
-      "createdAt": 1787047648000,
+      "createdAt": 1787056387000,
       "id": "01920000-0000-7000-8000-00000000c003",
       "isBuiltin": true,
       "name": "Meeting",
       "sortRank": 3.0,
       "taskCount": 0,
-      "updatedAt": 1787047648000
+      "updatedAt": 1787056387000
     },
     {
       "colour": "#267A94",
-      "createdAt": 1787047648000,
+      "createdAt": 1787056387000,
       "id": "01920000-0000-7000-8000-00000000c004",
       "isBuiltin": true,
       "name": "Research",
       "sortRank": 4.0,
       "taskCount": 0,
-      "updatedAt": 1787047648000
+      "updatedAt": 1787056387000
     },
     {
       "colour": "#525252",
-      "createdAt": 1787047648000,
+      "createdAt": 1787056387000,
       "id": "01920000-0000-7000-8000-00000000c005",
       "isBuiltin": true,
       "name": "Admin",
       "sortRank": 5.0,
       "taskCount": 0,
-      "updatedAt": 1787047648000
+      "updatedAt": 1787056387000
     }
   ],
   "get_task_detail": {
@@ -4058,15 +4058,15 @@
     "noteUpdatedAt": null,
     "project": {
       "colour": "#7E8CF0",
-      "createdAt": 1787047648428,
+      "createdAt": 1787056387224,
       "icon": null,
-      "id": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+      "id": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
       "isArchived": false,
       "kind": "work",
       "name": "Deep work",
       "openTaskCount": 3,
       "sortRank": 2048.0,
-      "updatedAt": 1787047648428,
+      "updatedAt": 1787056387224,
       "weekTrackedSec": 26280,
       "weeklyTargetSec": 36000
     },
@@ -4077,12 +4077,12 @@
         "elapsedSec": 2460,
         "endedAt": 1787054400000,
         "heartbeatAt": null,
-        "id": "01a01457-1d87-74a2-aba0-0efa0796d9a7",
+        "id": "01a014dc-758c-7aa2-9ca9-b6450d3411a4",
         "isConfirmed": true,
         "note": null,
         "source": "manual",
         "startedAt": 1787051940000,
-        "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "taskTitle": "Production firefight"
       },
       {
@@ -4091,12 +4091,12 @@
         "elapsedSec": 2700,
         "endedAt": 1787051700000,
         "heartbeatAt": null,
-        "id": "01a01457-1d86-77a2-be8a-004fa1983c55",
+        "id": "01a014dc-758c-7aa2-9ca9-b63f39361945",
         "isConfirmed": true,
         "note": null,
         "source": "manual",
         "startedAt": 1787049000000,
-        "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "taskTitle": "Production firefight"
       },
       {
@@ -4105,12 +4105,12 @@
         "elapsedSec": 4500,
         "endedAt": 1787044500000,
         "heartbeatAt": null,
-        "id": "01a01457-1d86-77a2-be8a-0036b72f3e66",
+        "id": "01a014dc-758b-7e10-9804-afbd1fea5eb5",
         "isConfirmed": true,
         "note": null,
         "source": "manual",
         "startedAt": 1787040000000,
-        "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "taskTitle": "Production firefight"
       },
       {
@@ -4119,12 +4119,12 @@
         "elapsedSec": 2400,
         "endedAt": 1786977600000,
         "heartbeatAt": null,
-        "id": "01a01457-1cb5-7043-bfc0-193c9486230a",
+        "id": "01a014dc-74a1-7ed0-a127-1a2238f51b16",
         "isConfirmed": true,
         "note": null,
         "source": "manual",
         "startedAt": 1786975200000,
-        "taskId": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "taskId": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "taskTitle": "Production firefight"
       }
     ],
@@ -4132,19 +4132,19 @@
     "task": {
       "categoryId": null,
       "completedAt": null,
-      "createdAt": 1787047648436,
+      "createdAt": 1787056387232,
       "dueAt": null,
       "dueDate": null,
       "energy": null,
       "estimateSec": null,
       "firstSessionAt": 1786975200000,
-      "id": "01a01457-1cb4-7501-88ff-74386479cd07",
+      "id": "01a014dc-74a0-7293-b94e-6aee91c40b43",
       "isRollover": false,
       "isScheduled": false,
       "lastSessionAt": 1787054400000,
       "parentId": null,
       "priority": 0,
-      "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+      "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
       "sortRank": 12288.0,
       "status": "open",
       "subtaskDone": 0,
@@ -4152,7 +4152,7 @@
       "tags": [],
       "title": "Production firefight",
       "trackedSec": 12060,
-      "updatedAt": 1787047648436
+      "updatedAt": 1787056387232
     }
   },
   "get_tasks": {
@@ -4160,19 +4160,19 @@
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648432,
+        "createdAt": 1787056387228,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 900,
         "firstSessionAt": null,
-        "id": "01a01457-1cb0-73a3-8f05-33721e91c0ed",
+        "id": "01a014dc-749c-73a2-a104-790f818ef713",
         "isRollover": false,
         "isScheduled": true,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 3,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 7168.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4180,30 +4180,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cae-7543-bdba-a554dd09a65d",
+            "id": "01a014dc-749a-7ac0-9160-13407c6ecacd",
             "name": "writing"
           }
         ],
         "title": "Fix the DST off-by-one",
         "trackedSec": 0,
-        "updatedAt": 1787047648432
+        "updatedAt": 1787056387228
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648426,
+        "createdAt": 1787056387222,
         "dueAt": 1787068800000,
         "dueDate": null,
         "energy": null,
         "estimateSec": 900,
         "firstSessionAt": null,
-        "id": "01a01457-1caa-7731-b645-c8c9732d8628",
+        "id": "01a014dc-7496-7cb3-b32f-dd929da4b173",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 2,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 1024.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4211,30 +4211,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1caa-7731-b645-c8db431cba31",
+            "id": "01a014dc-7497-7882-8b66-feda08a915eb",
             "name": "welcome"
           }
         ],
         "title": "Read the 60-second guide",
         "trackedSec": 0,
-        "updatedAt": 1787047648426
+        "updatedAt": 1787056387222
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648434,
+        "createdAt": 1787056387230,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": null,
         "firstSessionAt": null,
-        "id": "01a01457-1cb2-7a61-8cd6-c693485bf758",
+        "id": "01a014dc-749e-7d02-8d1f-78504304d5b8",
         "isRollover": true,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 2,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 9216.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4242,30 +4242,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1cad-7560-9eee-22fb7b530470",
+            "id": "01a014dc-7499-7351-af58-681caf12a105",
             "name": "dev"
           }
         ],
         "title": "Rewrite the sync layer",
         "trackedSec": 0,
-        "updatedAt": 1787047648434
+        "updatedAt": 1787056387230
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648427,
+        "createdAt": 1787056387223,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 3600,
         "firstSessionAt": 1787040000000,
-        "id": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+        "id": "01a014dc-7497-7882-8b66-fee3432c0a88",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1787044440000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 2048.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4273,30 +4273,30 @@
         "tags": [
           {
             "colour": null,
-            "id": "01a01457-1caa-7731-b645-c8db431cba31",
+            "id": "01a014dc-7497-7882-8b66-feda08a915eb",
             "name": "welcome"
           }
         ],
         "title": "Refactor auth module",
         "trackedSec": 4440,
-        "updatedAt": 1787047648427
+        "updatedAt": 1787056387223
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648428,
+        "createdAt": 1787056387224,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": 120,
         "firstSessionAt": null,
-        "id": "01a01457-1cac-77d3-b90a-8580f7e211e6",
+        "id": "01a014dc-7498-7cb1-9cef-4fdc192dc8cb",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": null,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "sortRank": 3072.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4304,24 +4304,24 @@
         "tags": [],
         "title": "Delete this project when you're done",
         "trackedSec": 0,
-        "updatedAt": 1787047648428
+        "updatedAt": 1787056387224
       },
       {
         "categoryId": null,
         "completedAt": null,
-        "createdAt": 1787047648436,
+        "createdAt": 1787056387232,
         "dueAt": null,
         "dueDate": null,
         "energy": null,
         "estimateSec": null,
         "firstSessionAt": 1786975200000,
-        "id": "01a01457-1cb4-7501-88ff-74386479cd07",
+        "id": "01a014dc-74a0-7293-b94e-6aee91c40b43",
         "isRollover": false,
         "isScheduled": false,
         "lastSessionAt": 1787054400000,
         "parentId": null,
         "priority": 0,
-        "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "sortRank": 12288.0,
         "status": "open",
         "subtaskDone": 0,
@@ -4329,7 +4329,7 @@
         "tags": [],
         "title": "Production firefight",
         "trackedSec": 12060,
-        "updatedAt": 1787047648436
+        "updatedAt": 1787056387232
       }
     ],
     "total": 6
@@ -4471,10 +4471,10 @@
         "blocks": [
           {
             "block": {
-              "createdAt": 1787047648429,
+              "createdAt": 1787056387225,
               "durationSec": 5400,
               "externalUid": null,
-              "id": "01a01457-1cad-7560-9eee-230148fd6065",
+              "id": "01a014dc-7499-7351-af58-682ad05c9570",
               "intent": "work",
               "isFixed": false,
               "label": null,
@@ -4482,9 +4482,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1786953600000,
-              "taskId": "01a01457-1cad-7560-9eee-22ee6d14e64f",
+              "taskId": "01a014dc-7498-7cb1-9cef-4ffc022c3c99",
               "tz": "Europe/London",
-              "updatedAt": 1787047648429
+              "updatedAt": 1787056387225
             },
             "driftSec": 840,
             "driftState": "overrun",
@@ -4493,27 +4493,27 @@
             "lanes": 2,
             "plannedSec": 5400,
             "projectColour": "#7E8CF0",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "taskStatus": "done",
             "title": "Refactor the scheduler",
             "trackedSec": 6240
           },
           {
             "block": {
-              "createdAt": 1787047648437,
+              "createdAt": 1787056387233,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb5-7043-bfc0-194814ffd7ad",
+              "id": "01a014dc-74a1-7ed0-a127-1a32952afa0e",
               "intent": "work",
               "isFixed": true,
               "label": "Daily stand-up",
               "localDate": "2026-08-17",
               "rrule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
-              "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+              "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
               "startsAt": 1786953600000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648437
+              "updatedAt": 1787056387233
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4529,10 +4529,10 @@
           },
           {
             "block": {
-              "createdAt": 1787047648436,
+              "createdAt": 1787056387232,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb4-7501-88ff-742d0967cd2a",
+              "id": "01a014dc-74a0-7293-b94e-6ad2bb700dd8",
               "intent": "work",
               "isFixed": true,
               "label": "Standup",
@@ -4542,7 +4542,7 @@
               "startsAt": 1786957200000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648436
+              "updatedAt": 1787056387232
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4569,10 +4569,10 @@
         "blocks": [
           {
             "block": {
-              "createdAt": 1787047648428,
+              "createdAt": 1787056387223,
               "durationSec": 3600,
               "externalUid": null,
-              "id": "01a01457-1cac-77d3-b90a-856fd71f2cae",
+              "id": "01a014dc-7497-7882-8b66-fef6438a4962",
               "intent": "work",
               "isFixed": false,
               "label": null,
@@ -4580,9 +4580,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1787040000000,
-              "taskId": "01a01457-1cab-7370-9cbd-8de7b5b6c282",
+              "taskId": "01a014dc-7497-7882-8b66-fee3432c0a88",
               "tz": "Europe/London",
-              "updatedAt": 1787047648428
+              "updatedAt": 1787056387223
             },
             "driftSec": 840,
             "driftState": "overrun",
@@ -4591,27 +4591,27 @@
             "lanes": 2,
             "plannedSec": 3600,
             "projectColour": "#56C2D6",
-            "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+            "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
             "taskStatus": "open",
             "title": "Refactor auth module",
             "trackedSec": 4440
           },
           {
             "block": {
-              "createdAt": 1787047648437,
+              "createdAt": 1787056387233,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb5-7043-bfc0-19677bef74ae",
+              "id": "01a014dc-74a1-7ed0-a127-1a5375718481",
               "intent": "work",
               "isFixed": true,
               "label": "Daily stand-up",
               "localDate": "2026-08-18",
               "rrule": null,
-              "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+              "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
               "startsAt": 1787040000000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648437
+              "updatedAt": 1787056387233
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4627,10 +4627,10 @@
           },
           {
             "block": {
-              "createdAt": 1787047648430,
+              "createdAt": 1787056387226,
               "durationSec": 3600,
               "externalUid": null,
-              "id": "01a01457-1cae-7543-bdba-a56759036480",
+              "id": "01a014dc-749a-7ac0-9160-135b63523b66",
               "intent": "work",
               "isFixed": false,
               "label": null,
@@ -4638,9 +4638,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1787047200000,
-              "taskId": "01a01457-1cae-7543-bdba-a54fa3aae5a4",
+              "taskId": "01a014dc-749a-7ac0-9160-1333326b25cb",
               "tz": "Europe/London",
-              "updatedAt": 1787047648430
+              "updatedAt": 1787056387226
             },
             "driftSec": 0,
             "driftState": "onEstimate",
@@ -4649,7 +4649,7 @@
             "lanes": 1,
             "plannedSec": 3600,
             "projectColour": "#7E8CF0",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "taskStatus": "done",
             "title": "Write the migration guide",
             "trackedSec": 3600
@@ -4667,20 +4667,20 @@
         "blocks": [
           {
             "block": {
-              "createdAt": 1787047648437,
+              "createdAt": 1787056387233,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb5-7043-bfc0-1972c127e4c2",
+              "id": "01a014dc-74a2-7a30-9c19-cc1ed20b079d",
               "intent": "work",
               "isFixed": true,
               "label": "Daily stand-up",
               "localDate": "2026-08-19",
               "rrule": null,
-              "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+              "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
               "startsAt": 1787126400000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648437
+              "updatedAt": 1787056387233
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4696,10 +4696,10 @@
           },
           {
             "block": {
-              "createdAt": 1787047648432,
+              "createdAt": 1787056387227,
               "durationSec": 1800,
               "externalUid": null,
-              "id": "01a01457-1cb0-73a3-8f05-3353a704492e",
+              "id": "01a014dc-749b-7fe1-8020-0af63f21158b",
               "intent": "work",
               "isFixed": false,
               "label": null,
@@ -4707,9 +4707,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1787140800000,
-              "taskId": "01a01457-1caf-7c40-9ad5-799014d6fccf",
+              "taskId": "01a014dc-749b-7fe1-8020-0aea0ee60f26",
               "tz": "Europe/London",
-              "updatedAt": 1787047648432
+              "updatedAt": 1787056387227
             },
             "driftSec": -900,
             "driftState": "inProgress",
@@ -4718,7 +4718,7 @@
             "lanes": 1,
             "plannedSec": 1800,
             "projectColour": "#7E8CF0",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "taskStatus": "done",
             "title": "Review the drift rail spec",
             "trackedSec": 900
@@ -4736,10 +4736,10 @@
         "blocks": [
           {
             "block": {
-              "createdAt": 1787047648433,
+              "createdAt": 1787056387229,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb1-7491-92d0-d4ddc683d78a",
+              "id": "01a014dc-749d-7131-a379-0e24e07762b2",
               "intent": "work",
               "isFixed": false,
               "label": null,
@@ -4747,9 +4747,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1787212800000,
-              "taskId": "01a01457-1cb0-73a3-8f05-33721e91c0ed",
+              "taskId": "01a014dc-749c-73a2-a104-790f818ef713",
               "tz": "Europe/London",
-              "updatedAt": 1787047648433
+              "updatedAt": 1787056387229
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4758,27 +4758,27 @@
             "lanes": 2,
             "plannedSec": 900,
             "projectColour": "#7E8CF0",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "taskStatus": "open",
             "title": "Fix the DST off-by-one",
             "trackedSec": 0
           },
           {
             "block": {
-              "createdAt": 1787047648437,
+              "createdAt": 1787056387233,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb5-7043-bfc0-198b5144fee6",
+              "id": "01a014dc-74a2-7a30-9c19-cc2a3adc75fd",
               "intent": "work",
               "isFixed": true,
               "label": "Daily stand-up",
               "localDate": "2026-08-20",
               "rrule": null,
-              "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+              "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
               "startsAt": 1787212800000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648437
+              "updatedAt": 1787056387233
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4805,20 +4805,20 @@
         "blocks": [
           {
             "block": {
-              "createdAt": 1787047648437,
+              "createdAt": 1787056387233,
               "durationSec": 900,
               "externalUid": null,
-              "id": "01a01457-1cb5-7043-bfc0-199b4b03d906",
+              "id": "01a014dc-74a2-7a30-9c19-cc33f2022b3e",
               "intent": "work",
               "isFixed": true,
               "label": "Daily stand-up",
               "localDate": "2026-08-21",
               "rrule": null,
-              "seriesId": "01a01457-1cb5-7043-bfc0-195864ccdf8b",
+              "seriesId": "01a014dc-74a1-7ed0-a127-1a41288f58de",
               "startsAt": 1787299200000,
               "taskId": null,
               "tz": "Europe/London",
-              "updatedAt": 1787047648437
+              "updatedAt": 1787056387233
             },
             "driftSec": -900,
             "driftState": "notStarted",
@@ -4834,10 +4834,10 @@
           },
           {
             "block": {
-              "createdAt": 1787047648433,
+              "createdAt": 1787056387229,
               "durationSec": 1800,
               "externalUid": null,
-              "id": "01a01457-1cb1-7491-92d0-d4f2062411ca",
+              "id": "01a014dc-749d-7131-a379-0e4a34bb0a70",
               "intent": "work",
               "isFixed": true,
               "label": null,
@@ -4845,9 +4845,9 @@
               "rrule": null,
               "seriesId": null,
               "startsAt": 1787306400000,
-              "taskId": "01a01457-1cb1-7491-92d0-d4eea99af4bb",
+              "taskId": "01a014dc-749d-7131-a379-0e3637572791",
               "tz": "Europe/London",
-              "updatedAt": 1787047648433
+              "updatedAt": 1787056387229
             },
             "driftSec": -1320,
             "driftState": "inProgress",
@@ -4856,7 +4856,7 @@
             "lanes": 1,
             "plannedSec": 1800,
             "projectColour": "#7E8CF0",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "taskStatus": "done",
             "title": "Answer support mail",
             "trackedSec": 480
@@ -4892,7 +4892,7 @@
       }
     ],
     "from": "2026-08-17",
-    "now": 1787047648652,
+    "now": 1787056387473,
     "to": "2026-08-23",
     "tz": "Europe/London"
   },
@@ -5075,7 +5075,7 @@
         }
       ],
       "elapsedEmptySec": 57360,
-      "elapsedSec": 126448,
+      "elapsedSec": 135187,
       "fragmentation": {
         "fragmentThresholdSec": 900,
         "fragmentedSec": 1200,
@@ -5096,7 +5096,7 @@
             "appliesDays": 31,
             "direction": "atMost",
             "endsWeek": null,
-            "id": "01a01457-1dbb-7661-98f3-752d4e280a3b",
+            "id": "01a014dc-75c3-7c41-a981-e37d63f52334",
             "period": "week",
             "startsWeek": "2026-W34",
             "subjectId": "allWork",
@@ -5118,7 +5118,7 @@
             "appliesDays": 127,
             "direction": "atMost",
             "endsWeek": null,
-            "id": "01a01457-1dbb-7661-98f3-753c0189ac66",
+            "id": "01a014dc-75c3-7c41-a981-e38cb8a3c114",
             "period": "week",
             "startsWeek": "2026-W34",
             "subjectId": "entertainment",
@@ -5140,7 +5140,7 @@
             "appliesDays": 127,
             "direction": "atLeast",
             "endsWeek": null,
-            "id": "01a01457-1dbb-7661-98f3-75486c0fde50",
+            "id": "01a014dc-75c3-7c41-a981-e39317bd8ae5",
             "period": "week",
             "startsWeek": "2026-W34",
             "subjectId": "sleep",
@@ -5179,7 +5179,7 @@
         ],
         "byArea": [
           {
-            "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+            "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
             "colour": "#5B6472",
             "kind": "rest",
             "monthlyTargetSec": null,
@@ -5187,7 +5187,7 @@
             "seconds": 50400
           },
           {
-            "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+            "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
             "colour": "#4FA374",
             "kind": "core",
             "monthlyTargetSec": null,
@@ -5195,7 +5195,7 @@
             "seconds": 7200
           },
           {
-            "areaId": "01a01457-1ca9-7381-a24e-3cf80b4ad445",
+            "areaId": "01a014dc-7496-7cb3-b32f-dd2d79f811c2",
             "colour": "#3FA8BD",
             "kind": "core",
             "monthlyTargetSec": null,
@@ -5227,13 +5227,13 @@
           {
             "colour": "#7E8CF0",
             "name": "Deep work",
-            "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+            "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
             "seconds": 16740
           },
           {
             "colour": "#56C2D6",
             "name": "Welcome to Fruit",
-            "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+            "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
             "seconds": 4440
           }
         ],
@@ -5501,7 +5501,7 @@
       }
     ],
     "elapsedEmptySec": 57360,
-    "elapsedSec": 126448,
+    "elapsedSec": 135187,
     "fragmentation": {
       "fragmentThresholdSec": 900,
       "fragmentedSec": 1200,
@@ -5522,7 +5522,7 @@
           "appliesDays": 31,
           "direction": "atMost",
           "endsWeek": null,
-          "id": "01a01457-1dbb-7661-98f3-752d4e280a3b",
+          "id": "01a014dc-75c3-7c41-a981-e37d63f52334",
           "period": "week",
           "startsWeek": "2026-W34",
           "subjectId": "allWork",
@@ -5544,7 +5544,7 @@
           "appliesDays": 127,
           "direction": "atMost",
           "endsWeek": null,
-          "id": "01a01457-1dbb-7661-98f3-753c0189ac66",
+          "id": "01a014dc-75c3-7c41-a981-e38cb8a3c114",
           "period": "week",
           "startsWeek": "2026-W34",
           "subjectId": "entertainment",
@@ -5566,7 +5566,7 @@
           "appliesDays": 127,
           "direction": "atLeast",
           "endsWeek": null,
-          "id": "01a01457-1dbb-7661-98f3-75486c0fde50",
+          "id": "01a014dc-75c3-7c41-a981-e39317bd8ae5",
           "period": "week",
           "startsWeek": "2026-W34",
           "subjectId": "sleep",
@@ -5605,7 +5605,7 @@
       ],
       "byArea": [
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cb555a9723c",
+          "areaId": "01a014dc-7496-7cb3-b32f-dcec71928673",
           "colour": "#5B6472",
           "kind": "rest",
           "monthlyTargetSec": null,
@@ -5613,7 +5613,7 @@
           "seconds": 50400
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd191021ff82",
           "colour": "#4FA374",
           "kind": "core",
           "monthlyTargetSec": null,
@@ -5621,7 +5621,7 @@
           "seconds": 7200
         },
         {
-          "areaId": "01a01457-1ca9-7381-a24e-3cf80b4ad445",
+          "areaId": "01a014dc-7496-7cb3-b32f-dd2d79f811c2",
           "colour": "#3FA8BD",
           "kind": "core",
           "monthlyTargetSec": null,
@@ -5653,13 +5653,13 @@
         {
           "colour": "#7E8CF0",
           "name": "Deep work",
-          "projectId": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+          "projectId": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
           "seconds": 16740
         },
         {
           "colour": "#56C2D6",
           "name": "Welcome to Fruit",
-          "projectId": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+          "projectId": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
           "seconds": 4440
         }
       ],
@@ -5762,20 +5762,86 @@
       0,
       0
     ],
+    "byLabel": [
+      {
+        "colour": "#3FA8BD",
+        "countsAs": "core",
+        "id": "00000000-0000-7000-8000-000000000001",
+        "isBuiltin": true,
+        "name": "Work",
+        "seconds": 720,
+        "sortRank": 0.0
+      },
+      {
+        "colour": "#C9603F",
+        "countsAs": "entertainment",
+        "id": "00000000-0000-7000-8000-000000000003",
+        "isBuiltin": true,
+        "name": "Distraction",
+        "seconds": 3420,
+        "sortRank": 2.0
+      }
+    ],
     "byProject": [
       {
         "colour": "#7E8CF0",
-        "id": "01a01457-1cac-77d3-b90a-859d2e7481ca",
+        "id": "01a014dc-7498-7cb1-9cef-4fe56473ba9f",
         "name": "Deep work",
         "seconds": 26280,
         "share": 0.855
       },
       {
         "colour": "#56C2D6",
-        "id": "01a01457-1caa-7731-b645-c8b53f34f3c4",
+        "id": "01a014dc-7496-7cb3-b32f-dd83c0b39621",
         "name": "Welcome to Fruit",
         "seconds": 4440,
         "share": 0.145
+      }
+    ],
+    "correlations": [
+      {
+        "blockId": "01a014dc-7497-7882-8b66-fef6438a4962",
+        "durationSec": 3600,
+        "startsAt": 1787040000000,
+        "title": "Refactor auth module",
+        "topApps": [
+          {
+            "appId": "code.exe",
+            "seconds": 2520
+          },
+          {
+            "appId": "chrome.exe",
+            "seconds": 1320
+          },
+          {
+            "appId": "slack.exe",
+            "seconds": 1080
+          }
+        ]
+      },
+      {
+        "blockId": "01a014dc-74a1-7ed0-a127-1a5375718481",
+        "durationSec": 900,
+        "startsAt": 1787040000000,
+        "title": "Daily stand-up",
+        "topApps": [
+          {
+            "appId": "code.exe",
+            "seconds": 900
+          }
+        ]
+      },
+      {
+        "blockId": "01a014dc-749a-7ac0-9160-135b63523b66",
+        "durationSec": 3600,
+        "startsAt": 1787047200000,
+        "title": "Write the migration guide",
+        "topApps": [
+          {
+            "appId": "code.exe",
+            "seconds": 3300
+          }
+        ]
       }
     ],
     "days": [
@@ -14415,42 +14481,42 @@
         "label": "Sleep/Rest",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3cb555a9723c"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dcec71928673"
         }
       },
       {
         "label": "Family",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3cdf06917ebe"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd00380e1410"
         }
       },
       {
         "label": "Fun",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3d49b9516bc8"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd706c117574"
         }
       },
       {
         "label": "Friendship",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3d223966e6b4"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd538164c208"
         }
       },
       {
         "label": "Personal Development",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3cf80b4ad445"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd2d79f811c2"
         }
       },
       {
         "label": "Wellbeing",
         "target": {
           "kind": "life",
-          "lifeAreaId": "01a01457-1ca9-7381-a24e-3ce033eeacc9"
+          "lifeAreaId": "01a014dc-7496-7cb3-b32f-dd191021ff82"
         }
       }
     ],

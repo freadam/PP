@@ -56,6 +56,21 @@ impl Store {
         // set of SQL, so a figure and the average it is compared against can
         // never be arrived at two different ways.
         report.baseline = self.baseline_for(from, period, tz)?;
+
+        // The two observed panels, filled here rather than in `report_for` so
+        // the four baseline periods do not pay for them. The baseline compares
+        // totals, focus and score; it has no use for either of these, and
+        // correlating four months of blocks against four months of spans to
+        // throw the result away would be the expensive kind of tidy.
+        report.by_label = self
+            .get_categories(Some((&report.from, &report.to)), tz)?
+            .into_iter()
+            // A label you did not use in this range is not news, and a column
+            // of zeroes pushes the two that matter off the panel.
+            .filter(|c| c.seconds > 0)
+            .collect();
+        report.correlations = self.correlations_between(&report.from, &report.to, tz)?;
+
         // Written last, because several of them are about the comparison.
         report.findings = findings_for(&report);
         Ok(report)
@@ -146,6 +161,9 @@ impl Store {
             target_days_applicable: applicable,
             baseline: None,
             findings: Vec::new(),
+            // Filled by `get_work_report` for the viewed range only — see there.
+            by_label: Vec::new(),
+            correlations: Vec::new(),
             days,
         })
     }

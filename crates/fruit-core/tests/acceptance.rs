@@ -1824,6 +1824,90 @@ fn keeping_an_idle_span_rejoins_the_segment() {
     assert_eq!(sessions[0].elapsed_sec, 30 * 60);
 }
 
+/// The two observed panels, carried by the work report over its whole range.
+///
+/// They used to be day-only, on the Activity screen. Moving them onto a report
+/// with a day/week/month switcher means they have to answer for a week — so the
+/// test plots blocks and records samples on *two* days and asks for the week,
+/// which a day-shaped implementation would half-answer.
+#[test]
+fn the_work_report_carries_observed_labels_and_the_plan_comparison_for_its_whole_range() {
+    // Wednesday and Thursday of the same ISO week.
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 8, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    let wed = task(&mut store, "Refactor auth");
+    let thu = task(&mut store, "Write the migration guide");
+    let b_wed = block(&mut store, &wed.id, at(2025, 7, 30, 9, 0), 60);
+    let b_thu = block(&mut store, &thu.id, at(2025, 7, 31, 14, 0), 60);
+
+    let mut watch = |app: &str, day_start: i64, minutes: i64| {
+        for m in 0..minutes {
+            store
+                .record_activity(ActivitySample {
+                    app_id: app.into(),
+                    window_title: None,
+                    domain: None,
+                    at: day_start + m * 60_000,
+                })
+                .unwrap();
+        }
+    };
+    watch("code.exe", at(2025, 7, 30, 9, 0), 60);
+    watch("slack.exe", at(2025, 7, 31, 14, 0), 60);
+
+    // The day report sees only its own day.
+    let day = store.get_work_report("2025-07-30", "day", TZ).unwrap();
+    assert_eq!(
+        day.correlations.iter().map(|c| c.block_id.as_str()).collect::<Vec<_>>(),
+        vec![b_wed.id.as_str()],
+        "a day report compares the plan for that day and no other"
+    );
+
+    // The week report sees both, oldest first.
+    let week = store.get_work_report("2025-07-30", "week", TZ).unwrap();
+    assert_eq!(
+        week.correlations.iter().map(|c| c.block_id.as_str()).collect::<Vec<_>>(),
+        vec![b_wed.id.as_str(), b_thu.id.as_str()],
+        "a week report reaches every day in the week, in time order"
+    );
+    assert_eq!(week.correlations[0].title, "Refactor auth");
+    assert_eq!(week.correlations[1].top_apps[0].app_id, "slack.exe");
+
+    // Nothing is labelled yet, so the label panel is empty rather than a column
+    // of zeroes — and the report says so by being empty, not by inventing rows.
+    assert!(
+        week.by_label.is_empty(),
+        "an unused label is not news: {:?}",
+        week.by_label
+    );
+
+    // Label Wednesday's hour, and only that hour shows up.
+    let cats = store.get_categories(None, TZ).unwrap();
+    let work = cats.iter().find(|c| c.name == "Work").expect("a built-in Work label");
+    let spans = store.get_activity_day("2025-07-30", TZ).unwrap().spans;
+    // Taken from the span rather than written as a round hour: a span runs from
+    // its first sample to its last plus one sampling interval, so sixty samples
+    // a minute apart are not sixty minutes. Restating that arithmetic here
+    // would make the test a second copy of it.
+    let observed = (spans[0].ended_at - spans[0].started_at) / 1000;
+    store.set_span_category(spans[0].id, Some(&work.id)).unwrap();
+
+    let week = store.get_work_report("2025-07-30", "week", TZ).unwrap();
+    let labelled: Vec<(&str, i64)> =
+        week.by_label.iter().map(|c| (c.name.as_str(), c.seconds)).collect();
+    assert_eq!(labelled, vec![("Work", observed)], "one label, one span's worth");
+
+    // …and it is *observed* time, which must never have been folded into the
+    // confirmed work total. No timer ran in this test at all.
+    assert_eq!(
+        week.total_work_sec, 0,
+        "observed time is not work until somebody confirms it"
+    );
+}
+
 /// Renaming a project.
 ///
 /// A project's name is not a label sitting beside its id — the capture parser

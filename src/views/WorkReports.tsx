@@ -32,6 +32,7 @@ import type {
   WorkReport,
   WorkSlice,
 } from "../lib/types";
+import { appColour, appLabel } from "../lib/apps";
 
 const PERIODS: { key: WorkPeriod; label: string }[] = [
   { key: "day", label: "Day" },
@@ -128,7 +129,13 @@ export function WorkReports() {
             />
             <FocusPanel report={report} />
             <AppsPanel report={report} />
+            <ByLabelPanel report={report} />
           </div>
+          {/* Full width, below the grid: each row is a block title, a bar and a
+              sentence, and squeezed into a grid cell the titles ellipsis away
+              into nothing. It is also the panel people read last — the working,
+              after the conclusions. */}
+          <AgainstPlanPanel report={report} />
         </>
       )}
     </div>
@@ -741,6 +748,120 @@ function FocusPanel({ report }: { report: WorkReport }) {
  * the work total — they answer a different question, and a reader who mixes
  * them has been misled by the layout.
  */
+/**
+ * Observed time in the words the user chose — Work · Study · Distraction · Life.
+ *
+ * Moved here from Activity, which could only ever show it for one day. A day's
+ * split is mostly noise; the same split over a week is the line that answers
+ * "where did it actually go" without any reading.
+ *
+ * Shares are of *observed* time, not of the range and not of the work total.
+ * Two of those three would be wrong, and the caption says which one it is.
+ */
+function ByLabelPanel({ report }: { report: WorkReport }) {
+  const total = report.byLabel.reduce((n, c) => n + c.seconds, 0);
+  return (
+    <section className="panel">
+      <h3>By label</h3>
+      <p className="caption">
+        Observed time only — what the machine saw, not what you confirmed. Not part of the work
+        total above; the Day view is where the two are reconciled.
+      </p>
+      {report.byLabel.length === 0 ? (
+        <p className="caption">
+          Nothing labelled in this range. Activity → What has no label yet is where labels get
+          attached, and each one writes a rule that applies from then on.
+        </p>
+      ) : (
+        <div className="bars">
+          {report.byLabel.map((c) => (
+            <div className="bar-row" key={c.id}>
+              <span className="micro">{c.name}</span>
+              <span className="bar" aria-label={`${c.name}: ${fmt.duration(c.seconds)}`}>
+                <i style={{ width: `${(c.seconds / Math.max(1, total)) * 100}%`, background: c.colour }} />
+              </span>
+              <span className="micro data">{Math.round((c.seconds / Math.max(1, total)) * 100)}%</span>
+              <span className="caption data">{fmt.duration(c.seconds)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * §2.3 CALIBRATE — each plotted block against what was actually in front of you.
+ *
+ * The only place in Fruit where an intention meets an *observation* rather than
+ * another record of itself, which is what lets it say "you were in Slack for the
+ * hour you plotted for the refactor".
+ *
+ * It was day-only on Activity. Over a week it becomes the panel that shows a
+ * *pattern* rather than an anecdote — one block that went to Chrome is a
+ * Tuesday, five of them is a habit.
+ */
+function AgainstPlanPanel({ report }: { report: WorkReport }) {
+  return (
+    <section className="panel">
+      <h3>Against the plan</h3>
+      {report.correlations.length === 0 ? (
+        <p className="caption">
+          Nothing plotted in this range had activity recorded under it, so there is no intention to
+          compare against. Plot a block in the Planner and this panel fills itself in.
+        </p>
+      ) : (
+        <div className="stack">
+          {report.correlations.map((c) => {
+            const total = c.topApps.reduce((sum, a) => sum + a.seconds, 0);
+            const top = c.topApps[0];
+            return (
+              <div key={c.blockId} className="stack" style={{ gap: 4 }}>
+                <div className="row">
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    {c.title}
+                  </span>
+                  {/* The date as well as the clock: over a week, "11:46 AM" on
+                      its own does not say which day it was. */}
+                  <span className="data micro" style={{ color: "var(--muted)" }}>
+                    {report.period !== "day" && `${fmt.toLocalDate(new Date(c.startsAt)).slice(5)} · `}
+                    {fmt.clockRange(c.startsAt, c.durationSec)}
+                  </span>
+                </div>
+                {/* One stacked bar per block: proportions, not a legend to decode. */}
+                <span
+                  className="app-bar"
+                  role="img"
+                  aria-label={c.topApps
+                    .map((a) => `${appLabel(a.appId)} ${fmt.duration(a.seconds)}`)
+                    .join(", ")}
+                >
+                  {c.topApps.map((a) => (
+                    <i
+                      key={a.appId}
+                      style={{
+                        width: `${(a.seconds / Math.max(1, total)) * 100}%`,
+                        background: appColour(a.appId),
+                      }}
+                      title={`${appLabel(a.appId)} · ${fmt.duration(a.seconds)}`}
+                    />
+                  ))}
+                </span>
+                {top && (
+                  <span className="caption">
+                    Mostly <strong>{appLabel(top.appId)}</strong> · {fmt.duration(top.seconds)} of{" "}
+                    {fmt.duration(c.durationSec)} plotted
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AppsPanel({ report }: { report: WorkReport }) {
   return (
     <section className="panel">

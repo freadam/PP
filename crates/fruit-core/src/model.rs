@@ -1643,6 +1643,25 @@ pub struct WorkReport {
     /// week lightly if possible" — this app does not tell you what to do about
     /// your own week, because it does not know what your week was for.
     pub findings: Vec<Finding>,
+
+    /// Observed time by the label you gave it, over the whole range.
+    ///
+    /// Unlike everything above it, this is *observed* rather than confirmed —
+    /// what the machine saw, not what anyone signed off. It sits beside the
+    /// confirmed panels rather than among them, and the screen says which is
+    /// which, because a work total that quietly absorbed "Chrome was open" is
+    /// the one dishonesty this app exists to avoid.
+    ///
+    /// Empty when Activity is off or nothing in the range carries a label.
+    pub by_label: Vec<ObservationCategory>,
+    /// Each plotted block in the range against the apps that were actually in
+    /// front of you while it ran, newest last.
+    ///
+    /// The only place an intention meets an observation rather than another
+    /// record of itself. Blocks with nothing observed under them are left out —
+    /// an empty bar says "you did nothing", when what happened is that nothing
+    /// was watching.
+    pub correlations: Vec<BlockCorrelation>,
 }
 
 #[derive(Debug, Clone, Serialize)]

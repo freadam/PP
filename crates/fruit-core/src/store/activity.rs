@@ -295,6 +295,41 @@ impl Store {
     /// *observation* rather than against its own record — which makes it the
     /// one report that can say "you were in Slack for the hour you plotted for
     /// the refactor", and the reason Activity is worth having at all.
+    /// The same comparison over a range of local dates, oldest first.
+    ///
+    /// A day at a time rather than one query over the whole span, because
+    /// `correlate` is defined against a day's blocks and a day's spans and both
+    /// of those are already day-shaped readers. Looping is what keeps the week
+    /// answer and the day answer arrived at the same way — a second, range-wide
+    /// implementation would be a second set of rules about overlap, and the two
+    /// would drift.
+    pub fn correlations_between(
+        &self,
+        from: &str,
+        to: &str,
+        tz: &str,
+    ) -> Result<Vec<BlockCorrelation>> {
+        let mut out = Vec::new();
+        for date in crate::time::date_series(from, to)? {
+            let spans: Vec<ActivitySpanRow> = self
+                .labelled_spans(&date, tz)?
+                .into_iter()
+                .map(|s| ActivitySpanRow {
+                    id: s.id,
+                    started_at: s.started_at,
+                    ended_at: s.ended_at,
+                    app_id: s.app_id,
+                    window_title: s.window_title,
+                    domain: s.domain,
+                    category_id: s.category_id,
+                })
+                .collect();
+            out.extend(self.correlate(&date, &spans)?);
+        }
+        out.sort_by_key(|c| c.starts_at);
+        Ok(out)
+    }
+
     fn correlate(&self, date: &str, spans: &[ActivitySpanRow]) -> Result<Vec<BlockCorrelation>> {
         let mut out = Vec::new();
         for block in self.blocks_on(date)? {

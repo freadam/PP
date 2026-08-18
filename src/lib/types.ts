@@ -834,6 +834,12 @@ export interface WorkReport {
   /** The report read back in sentences, generated in Rust so the renderer
    *  never re-derives a rule. Empty when there is nothing to say. */
   findings: Finding[];
+  /** Observed time by label, over the range. **Observed, not confirmed** — it
+   *  must never be added to `totalWorkSec`. Only labels actually used. */
+  byLabel: ObservationCategory[];
+  /** Each plotted block in the range against what was on screen while it ran,
+   *  oldest first. Blocks with nothing observed under them are left out. */
+  correlations: BlockCorrelation[];
 }
 
 export interface Finding {

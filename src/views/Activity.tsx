@@ -1,23 +1,27 @@
 /**
  * Activity (§3.5, P2) — "was I actually doing the thing the timer said?"
  *
- * Five panels, and the order is the argument:
+ * Three panels, and the order is the argument:
  *
- *   1. **Where the day went, by label.** Work · Study · Distraction · Life, in
- *      the words the user chose. First because it is the only panel that answers
- *      the question in one line; everything below it is the working.
- *   2. **What has no label yet**, ranked by time, each row one click from having
+ *   1. **What has no label yet**, ranked by time, each row one click from having
  *      one. An empty taxonomy and a text field is a chore — "these three things
- *      took eleven hours between them" is a question people answer.
- *   3. **Against the plan.** Each block on the day, with the apps that were
- *      actually in front of you while it ran. This is the only place in Fruit
- *      where an intention meets an *observation* rather than another record of
- *      itself, and it is the reason the feature exists at all.
- *   4. **Per-app totals**, longest first.
- *   5. **The day itself**, on the Planner's exact time axis and hour height, so
+ *      took eleven hours between them" is a question people answer. First,
+ *      because it is the only panel here that asks something of you.
+ *   2. **Per-app totals**, longest first.
+ *   3. **The day itself**, on the Planner's exact time axis and hour height, so
  *      a block and the app usage beneath it read as one picture rather than as
  *      two charts that happen to be about the same hours. Every interval here is
  *      relabellable on the spot — the YouTube-lecture case.
+ *
+ * # What this screen is for, and what moved off it
+ *
+ * What is left is the *working surface*: the day in front of you, and the
+ * labelling that makes tomorrow's numbers mean something. The two panels that
+ * were **conclusions** rather than work — where the time went by label, and the
+ * plan against what was observed under it — now live on Reports → Work, where
+ * they answer for a week or a month instead of only for one day. A conclusion
+ * drawn from a single day is mostly noise, and both of those had the switcher
+ * they needed sitting on the other screen.
  *
  * Off by default. When it is off this screen says so and links to the switch —
  * it never shows an empty chart that implies the data is merely missing.
@@ -35,26 +39,7 @@ import type {
   UnlabelledRow,
 } from "../lib/types";
 import { Empty } from "../components/chrome";
-
-/**
- * Which of the eight `--app-*` tokens an application gets (§5.2).
- *
- * A stable hash rather than order-of-appearance, so an app keeps its colour
- * from one day to the next — a legend you have to re-learn every morning is
- * worse than no colour at all.
- */
-const APP_RAMP = 8;
-
-function appColour(appId: string): string {
-  let hash = 0;
-  for (let i = 0; i < appId.length; i++) hash = (hash * 31 + appId.charCodeAt(i)) | 0;
-  return `var(--app-${(Math.abs(hash) % APP_RAMP) + 1})`;
-}
-
-/** `code.exe` and `Code.app` are the same thing to a human reading a total. */
-function appLabel(appId: string): string {
-  return appId.replace(/\.(exe|app)$/i, "");
-}
+import { appColour, appLabel } from "../lib/apps";
 
 export function Activity() {
   const status = useApp((s) => s.activityStatus);
@@ -134,7 +119,6 @@ export function Activity() {
         </Empty>
       ) : (
         <>
-          <ByCategory cats={cats} />
           <Unlabelled
             rows={unlabelled}
             cats={cats}
@@ -156,82 +140,11 @@ export function Activity() {
             }
             onDone={reload}
           />
-          <Correlations day={day} />
           <ByApp totals={day.byApp} trackedSec={day.trackedSec} />
           <DayTimeline day={day} hourHeight={hourHeight} cats={cats} onDone={reload} />
         </>
       )}
     </div>
-  );
-}
-
-/**
- * §2.3 CALIBRATE — the plotted block against what was actually in front of you.
- *
- * The line "you were in Slack for the hour you plotted for the refactor" is the
- * whole payoff, so it is the first thing on the screen, not a footnote under a
- * chart.
- */
-function Correlations({ day }: { day: ActivityDay }) {
-  if (day.correlations.length === 0) {
-    return (
-      <section className="panel">
-        <h2>Against the plan</h2>
-        <p className="caption">
-          Nothing was plotted on this day, so there is no intention to compare against. Plot a
-          block in the Planner and this panel fills itself in.
-        </p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="panel">
-      <h2>Against the plan</h2>
-      <div className="stack">
-        {day.correlations.map((c) => {
-          const total = c.topApps.reduce((sum, a) => sum + a.seconds, 0);
-          const top = c.topApps[0];
-          return (
-            <div key={c.blockId} className="stack" style={{ gap: 4 }}>
-              <div className="row">
-                <span className="grow" style={{ minWidth: 0 }}>
-                  {c.title}
-                </span>
-                <span className="data micro" style={{ color: "var(--muted)" }}>
-                  {fmt.clockRange(c.startsAt, c.durationSec)}
-                </span>
-              </div>
-              {/* One stacked bar per block: proportions, not a legend to decode. */}
-              <span
-                className="app-bar"
-                role="img"
-                aria-label={c.topApps
-                  .map((a) => `${appLabel(a.appId)} ${fmt.duration(a.seconds)}`)
-                  .join(", ")}
-              >
-                {c.topApps.map((a) => (
-                  <i
-                    key={a.appId}
-                    style={{
-                      width: `${(a.seconds / Math.max(1, total)) * 100}%`,
-                      background: appColour(a.appId),
-                    }}
-                    title={`${appLabel(a.appId)} · ${fmt.duration(a.seconds)}`}
-                  />
-                ))}
-              </span>
-              {top && (
-                <span className="caption">
-                  Mostly <strong>{appLabel(top.appId)}</strong> ·{" "}
-                  {fmt.duration(top.seconds)} of {fmt.duration(c.durationSec)} plotted
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -359,42 +272,6 @@ function DayTimeline({
           </div>
         </div>
       </div>
-    </section>
-  );
-}
-
-/**
- * Where the day went, in the user's own words.
- *
- * First panel on the screen because it is the only one that answers the
- * question in a line. Zero-second categories are dropped: a label you have not
- * used today is not news, and five empty rows push the two that matter off the
- * fold.
- */
-function ByCategory({ cats }: { cats: ObservationCategory[] }) {
-  const used = cats.filter((c) => c.seconds > 0);
-  const total = used.reduce((n, c) => n + c.seconds, 0);
-  if (used.length === 0) return null;
-
-  return (
-    <section className="panel">
-      <h2>By label</h2>
-      <div className="stack" style={{ gap: 6 }}>
-        {used.map((c) => (
-          <div key={c.id} className="row">
-            <span className="swatch" style={{ background: c.colour }} aria-hidden="true" />
-            <span style={{ width: 120 }}>{c.name}</span>
-            <span className="bar grow" aria-hidden="true">
-              <i style={{ width: `${(c.seconds / total) * 100}%`, background: c.colour }} />
-            </span>
-            <span className="data caption">{fmt.duration(c.seconds)}</span>
-          </div>
-        ))}
-      </div>
-      <p className="caption">
-        Observed time only — what the machine saw, not what you confirmed. The Day view is
-        where the two are reconciled.
-      </p>
     </section>
   );
 }
