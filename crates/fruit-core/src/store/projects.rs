@@ -55,13 +55,7 @@ impl Store {
     }
 
     pub fn create_project(&mut self, input: NewProject) -> Result<ProjectRow> {
-        let name = input.name.trim().to_string();
-        if name.is_empty() {
-            return Err(AppError::invalid("A project needs a name."));
-        }
-        if name.chars().count() > 120 {
-            return Err(AppError::invalid("Project names are limited to 120 characters."));
-        }
+        let name = clean_name(&input.name)?;
         let kind = input.kind.unwrap_or_else(|| "work".into());
         if !KINDS.contains(&kind.as_str()) {
             return Err(AppError::invalid(format!("'{kind}' is not a project kind.")));
@@ -107,13 +101,15 @@ impl Store {
     pub fn update_project(&mut self, id: &str, patch: ProjectPatch) -> Result<ProjectRow> {
         validate_id(id, "project")?;
         let now = self.now();
+        // Renaming goes through the same gate as naming: a project created with
+        // a 120-character cap and then renamed past it would be a cap in name
+        // only. The parser matches `#project` against these (§4.4 rule 7), so
+        // the name is data other features read, not a label.
         if let Some(name) = &patch.name {
-            if name.trim().is_empty() {
-                return Err(AppError::invalid("A project needs a name."));
-            }
+            let name = clean_name(name)?;
             self.conn.execute(
                 "UPDATE project SET name = ?2, updated_at = ?3 WHERE id = ?1",
-                params![id, name.trim(), now],
+                params![id, name, now],
             )?;
         }
         if let Some(colour) = &patch.colour {
@@ -199,6 +195,19 @@ impl Store {
         let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
         Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
     }
+}
+
+/// One gate for every path that sets a project's name, so creating and renaming
+/// cannot disagree about what a name is allowed to be.
+fn clean_name(raw: &str) -> Result<String> {
+    let name = raw.trim();
+    if name.is_empty() {
+        return Err(AppError::invalid("A project needs a name."));
+    }
+    if name.chars().count() > 120 {
+        return Err(AppError::invalid("Project names are limited to 120 characters."));
+    }
+    Ok(name.to_string())
 }
 
 /// The picker warns when a choice fails contrast (§5.2); the command layer

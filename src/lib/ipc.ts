@@ -43,6 +43,7 @@ import type {
   NewTask,
   Page,
   ProjectRow,
+  ProjectPatch,
   ReconcileAction,
   ReconcileItem,
   RecoveryActionKind,
@@ -195,6 +196,11 @@ export const restore = (token: UndoToken) => call<void>("restore", { token });
 
 export const createProject = (name: string, colour?: string, weeklyTargetSec?: number | null) =>
   call<ProjectRow>("create_project", { input: { name, colour, weeklyTargetSec } });
+
+/** A partial update — rename, recolour, archive. An omitted field is left
+ *  alone, so a rename is `{ name }` and nothing else moves. */
+export const updateProject = (id: string, patch: ProjectPatch) =>
+  call<ProjectRow>("update_project", { id, patch });
 
 export const deleteProject = (id: string, moveTasksToInbox: boolean) =>
   call<UndoToken>("delete_project", { id, moveTasksToInbox });

@@ -461,6 +461,29 @@ select {
   font-variant-numeric: tabular-nums;
 }
 
+/* A row with an action beside it. The action is quiet until the row is hovered
+   or something inside it has focus — a column of pencils down the sidebar is
+   noise, and the row's own job is to be a filter.
+
+   `:focus-within` rather than hover alone is what keeps it usable from the
+   keyboard: tabbing to the button reveals it. It stays in the tab order and in
+   the accessibility tree either way, so it is quiet, not hidden. */
+.sidebar-row-group {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sidebar-row-group .row-action {
+  flex: none;
+  opacity: 0;
+  color: var(--faint);
+  transition: opacity var(--m-fast) var(--e-out);
+}
+.sidebar-row-group:hover .row-action,
+.sidebar-row-group:focus-within .row-action {
+  opacity: 1;
+}
+
 .dot {
   width: 8px;
   height: 8px;
@@ -3225,6 +3248,11 @@ select {
   }
   .day-time-mark {
     min-height: 24px;
+  }
+  /* There is no hover on a touch screen, so a control that waits for one is a
+     control that never appears. */
+  .sidebar-row-group .row-action {
+    opacity: 1;
   }
   :root {
     --checkbox: var(--checkbox-touch);

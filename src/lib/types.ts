@@ -35,6 +35,16 @@ export interface ProjectRow {
   updatedAt: Millis;
 }
 
+/** A partial update. Every field is optional and an omitted one is left alone,
+ *  so a rename sends `{ name }` and touches nothing else. */
+export interface ProjectPatch {
+  name?: string;
+  colour?: string;
+  kind?: string;
+  isArchived?: boolean;
+  weeklyTargetSec?: number | null;
+}
+
 export interface TaskRow {
   id: string;
   projectId: string | null;

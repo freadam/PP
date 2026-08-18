@@ -336,9 +336,11 @@ function WorkKinds() {
  */
 function FocusWallpapers({
   dir,
+  last,
   onPick,
 }: {
   dir: string | undefined;
+  last: string | undefined;
   onPick: (key: string, value: unknown) => Promise<void>;
 }) {
   const run = useApp((s) => s.run);
@@ -357,7 +359,7 @@ function FocusWallpapers({
   return (
     <Field
       label="Wallpapers"
-      hint="Focus mode draws one of these behind the clock instead of a phase gradient — press W in Focus, or the Photo button. Fruit ships no pictures of its own: it has no licence to redistribute photographs, so the folder starts empty and what goes in it is yours. jpg, png, webp, avif and gif, up to 16MB each. Nothing is downloaded and nothing leaves this machine."
+      hint="Focus mode opens on the picture you last used, and falls back to a phase gradient when the folder is empty. W, or the Photo button, switches between the two and Focus remembers which you chose. Fruit ships no pictures of its own: it has no licence to redistribute photographs, so the folder starts empty and what goes in it is yours. jpg, png, webp, avif and gif, up to 16MB each. Nothing is downloaded and nothing leaves this machine."
     >
       <div className="row" style={{ flexWrap: "wrap" }}>
         <button
@@ -400,6 +402,14 @@ function FocusWallpapers({
           {folder.count === 0
             ? "no pictures yet"
             : `${folder.count} picture${folder.count === 1 ? "" : "s"}`}
+          {/* Which one Focus will open on. Naming it is the difference between
+              a remembered setting and an unexplained one. */}
+          {last && folder.count > 0 && (
+            <>
+              {" · opens on "}
+              <span className="data">{last}</span>
+            </>
+          )}
         </span>
       )}
     </Field>
@@ -806,7 +816,11 @@ export function Settings() {
       </Section>
 
       <Section title="Focus">
-        <FocusWallpapers dir={settings["focus.wallpaperDir"] as string | undefined} onPick={put} />
+        <FocusWallpapers
+          dir={settings["focus.wallpaperDir"] as string | undefined}
+          last={settings["focus.wallpaper"] as string | undefined}
+          onPick={put}
+        />
       </Section>
 
       <Section title="Testing">

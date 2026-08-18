@@ -101,6 +101,9 @@ function ProjectsPane() {
   const backlog = useApp((s) => s.backlog);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  /** The project being renamed, and the text so far. */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const [deleted, setDeleted] = useState<DeletedRow[]>([]);
 
   useEffect(() => {
@@ -119,6 +122,23 @@ function ProjectsPane() {
     setName("");
     setCreating(false);
     await loadProjects();
+  };
+
+  /**
+   * Commit a rename.
+   *
+   * A project's name is read in more places than this list — the capture
+   * parser matches `#project` against it, and the Day, Reports and detail
+   * views all print it — so this refreshes everything rather than only the
+   * sidebar it was typed into.
+   */
+  const rename = async (id: string, before: string) => {
+    const next = draft.trim();
+    setRenaming(null);
+    if (!next || next === before) return;
+    const { run, refresh } = useApp.getState();
+    const ok = await run(() => ipc.updateProject(id, { name: next }), "Couldn't rename that project.");
+    if (ok) await refresh();
   };
 
   return (
@@ -151,20 +171,58 @@ function ProjectsPane() {
                 : null;
             return (
               <div key={p.id}>
-                <button
-                  className="sidebar-row"
-                  aria-selected={filter === p.id}
-                  onClick={() => setFilter(p.id)}
-                >
-                  <span className="dot" style={{ background: p.colour }} />
-                  <span className="grow" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {p.name}
-                  </span>
-                  <span className="micro" style={{ color: "var(--faint)" }}>
-                    {p.kind}
-                  </span>
-                  <span className="count data">{p.openTaskCount}</span>
-                </button>
+                {renaming === p.id ? (
+                  <input
+                    autoFocus
+                    value={draft}
+                    aria-label={`Rename ${p.name}`}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onBlur={() => void rename(p.id, p.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void rename(p.id, p.name);
+                      if (e.key === "Escape") setRenaming(null);
+                    }}
+                    style={{ width: "100%" }}
+                  />
+                ) : (
+                  <div className="sidebar-row-group">
+                    <button
+                      className="sidebar-row"
+                      aria-selected={filter === p.id}
+                      onClick={() => setFilter(p.id)}
+                      /* The shortcut for people who already expect it. The
+                         button beside it is the discoverable path — this is
+                         not the only way in. */
+                      onDoubleClick={() => {
+                        setDraft(p.name);
+                        setRenaming(p.id);
+                      }}
+                    >
+                      <span className="dot" style={{ background: p.colour }} />
+                      <span
+                        className="grow"
+                        style={{ overflow: "hidden", textOverflow: "ellipsis" }}
+                      >
+                        {p.name}
+                      </span>
+                      <span className="micro" style={{ color: "var(--faint)" }}>
+                        {p.kind}
+                      </span>
+                      <span className="count data">{p.openTaskCount}</span>
+                    </button>
+                    <button
+                      className="btn btn-quiet btn-icon row-action"
+                      aria-label={`Rename ${p.name}`}
+                      title="Rename"
+                      onClick={() => {
+                        setDraft(p.name);
+                        setRenaming(p.id);
+                      }}
+                    >
+                      ✎
+                    </button>
+                  </div>
+                )}
                 {pct != null && (
                   <div
                     className="target-bar"

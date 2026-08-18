@@ -6,7 +6,7 @@
  * Pomodoro phase, so a break is recognisable peripherally from across the room.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApp } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
@@ -14,6 +14,11 @@ import type { Wallpaper } from "../lib/types";
 
 const GRADIENTS = ["desk", "terrain", "water", "night"] as const;
 type Gradient = (typeof GRADIENTS)[number];
+
+/* Both remembered, because Focus is a mode you enter many times a day and a
+   preference you have to re-set on every entry is not a preference. */
+const USE_PHOTO = "focus.usePhoto";
+const LAST_PICTURE = "focus.wallpaper";
 
 /**
  * Your own pictures behind the clock.
@@ -26,10 +31,15 @@ type Gradient = (typeof GRADIENTS)[number];
  * The images are loaded lazily and cached for the session: a full-screen photo
  * crosses IPC as base64, and re-reading it on every phase change would stutter
  * the one screen whose entire job is not to.
+ *
+ * The picture is tracked **by name, not by index**. The folder is a folder on
+ * disk that changes between sessions, and an index into it is a promise about
+ * ordering that a single new file breaks — drop one in that sorts first and
+ * "the picture I was on" silently becomes a different picture.
  */
-function useWallpapers(enabled: boolean) {
+function useWallpapers(enabled: boolean, remembered: string | null) {
   const [items, setItems] = useState<Wallpaper[] | null>(null);
-  const [index, setIndex] = useState(0);
+  const [name, setName] = useState<string | null>(null);
   const [uri, setUri] = useState<string | null>(null);
   const [cache] = useState(() => new Map<string, string>());
 
@@ -40,11 +50,19 @@ function useWallpapers(enabled: boolean) {
     // one screen meant to be calm on a red banner would be the wrong trade.
     void ipc
       .getWallpapers()
-      .then((f) => setItems(f.items))
+      .then((f) => {
+        setItems(f.items);
+        // The remembered picture can have been renamed, moved or deleted since
+        // Focus last closed. Falling back to the first one keeps the folder
+        // working; honouring a name that is no longer there would show the
+        // gradients and no reason why.
+        const still = remembered && f.items.some((i) => i.name === remembered);
+        setName((n) => n ?? (still ? remembered : (f.items[0]?.name ?? null)));
+      })
       .catch(() => setItems([]));
-  }, [enabled]);
+  }, [enabled, remembered]);
 
-  const current = items && items.length > 0 ? items[index % items.length] : null;
+  const current = items?.find((i) => i.name === name) ?? null;
 
   useEffect(() => {
     if (!current) {
@@ -69,11 +87,31 @@ function useWallpapers(enabled: boolean) {
     };
   }, [current, cache]);
 
+  /* Written when the picture resolves, not only when the user changes it — so
+     a remembered name that has gone from the folder is replaced by the one
+     actually being drawn, rather than left dangling for every future open. */
+  useEffect(() => {
+    if (!enabled || !name) return;
+    void ipc.setSetting(LAST_PICTURE, name).catch(() => {});
+  }, [enabled, name]);
+
   return {
     items,
     current,
-    uri,
-    next: () => setIndex((i) => i + 1),
+    /* Only while photos are on. The loaded picture and the folder listing are
+       both kept across a toggle so coming back is instant, but reporting the
+       uri regardless would leave the photograph painted after the user turned
+       photos off — the controls would say gradient and the screen would say
+       otherwise. */
+    uri: enabled ? uri : null,
+    next: () =>
+      setName((n) => {
+        if (!items || items.length === 0) return n;
+        // -1 for an unknown name lands on the first, which is where a "next"
+        // from nowhere should go.
+        const at = items.findIndex((i) => i.name === n);
+        return items[(at + 1) % items.length]!.name;
+      }),
     count: items?.length ?? 0,
   };
 }
@@ -86,12 +124,32 @@ export function Focus() {
   const toggleTimer = useApp((s) => s.toggleTimer);
 
   const [manual, setManual] = useState<Gradient | null>(null);
-  /* Off means the four phase gradients, which stay the default: they carry a
-     meaning a photograph cannot (a break is recognisable across the room), so
-     turning them off has to be a choice rather than the consequence of having
-     dropped a file in a folder. */
-  const [usePhoto, setUsePhoto] = useState(false);
-  const photo = useWallpapers(usePhoto);
+  /* `null` while the remembered choice is still being read. The gradient
+     buttons only exist in photo-off, so rendering a guess would flash four
+     buttons and take them away again on the one screen that must not flicker.
+     Photos are the default: the folder is the point of the feature, and one
+     you have to switch on at every entry is one you stop using. The gradients
+     remain a keystroke away, and still take over on their own when the folder
+     is empty. */
+  const [usePhoto, setUsePhoto] = useState<boolean | null>(null);
+  const [remembered, setRemembered] = useState<string | null>(null);
+  const photo = useWallpapers(usePhoto === true, remembered);
+
+  useEffect(() => {
+    void ipc
+      .getSettings()
+      .then((s) => {
+        setRemembered((s[LAST_PICTURE] as string | undefined) ?? null);
+        setUsePhoto((s[USE_PHOTO] as boolean | undefined) ?? true);
+      })
+      .catch(() => setUsePhoto(true));
+  }, []);
+
+  const togglePhoto = useCallback(() => {
+    const next = !usePhoto;
+    setUsePhoto(next);
+    void ipc.setSetting(USE_PHOTO, next).catch(() => {});
+  }, [usePhoto]);
   const [hideDigits, setHideDigits] = useState(false);
   const [idleChrome, setIdleChrome] = useState(false);
   const [escSeen, setEscSeen] = useState(false);
@@ -101,6 +159,16 @@ export function Focus() {
   const bound: Gradient =
     phase === "shortBreak" ? "terrain" : phase === "longBreak" ? "water" : "desk";
   const background = manual ?? bound;
+
+  /* A folder that is known to hold nothing — not one still being read, which
+     is why this asks `items` rather than `uri`. Gating on `uri` would flash
+     the gradient buttons in during every picture load. */
+  const noPictures = photo.items !== null && photo.count === 0;
+  /* The gradient is what is actually on screen whenever there is no picture to
+     draw, so its controls belong on screen too. Photo mode over an empty
+     folder used to hide them, which left someone whose folder is empty with no
+     way to pick a gradient without first turning photos off. */
+  const showGradients = usePhoto === false || (usePhoto === true && noPictures);
 
   /* The control strip fades after 4s of no input; any input restores it. The
      Esc hint fades last and slowest. */
@@ -127,7 +195,7 @@ export function Focus() {
         setEscSeen(true);
         setOverlay(null);
       } else if (e.key === "w" || e.key === "W") {
-        setUsePhoto((v) => !v);
+        togglePhoto();
       } else if (e.key === " ") {
         e.preventDefault();
         if (timer.runTaskId) void toggleTimer(timer.runTaskId, timer.session?.blockId);
@@ -139,7 +207,7 @@ export function Focus() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [setOverlay, timer.runTaskId, timer.session, toggleTimer]);
+  }, [setOverlay, timer.runTaskId, timer.session, toggleTimer, togglePhoto]);
 
   // The planner context: the next block that has not started yet.
   const nextBlock = week?.days
@@ -200,7 +268,7 @@ export function Focus() {
         <button className="btn" onClick={() => setHideDigits((v) => !v)}>
           {hideDigits ? "Show" : "Hide"} digits <span className="kbd">H</span>
         </button>
-        {!usePhoto &&
+        {showGradients &&
           GRADIENTS.map((g, i) => (
             <button
               key={g}
@@ -213,8 +281,8 @@ export function Focus() {
           ))}
         <button
           className="btn"
-          aria-pressed={usePhoto}
-          onClick={() => setUsePhoto((v) => !v)}
+          aria-pressed={usePhoto === true}
+          onClick={togglePhoto}
           title="Draw one of your own pictures instead of a phase gradient. Settings → Focus says where to put them."
         >
           Photo <span className="kbd">W</span>
@@ -227,8 +295,10 @@ export function Focus() {
           </button>
         )}
         {/* Never a blank control strip with no explanation: if the folder is
-            empty the button that just did nothing has to say why. */}
-        {usePhoto && photo.items !== null && photo.count === 0 && (
+            empty the button that just did nothing has to say why. Now that
+            photos are the default this is also the first thing a new user sees
+            here, so it has to name the fix rather than just the problem. */}
+        {usePhoto && noPictures && (
           <span className="caption">
             No pictures yet — Settings → Focus opens the folder to put them in.
           </span>

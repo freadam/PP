@@ -1824,6 +1824,84 @@ fn keeping_an_idle_span_rejoins_the_segment() {
     assert_eq!(sessions[0].elapsed_sec, 30 * 60);
 }
 
+/// Renaming a project.
+///
+/// A project's name is not a label sitting beside its id — the capture parser
+/// matches `#project` against it (§4.4 rule 7), so a rename changes what typing
+/// into the capture bar resolves to. The id is what everything else holds, so
+/// the tasks stay attached and nothing is re-pointed.
+#[test]
+fn a_project_can_be_renamed_and_keeps_everything_attached() {
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 9, 0));
+    let p = store
+        .create_project(NewProject {
+            name: "Ledger".into(),
+            colour: None,
+            kind: None,
+            weekly_target_sec: None,
+        })
+        .unwrap();
+    let t = store
+        .create_task(NewTask {
+            title: "Reconcile June".into(),
+            project_id: Some(p.id.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let renamed = store
+        .update_project(&p.id, ProjectPatch { name: Some("  Accounts  ".into()), ..Default::default() })
+        .unwrap();
+
+    assert_eq!(renamed.name, "Accounts", "the name is trimmed, as on create");
+    assert_eq!(renamed.id, p.id, "a rename is not a new project");
+    assert_eq!(renamed.colour, p.colour, "renaming changes the name and nothing else");
+    assert_eq!(renamed.open_task_count, 1, "the task is still attached");
+    assert_eq!(
+        store.get_task_detail(&t.id).unwrap().task.project_id.as_deref(),
+        Some(p.id.as_str()),
+        "tasks hold the id, so a rename never re-points them"
+    );
+
+    // The parser follows the new name, and stops answering to the old one.
+    let names = store.project_names().unwrap();
+    assert!(names.iter().any(|(n, id)| n == "Accounts" && id == &p.id));
+    assert!(!names.iter().any(|(n, _)| n == "Ledger"));
+}
+
+/// The same gate on both paths.
+///
+/// `create_project` has always capped names at 120 characters and rejected
+/// blank ones. Renaming used to skip the cap, which made it a cap you could
+/// walk straight past by creating a project and then renaming it.
+#[test]
+fn renaming_a_project_is_held_to_the_same_rules_as_naming_one() {
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 9, 0));
+    let p = store
+        .create_project(NewProject {
+            name: "Ledger".into(),
+            colour: None,
+            kind: None,
+            weekly_target_sec: None,
+        })
+        .unwrap();
+
+    let patch = |name: &str| ProjectPatch { name: Some(name.into()), ..Default::default() };
+
+    assert!(store.update_project(&p.id, patch("")).is_err(), "blank");
+    assert!(store.update_project(&p.id, patch("   ")).is_err(), "whitespace is blank");
+    assert!(
+        store.update_project(&p.id, patch(&"x".repeat(121))).is_err(),
+        "past the cap that create enforces"
+    );
+    assert!(store.update_project(&p.id, patch(&"x".repeat(120))).is_ok(), "at the cap");
+
+    // A rejected rename leaves the project alone rather than half-applying.
+    let _ = store.update_project(&p.id, patch(""));
+    let after = store.get_projects(TZ).unwrap();
+    assert_eq!(after.iter().find(|r| r.id == p.id).unwrap().name, "x".repeat(120));
+}
+
 /// Keeping an idle span, then **carrying on working**.
 ///
 /// The existing keep test stops the timer immediately afterwards. The real app
