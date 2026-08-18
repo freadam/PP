@@ -421,7 +421,13 @@ export interface BlockCorrelation {
   title: string;
   startsAt: Millis;
   durationSec: number;
+  /** The longest few. **Truncated** — this does not sum to `observedSec` and
+   *  must never be used to work out coverage. */
   topApps: AppTotal[];
+  /** Every second observed under the block, before that truncation. Divide by
+   *  `durationSec` for coverage; dividing by the sum of `topApps` reports what
+   *  the observed time was made of while looking like how much there was. */
+  observedSec: number;
 }
 
 export interface ActivityDay {

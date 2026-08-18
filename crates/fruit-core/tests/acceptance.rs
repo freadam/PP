@@ -1824,6 +1824,187 @@ fn keeping_an_idle_span_rejoins_the_segment() {
     assert_eq!(sessions[0].elapsed_sec, 30 * 60);
 }
 
+/// **A block that was barely watched must not report like a block that was.**
+///
+/// Reported from a real screen: a three-hour block reading "Mostly Telegram ·
+/// 19m of 3h plotted" and drawing a bar filling its whole width. The bar was
+/// normalised against the sum of the apps under it, so it always came out full
+/// — it showed what the observed time was *made of* while looking exactly like
+/// how much of the block was observed.
+///
+/// `observed_sec` is the figure that makes the comparison honest, and it is
+/// summed before `top_apps` is truncated so a block whose time went to many
+/// small apps does not look better covered than one whose time went to two.
+#[test]
+fn a_correlation_says_how_much_of_the_block_was_actually_observed() {
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 8, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+
+    let t = task(&mut store, "finalize the poultry level testing");
+    // Three hours plotted, twenty minutes of it watched.
+    let b = block(&mut store, &t.id, at(2025, 7, 30, 14, 0), 180);
+    for m in 0..20 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "telegram.exe".into(),
+                window_title: None,
+                domain: None,
+                at: at(2025, 7, 30, 14, 0) + m * 60_000,
+            })
+            .unwrap();
+    }
+
+    let c = store
+        .get_activity_day("2025-07-30", TZ)
+        .unwrap()
+        .correlations
+        .into_iter()
+        .find(|c| c.block_id == b.id)
+        .expect("the block has activity under it");
+
+    assert_eq!(c.duration_sec, 3 * 3600);
+    let top: i64 = c.top_apps.iter().map(|a| a.seconds).sum();
+    assert_eq!(c.observed_sec, top, "one app, so the two agree here");
+    assert!(
+        c.observed_sec < 25 * 60,
+        "twenty minutes of samples is not three hours: {}",
+        c.observed_sec
+    );
+    // The bug, stated as arithmetic: normalising against the apps gives 100%
+    // for any block with anything at all under it.
+    assert_eq!(top / top, 1, "the old denominator always yields a full bar");
+    assert!(
+        c.observed_sec * 100 / c.duration_sec < 15,
+        "against the block it is a small fraction, which is the truth"
+    );
+}
+
+/// `observed_sec` counts every app, not just the ones that fit on the bar.
+///
+/// `top_apps` is truncated to five. Summing it to work out coverage would make
+/// a block whose three hours went to twenty applications report as well
+/// observed as one whose three hours went to one.
+#[test]
+fn observed_seconds_survive_the_truncation_of_the_app_list() {
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 8, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_MIN_SPAN_SEC, 0.into())
+        .unwrap();
+
+    let t = task(&mut store, "Scattered afternoon");
+    let b = block(&mut store, &t.id, at(2025, 7, 30, 14, 0), 60);
+    // Eight applications, five minutes each — more than the bar will carry.
+    for (i, app) in ["a", "b", "c", "d", "e", "f", "g", "h"].iter().enumerate() {
+        for m in 0..5 {
+            store
+                .record_activity(ActivitySample {
+                    app_id: format!("{app}.exe"),
+                    window_title: None,
+                    domain: None,
+                    at: at(2025, 7, 30, 14, 0) + (i as i64 * 5 + m) * 60_000,
+                })
+                .unwrap();
+        }
+    }
+
+    let c = store
+        .get_activity_day("2025-07-30", TZ)
+        .unwrap()
+        .correlations
+        .into_iter()
+        .find(|c| c.block_id == b.id)
+        .unwrap();
+
+    assert_eq!(c.top_apps.len(), 5, "the bar carries five");
+    let shown: i64 = c.top_apps.iter().map(|a| a.seconds).sum();
+    assert!(
+        c.observed_sec > shown,
+        "the other three applications still happened: {} observed vs {} shown",
+        c.observed_sec,
+        shown
+    );
+    assert!(
+        c.observed_sec <= c.duration_sec,
+        "overlaps are clipped to the block, so this can never exceed it"
+    );
+}
+
+/// **Two observers watching the same minute watched one minute.**
+///
+/// Caught by the preview fixture, which deliberately seeds a browser row and an
+/// editor row running at once, and which reported a one-hour block as 136%
+/// observed. Per-app totals may overlap — that is the honest answer to "what
+/// was this made of" — but coverage is a question about the *window*, and
+/// summing the overlaps answers a different one while wearing its name.
+#[test]
+fn overlapping_observers_do_not_inflate_how_much_of_a_block_was_seen() {
+    let (mut store, _clock) = store_at(at(2025, 7, 30, 8, 0));
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, true.into())
+        .unwrap();
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_MIN_SPAN_SEC, 0.into())
+        .unwrap();
+
+    let t = task(&mut store, "Read the RFC");
+    let b = block(&mut store, &t.id, at(2025, 7, 30, 14, 0), 60);
+
+    // Half an hour of the editor, and half an hour of the browser sitting
+    // exactly on top of it — the same wall-clock half hour, twice observed.
+    for m in 0..30 {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                domain: None,
+                at: at(2025, 7, 30, 14, 0) + m * 60_000,
+            })
+            .unwrap();
+        store
+            .record_activity(ActivitySample {
+                app_id: "firefox.exe".into(),
+                window_title: None,
+                domain: None,
+                at: at(2025, 7, 30, 14, 0) + m * 60_000,
+            })
+            .unwrap();
+    }
+
+    let c = store
+        .get_activity_day("2025-07-30", TZ)
+        .unwrap()
+        .correlations
+        .into_iter()
+        .find(|c| c.block_id == b.id)
+        .unwrap();
+
+    let summed: i64 = c.top_apps.iter().map(|a| a.seconds).sum();
+    assert!(
+        summed > c.observed_sec,
+        "the per-app totals double-count on purpose: {summed} vs {}",
+        c.observed_sec
+    );
+    assert!(
+        c.observed_sec <= c.duration_sec,
+        "coverage can never exceed the block: {} of {}",
+        c.observed_sec,
+        c.duration_sec
+    );
+    // Thirty minutes of wall clock were watched, however many observers watched
+    // them. Allow a sampling interval either way rather than restating the
+    // arithmetic of how a span is built.
+    assert!(
+        (c.observed_sec - 30 * 60).abs() <= 60,
+        "half the hour was watched, not all of it: {}",
+        c.observed_sec
+    );
+}
+
 /// The two observed panels, carried by the work report over its whole range.
 ///
 /// They used to be day-only, on the Activity screen. Moving them onto a report

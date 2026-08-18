@@ -64,6 +64,40 @@ fn ranked(totals: std::collections::HashMap<String, i64>) -> Vec<AppTotal> {
     out
 }
 
+/// How many seconds of `[start, end)` any span covered — counting a second that
+/// two spans both covered once.
+///
+/// "How much of this was watched" is a question about the *window*, not about
+/// the observers, and the two answers differ whenever observers overlap. They
+/// do overlap: the foreground sampler and the browser connector both report
+/// while you read a page.
+fn union_seconds(spans: &[ActivitySpanRow], start: Millis, end: Millis) -> i64 {
+    let mut clipped: Vec<(Millis, Millis)> = spans
+        .iter()
+        .map(|s| (s.started_at.max(start), s.ended_at.min(end)))
+        .filter(|(a, b)| b > a)
+        .collect();
+    clipped.sort_unstable();
+
+    let mut covered_ms = 0;
+    let mut open: Option<(Millis, Millis)> = None;
+    for (a, b) in clipped {
+        open = match open {
+            // Touching or overlapping: extend rather than count twice.
+            Some((oa, ob)) if a <= ob => Some((oa, ob.max(b))),
+            Some((oa, ob)) => {
+                covered_ms += ob - oa;
+                Some((a, b))
+            }
+            None => Some((a, b)),
+        };
+    }
+    if let Some((oa, ob)) = open {
+        covered_ms += ob - oa;
+    }
+    covered_ms / 1000
+}
+
 impl Store {
     pub fn activity_settings(&self) -> Result<ActivitySettings> {
         let flag = |key: &str, default: bool| {
@@ -346,6 +380,19 @@ impl Store {
             if totals.is_empty() {
                 continue;
             }
+            // The **union** of what the observers covered, not the sum.
+            //
+            // Two observers can cover the same minute — the foreground sampler
+            // and the browser connector both report while you read a page, and
+            // `dedupe_browser_overlap` only unpicks the app-versus-domain case.
+            // Summing counts that minute twice, which is right for "what was
+            // this made of" (`top_apps`, below) and wrong for "how much of the
+            // block was watched": it lets a block report more observation than
+            // it has room for, and a coverage bar built on it exceeds 100%.
+            //
+            // Merging the intervals is what makes the figure mean what its name
+            // says, and what makes it genuinely ≤ the block's length.
+            let observed_sec = union_seconds(spans, start, end);
             let mut apps = ranked(totals);
             let title = match &block.task_id {
                 Some(task_id) => self
@@ -363,6 +410,7 @@ impl Store {
                 starts_at: start,
                 duration_sec: block.duration_sec,
                 top_apps: apps,
+                observed_sec,
             });
         }
         Ok(out)

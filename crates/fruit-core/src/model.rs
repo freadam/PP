@@ -1002,7 +1002,19 @@ pub struct BlockCorrelation {
     pub title: String,
     pub starts_at: Millis,
     pub duration_sec: i64,
+    /// The longest few, for the bar. **Truncated**, so this does not sum to
+    /// `observed_sec` and must never be used to work out coverage.
     pub top_apps: Vec<AppTotal>,
+    /// Every second observed under the block, before the truncation above.
+    ///
+    /// The figure that makes the comparison honest. Without it a caller can
+    /// only add up `top_apps` and normalise against that, which reports *what
+    /// the observed time was made of* while looking exactly like *how much of
+    /// the block was observed* — so three hours with nineteen minutes under
+    /// them draw the same full bar as three hours with three hours under them.
+    ///
+    /// Always ≤ `duration_sec`: the overlaps are clipped to the block.
+    pub observed_sec: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

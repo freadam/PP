@@ -813,8 +813,28 @@ function AgainstPlanPanel({ report }: { report: WorkReport }) {
       ) : (
         <div className="stack">
           {report.correlations.map((c) => {
-            const total = c.topApps.reduce((sum, a) => sum + a.seconds, 0);
             const top = c.topApps[0];
+            /* Against the **block**, never against the apps under it. Dividing
+               by the observed total is what made every bar full width: it
+               reports what the observed time was made of, which looks exactly
+               like how much of the block was observed. Three hours with
+               nineteen minutes under them drew the same bar as three hours
+               with three hours under them. */
+            const plotted = Math.max(1, c.durationSec);
+            const covered = Math.min(1, c.observedSec / plotted);
+            /* The apps divide the *observed* band between them, and the band is
+               only as wide as `covered`. The denominator takes whichever of the
+               two is larger, which handles both ways the figures can fail to
+               line up:
+                 · overlapping observers make the per-app seconds sum above the
+                   observed total — they share the band rather than overflowing
+                   the bar and being clipped;
+                 · a truncated app list sums below it — the apps that did not
+                   fit leave a real gap rather than being inflated to cover for
+                   them. */
+            const shown = c.topApps.reduce((sum, a) => sum + a.seconds, 0);
+            const denom = Math.max(1, shown, c.observedSec);
+            const width = (sec: number) => `${(sec / denom) * covered * 100}%`;
             return (
               <div key={c.blockId} className="stack" style={{ gap: 4 }}>
                 <div className="row">
@@ -828,29 +848,40 @@ function AgainstPlanPanel({ report }: { report: WorkReport }) {
                     {fmt.clockRange(c.startsAt, c.durationSec)}
                   </span>
                 </div>
-                {/* One stacked bar per block: proportions, not a legend to decode. */}
+                {/* One stacked bar per block, drawn across the block's whole
+                    length. What is left unfilled is time nobody watched — which
+                    is a fact about the block and belongs on the picture. */}
                 <span
                   className="app-bar"
                   role="img"
-                  aria-label={c.topApps
-                    .map((a) => `${appLabel(a.appId)} ${fmt.duration(a.seconds)}`)
-                    .join(", ")}
+                  aria-label={`${Math.round(covered * 100)}% of the block observed: ${
+                    c.topApps
+                      .map((a) => `${appLabel(a.appId)} ${fmt.duration(a.seconds)}`)
+                      .join(", ") || "nothing"
+                  }`}
                 >
                   {c.topApps.map((a) => (
                     <i
                       key={a.appId}
-                      style={{
-                        width: `${(a.seconds / Math.max(1, total)) * 100}%`,
-                        background: appColour(a.appId),
-                      }}
+                      style={{ width: width(a.seconds), background: appColour(a.appId) }}
                       title={`${appLabel(a.appId)} · ${fmt.duration(a.seconds)}`}
                     />
                   ))}
                 </span>
                 {top && (
                   <span className="caption">
-                    Mostly <strong>{appLabel(top.appId)}</strong> · {fmt.duration(top.seconds)} of{" "}
-                    {fmt.duration(c.durationSec)} plotted
+                    {/* The share is the headline, because it is the thing that
+                        was being read wrong off the bar. Never colour alone:
+                        the sentence carries it. */}
+                    <strong className="data">{Math.round(covered * 100)}%</strong> of{" "}
+                    {fmt.duration(c.durationSec)} plotted was observed
+                    {covered < 1 && (
+                      <>
+                        {" "}
+                        — {fmt.duration(c.durationSec - c.observedSec)} of it went unwatched
+                      </>
+                    )}
+                    . Mostly <strong>{appLabel(top.appId)}</strong> · {fmt.duration(top.seconds)}
                   </span>
                 )}
               </div>
