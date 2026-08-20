@@ -13,6 +13,16 @@ use crate::time::{check_plausible, local_date, parse_date, zone};
 const MAX_DEPTH: usize = 3;
 const MAX_TITLE: usize = 500;
 
+/// How far back the Today screen looks for work left hanging. A week: the
+/// horizon the rest of the app already thinks in, and short enough that the
+/// list stays a set of loose ends rather than an archive of every unfinished
+/// thing.
+const LOOSE_END_LOOKBACK_DAYS: i64 = 7;
+/// How many loose ends the landing screen will show. Five fits above the fold
+/// beside the top three and the day's totals; a longer list stops being a
+/// prompt and starts being a backlog.
+const LOOSE_END_LIMIT: i64 = 5;
+
 /// What "compact" means, in characters (§2, M4).
 ///
 /// About three hundred words: room for the context a task needs and the two
@@ -588,6 +598,67 @@ impl Store {
             .collect();
 
         Ok(BacklogView { groups, tasks })
+    }
+
+    /// Work that was left hanging: tasks with time logged on a day before
+    /// `date` that nobody has marked done.
+    ///
+    /// This is the clause from interview 1 that made the whole thing one
+    /// product — "tasks I logged time on yesterday but didn't mark complete".
+    /// It is not a list anyone maintains. It is an *inference*, and it is only
+    /// possible because time attaches to tasks: a tracker without tasks cannot
+    /// ask the question, and a task list without time cannot answer it.
+    ///
+    /// Two deliberate bounds, because the alternative is a list that grows
+    /// forever and becomes a standing accusation:
+    ///
+    /// * **`LOOSE_END_LOOKBACK_DAYS`** — a week back, not all history. Work
+    ///   untouched for a month is not a loose end from yesterday; it is a
+    ///   backlog item, and the backlog already has a screen.
+    /// * **`LOOSE_END_LIMIT`** — a landing screen answers "what am I doing
+    ///   now?". Twelve rows of guilt answers a different question badly.
+    ///
+    /// Work that has already been picked back up **today** is excluded, even
+    /// though it was also left hanging yesterday. It is not a loose end any
+    /// more; it is what the user is doing, and the screen already says so
+    /// twice — in the plan above and in the timer chip. Listing it a third
+    /// time under a heading that means "you forgot about this" would be
+    /// reporting the opposite of what happened.
+    ///
+    /// Ordered most-recently-worked first, so yesterday's genuinely sits at the
+    /// top. Nothing here decides anything: it is a filter over rows the task
+    /// reads already produce, with `tracked_sec` and `last_session_at` coming
+    /// from the same projection every other task list uses.
+    pub fn unfinished_before(&self, date: &str, tz: &str) -> Result<Vec<TaskRow>> {
+        let zone = zone(tz)?;
+        let day = parse_date(date)?;
+        let until = crate::time::day_start(day, &zone);
+        let since = crate::time::day_start(
+            day - chrono::Duration::days(LOOSE_END_LOOKBACK_DAYS),
+            &zone,
+        );
+
+        let sql = format!(
+            "SELECT {cols} FROM task t
+              WHERE t.deleted_at IS NULL AND t.status = 'open'
+                AND EXISTS (SELECT 1 FROM time_session s
+                             WHERE s.task_id = t.id
+                               AND s.started_at >= ?2 AND s.started_at < ?3)
+                AND NOT EXISTS (SELECT 1 FROM time_session s
+                                 WHERE s.task_id = t.id AND s.started_at >= ?3)
+              ORDER BY (SELECT MAX(COALESCE(s.ended_at, s.started_at)) FROM time_session s
+                         WHERE s.task_id = t.id) DESC
+              LIMIT ?4",
+            cols = task_cols(1),
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mapped = stmt.query_map(
+            params![self.now(), since, until, LOOSE_END_LIMIT],
+            Self::map_task,
+        )?;
+        let mut rows: Vec<TaskRow> = mapped.collect::<std::result::Result<_, _>>()?;
+        self.attach_tags(&mut rows)?;
+        Ok(rows)
     }
 
     pub fn get_task_detail(&self, id: &str) -> Result<TaskDetail> {

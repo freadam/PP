@@ -6,6 +6,7 @@ instead of being quietly marked green.
 
 ```bash
 cargo test                                  # M, F, D, and the U criteria below the UI
+npm run test:units                          # the pure frontend folds (C1)
 node scripts/check-ui.mjs                   # I1, I3–I7, U10 (needs `npm run preview`)
 ```
 
@@ -56,6 +57,26 @@ silently would be indistinguishable from a bug. `two_touching_entries_become_one
 |---|---|
 | **M13** — built, unproven against the real file | The importer detects a sheet's shape rather than assuming one, and the round trip it *can* be held against — Fruit reading Fruit's own export — passes (`the_importer_finds_the_shape_of_fruits_own_export`). It has never seen the client's workbook, because nobody has provided one; that is open question 6, not a gap in the code. |
 | **M12** — built, unsigned | The export exists and its totals are formulas; the *format* needs the client's reference month before it can be signed off. |
+
+---
+
+## Capture honesty (C) — the success metric, on screen
+
+The plan's headline number is that **≥90% of confirmed work is captured live**
+rather than reconstructed afterwards. Until this cycle it was a promise nobody
+could check: the build stored `time_session.source` and never showed the ratio.
+
+| # | Criterion | Covered by | Runs |
+|---|---|---|---|
+| C1 | A day's confirmed work is split into time captured **while it happened** (`timer`, `pomodoro`) and time **reconstructed from memory** (`manual`), with the ≥90% gate marked | `splitByCapture` in `src/lib/honesty.ts`, unit-tested in `scripts/check-units.mjs` (8 cases, including the gate boundary at exactly 90%). Rendered by `HonestyCard` on the Day summary strip and in the Today header. | ✅ |
+| C1a | The ratio is a proportion of the **same seconds** the Work card shows | `every_confirmed_work_segment_says_how_it_was_captured` asserts `live + reconstructed == totals.confirmedWorkSec`. The split reads `DaySegment`s — already clipped to the date and already resolved by §7 precedence — rather than session rows, so a session that crosses midnight or is outranked by confirmed life time cannot inflate the denominator. | ✅ |
+| C1b | Crash-recovered time is excluded from the ratio and still counted in the total | `a day of nothing but recovered time still has no ratio` and `recovered time is excluded from the ratio but not from the total` in `check-units.mjs`. Its provenance is the recovery machine rather than a choice anyone made about honesty; hiding it instead would leave a total that doesn't add up. | ✅ |
+| C1c | An empty day reads as empty, not as 0% | `an empty day has no ratio rather than a zero one` — `livePct` is `null`, and the card renders `—`. A hollow 0% reads as failure when it is really just a day nobody has worked yet. | ✅ |
+| C1d | The gate survives greyscale | The met state carries a `✓` glyph as well as `--done`, the same redundancy rule as the slot states (I3/M16). | ✅ |
+
+The **measurement** of the real ratio is still V1's job: this criterion is that
+the number exists, is derived from the right seconds, and is on screen. What it
+reads on a real week on the client's machine is what V1 finds out.
 
 ---
 

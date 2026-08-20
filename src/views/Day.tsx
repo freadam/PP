@@ -38,6 +38,7 @@ import type {
   SlotState,
 } from "../lib/types";
 import { Empty } from "../components/chrome";
+import { HonestyCard } from "../components/HonestyCard";
 
 /** The wireframe offers 15/30/60; 5 is kept for splitting a short interval. */
 const SLOT_CHOICES = [5, 15, 30, 60] as const;
@@ -338,7 +339,7 @@ export function Day() {
         </button>
       </div>
 
-      <SummaryCards totals={day.totals} />
+      <SummaryCards totals={day.totals} segments={day.segments} />
 
       {filter !== "all" && (
         /* A filtered table shows fewer rows but the same day. Saying so is the
@@ -460,8 +461,19 @@ export function Day() {
  *
  * Unaccounted is hatched, like the rows it counts, so the eye connects the
  * figure to the thing it can act on.
+ *
+ * A seventh tile follows them and is deliberately a different kind of thing:
+ * the six are durations that sum to the day, and `HonestyCard` is a ratio over
+ * the first of them. See its own file for why it is shaped so it cannot be
+ * misread as a bucket.
  */
-function SummaryCards({ totals }: { totals: DayView["totals"] }) {
+function SummaryCards({
+  totals,
+  segments,
+}: {
+  totals: DayView["totals"];
+  segments: DaySegment[];
+}) {
   const cards = [
     { label: "Work", sec: totals.confirmedWorkSec, cls: "l-work" },
     { label: "Life", sec: totals.confirmedLifeSec - totals.sleepSec, cls: "l-life" },
@@ -482,6 +494,11 @@ function SummaryCards({ totals }: { totals: DayView["totals"] }) {
             <strong className="data">{fmt.duration(c.sec)}</strong>
           </div>
         ))}
+        {/* C1. Not a seventh bucket — the six above partition the day, and this
+            is a ratio over one of them. It is here because the question "how
+            much of this did you actually watch happen?" belongs beside the
+            figures it qualifies, not on a screen of its own. */}
+        <HonestyCard segments={segments} />
       </div>
       {/* The same numbers as proportions. It fills the width exactly because
           the totals behind it sum to the day — the counting invariant, drawn. */}

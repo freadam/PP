@@ -76,15 +76,23 @@ export function useKeyboard() {
       // reach through.
       if (typing) return;
 
-      // `G` then P/T/A/R/S
+      // `G` then Y/D/P/T/A/R/S
       if (pendingG.current) {
         pendingG.current = false;
         const map: Record<string, string> = {
+          // `d` was missing here while Day was the landing route, so the rail's
+          // own "G then D" tooltip was a promise nothing kept — invisible,
+          // because the view it failed to reach was already on screen.
+          d: "go-day",
           p: "go-planner",
           t: "go-tasks",
           a: "go-activity",
           r: "go-reports",
           s: "go-settings",
+          // Y, not T: `T` is already G-then-T for Projects, and a bare `t`
+          // jumps the current view to today's date. Rebinding either would
+          // break a habit to save one letter.
+          y: "go-today",
         };
         const id = map[e.key.toLowerCase()];
         if (id) {

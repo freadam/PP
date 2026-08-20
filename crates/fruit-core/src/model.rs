@@ -2070,6 +2070,18 @@ pub enum SlotOwner {
         project_name: Option<String>,
         project_colour: Option<String>,
         contribution: Option<Contribution>,
+        /// How the interval was captured — `timer`, `pomodoro`, `manual` or
+        /// `recovered`, straight off `time_session.source`.
+        ///
+        /// Carried here for the same reason `project_name` is: so the renderer
+        /// can say something about a segment without a second query. It is what
+        /// lets the Day view split its confirmed hours into time captured while
+        /// it happened and time reconstructed from memory — the ratio the
+        /// product's success is measured by. Deriving it from the session rows
+        /// instead would sum whole sessions, which is not what this day holds:
+        /// a session is clipped at midnight and outranked by confirmed life
+        /// time, and only a segment knows that.
+        source: String,
     },
     /// The machine saw an application, and nobody has confirmed what it meant.
     Observed {
@@ -2125,6 +2137,11 @@ pub struct DaySegment {
 #[serde(rename_all = "camelCase")]
 pub struct DayPlan {
     pub block_id: String,
+    /// The task the interval was plotted for, when it was plotted for one. A
+    /// block can carry a bare label instead ("Standup"), which is why this is
+    /// optional — and why a caller that wants to start a timer from a plan has
+    /// to cope with a plan there is no task to time.
+    pub task_id: Option<String>,
     pub title: String,
     pub project_colour: Option<String>,
     pub starts_at: Millis,

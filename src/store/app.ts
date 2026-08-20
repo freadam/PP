@@ -32,8 +32,22 @@ import type {
   WeekView,
 } from "../lib/types";
 
-/** Day first: it is the primary operational screen (Plan Rev 3 §8.1). */
+/**
+ * Today first.
+ *
+ * The Day view is still the primary *operational* screen — it is where an hour
+ * gets made honest, and every number in the app is summed from what happens
+ * there. But it is not what someone opens the app to see at nine in the
+ * morning. Interview 1 asked for "top 3 tasks scheduled for the day, tasks I
+ * logged time on yesterday but didn't mark complete", and answering that in one
+ * glance is a different screen from a twenty-four-row table.
+ *
+ * So Today is the landing route and Day is one keystroke away. That is the
+ * whole of the "Projects-first → Today-first" decision, and it lives here
+ * rather than in a router because there is no router.
+ */
 export type ViewName =
+  | "today"
   | "day"
   | "planner"
   | "tasks"
@@ -114,6 +128,15 @@ interface AppState {
 
   // ─── the day (Plan Rev 3 §8.1) — the primary screen ──────────────────
   day: DayView | null;
+  /**
+   * Tasks with time logged before today that were never marked done — the
+   * "still open" half of the Today screen.
+   *
+   * A slice of its own rather than a field on `day`, because it is not about
+   * the day being displayed: it is about the days *before* today, and it does
+   * not change when someone pages back to look at last Tuesday.
+   */
+  stillOpen: TaskRow[];
   dayDate: LocalDate;
   slotMinutes: number;
   lifeAreas: LifeAreaRow[];
@@ -168,6 +191,7 @@ interface AppState {
   loadProjects: () => Promise<void>;
   loadReports: () => Promise<void>;
   loadDay: () => Promise<void>;
+  loadStillOpen: () => Promise<void>;
   setDayDate: (d: LocalDate) => void;
   setSlotMinutes: (m: number) => void;
   loadMonth: () => Promise<void>;
@@ -205,7 +229,7 @@ interface AppState {
 let toastSeq = 0;
 
 export const useApp = create<AppState>((set, get) => ({
-  view: "day",
+  view: "today",
   overlay: null,
   theme: "light",
   sidebarWidth: 260,
@@ -222,6 +246,7 @@ export const useApp = create<AppState>((set, get) => ({
   blockDialog: null,
 
   day: null,
+  stillOpen: [],
   dayDate: fmt.today(),
   slotMinutes: 30,
   lifeAreas: [],
@@ -281,6 +306,7 @@ export const useApp = create<AppState>((set, get) => ({
       get().loadTasks(),
       get().loadProjects(),
       get().loadDay(),
+      get().loadStillOpen(),
     ]);
     const timer = await ipc.getTimerState().catch(() => get().timer);
     const unreconciled = await ipc.getUnreconciledDays(fmt.today()).catch(() => []);
@@ -301,6 +327,12 @@ export const useApp = create<AppState>((set, get) => ({
     if (view === "reports") void get().loadMonth();
     if (view === "activity") void get().loadActivity();
     if (view === "day") void get().loadDay();
+    if (view === "today") {
+      // Today always shows today, whatever date the Day view was left on.
+      if (get().dayDate !== fmt.today()) set({ dayDate: fmt.today() });
+      void get().loadDay();
+      void get().loadStillOpen();
+    }
   },
 
   setOverlay(overlay) {
@@ -410,6 +442,22 @@ export const useApp = create<AppState>((set, get) => ({
     if (day) set({ day });
     if (areas.length) set({ lifeAreas: areas });
     set({ dayEntries: entries });
+  },
+
+  /**
+   * The Today screen's loose ends (interview 1).
+   *
+   * Always about *today*, never about `dayDate`: paging the Day view back to
+   * last Tuesday must not silently redefine what "still open" means. Failures
+   * are swallowed to an empty list — a landing screen that refuses to render
+   * because one of its three sections could not load is worse than a landing
+   * screen with two sections.
+   */
+  async loadStillOpen() {
+    const stillOpen = await ipc
+      .getUnfinishedBefore(fmt.today(), fmt.tz())
+      .catch(() => [] as TaskRow[]);
+    set({ stillOpen });
   },
 
   setDayDate(dayDate) {
@@ -640,6 +688,9 @@ export const useApp = create<AppState>((set, get) => ({
     if (view === "activity") await get().loadActivity();
     // The Day view reads sessions and blocks, so any mutation can change it.
     if (view === "day") await get().loadDay();
+    // Today reads both, and its "still open" list is an inference over sessions
+    // — starting a timer on a loose end is exactly what takes it off the list.
+    if (view === "today") await Promise.all([get().loadDay(), get().loadStillOpen()]);
   },
 }));
 

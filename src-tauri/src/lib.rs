@@ -816,6 +816,14 @@ fn get_day(
     with(&state, |s| s.get_day(&date, &tz, slot_minutes))
 }
 
+/// Tasks with time logged before `date` that were never marked done — the
+/// "still open" clause of the Today screen. A filter over the ordinary task
+/// projection; it owns no totals and no precedence.
+#[tauri::command]
+fn get_unfinished_before(state: State<'_, AppState>, date: String, tz: String) -> Res<Vec<TaskRow>> {
+    with(&state, |s| s.unfinished_before(&date, &tz))
+}
+
 /// The month dashboard (wireframe screen 3). Month is the plan's default
 /// reporting horizon, so this is what Reports opens to.
 #[tauri::command]
@@ -1385,6 +1393,7 @@ pub fn run() {
             get_reports,
             get_reconcile_items,
             get_day,
+            get_unfinished_before,
             get_month,
             preview_excel,
             export_excel,

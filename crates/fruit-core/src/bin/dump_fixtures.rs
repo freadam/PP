@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 use chrono::{Datelike, Duration};
 use fruit_core::model::*;
+use fruit_core::clock::TestClock;
 use fruit_core::time::{format_date, local_date, now_ms, parse_date, week_start, zone};
 use fruit_core::Store;
 use serde_json::{json, Map, Value};
@@ -20,7 +21,12 @@ use serde_json::{json, Map, Value};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tz = std::env::var("TZ").unwrap_or_else(|_| "Europe/London".into());
     let zone_ = zone(&tz)?;
-    let mut store = Store::open_in_memory()?;
+    // A clock that starts at the real now and can be driven, so the recording
+    // can contain a session the **timer** produced rather than only sessions
+    // typed in after the fact. Nothing else here depends on time standing
+    // still: every borrowed instant is put back before the DTOs are dumped.
+    let clock = TestClock::new(now_ms());
+    let mut store = Store::in_memory_with_clock(std::sync::Arc::new(clock.clone()))?;
     store.seed_first_run(&tz)?;
 
     let today = local_date(now_ms(), &zone_);
@@ -271,6 +277,46 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         note: None,
     })?;
 
+    // Yesterday's loose end: time logged, never marked done. The Today screen's
+    // "still open" list is an inference over exactly this shape, and a fixture
+    // without one leaves that section rendering as nothing — which is also what
+    // it renders as when the inference is broken, so the preview would prove
+    // nothing either way.
+    let yesterday_start =
+        fruit_core::time::day_start(today_date - Duration::days(1), &zone_) + 14 * 3_600_000;
+    let loose_end = store.create_task(NewTask {
+        title: "Chase the vendor invoice".into(),
+        project_id: Some(deep.id.clone()),
+        estimate_sec: Some(1800),
+        ..Default::default()
+    })?;
+    store.add_session(ManualSession {
+        contribution: None,
+        replace_existing: false,
+        task_id: loose_end.id.clone(),
+        block_id: None,
+        started_at: yesterday_start,
+        ended_at: yesterday_start + 35 * 60_000,
+        note: None,
+    })?;
+
+    // Time captured **live**, by the timer, on today.
+    //
+    // Every other session in this file is entered after the fact, which makes
+    // the recorded database 100% reconstructed — and the honesty card, whose
+    // whole job is the ratio between the two, would show a flat 0% in the
+    // preview and prove nothing. So this one runs the real timer against a
+    // driven clock: the row's `source` is `timer` because the timer wrote it,
+    // not because a fixture asserted it. `add_session` deliberately has no way
+    // to claim otherwise.
+    let live_from = activity_base + 6 * 3_600_000;
+    let resume = clock.now();
+    clock.set(live_from);
+    store.start_timer(&firefight.id, None)?;
+    clock.advance(52 * 60_000);
+    store.stop_timer()?;
+    clock.set(resume);
+
     // One stretch of work recorded as two rows, four minutes apart — a timer
     // stopped to take a call, which is the ordinary way this happens. It gives
     // the Day view's range selection something real to offer **Merge** on;
@@ -444,6 +490,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     out.insert("get_timer_state".into(), json!(store.timer_state()?));
     out.insert("get_day".into(), json!(store.get_day(&today, &tz, None)?));
+    // The Today screen's "still open" list. Recorded rather than asserted, so
+    // the preview shows whatever this database genuinely left hanging.
+    out.insert(
+        "get_unfinished_before".into(),
+        json!(store.unfinished_before(&today, &tz)?),
+    );
     out.insert("get_month".into(), json!(store.get_month(&today[..7], &tz)?));
     out.insert("get_life_areas".into(), json!(store.get_life_areas(&tz, false)?));
     out.insert(

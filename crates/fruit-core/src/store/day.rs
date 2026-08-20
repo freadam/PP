@@ -137,7 +137,7 @@ impl Store {
         let now = self.now();
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.task_id, t.title, t.project_id, p.colour, s.contribution,
-                    s.started_at, COALESCE(s.ended_at, ?3), p.name
+                    s.started_at, COALESCE(s.ended_at, ?3), p.name, s.source
                FROM time_session s
                JOIN task t         ON t.id = s.task_id
                LEFT JOIN project p ON p.id = t.project_id
@@ -156,6 +156,7 @@ impl Store {
                     project_name: r.get(8)?,
                     project_colour: r.get(4)?,
                     contribution: contribution.as_deref().and_then(Contribution::parse),
+                    source: r.get(9)?,
                 },
             })
         })?;
@@ -243,7 +244,7 @@ impl Store {
         let mut stmt = self.conn.prepare(
             "SELECT b.id, COALESCE(t.title, b.label, 'Untitled'), p.colour,
                     b.starts_at, b.duration_sec, COALESCE(c.tracked_sec, 0),
-                    b.is_fixed, b.series_id, b.intent
+                    b.is_fixed, b.series_id, b.intent, b.task_id
                FROM scheduled_block b
                LEFT JOIN task t    ON t.id = b.task_id
                LEFT JOIN project p ON p.id = t.project_id
@@ -256,6 +257,7 @@ impl Store {
             let tracked_sec: i64 = r.get(5)?;
             Ok(DayPlan {
                 block_id: r.get(0)?,
+                task_id: r.get(9)?,
                 title: r.get(1)?,
                 project_colour: r.get(2)?,
                 starts_at: r.get(3)?,
@@ -1011,6 +1013,7 @@ mod tests {
                 project_name: None,
                 project_colour: None,
                 contribution: None,
+                source: "timer".into(),
             },
         }
     }
@@ -1061,6 +1064,7 @@ mod tests {
                 project_name: None,
                 project_colour: None,
                 contribution: None,
+                source: "timer".into(),
             },
         }
     }
@@ -1068,6 +1072,7 @@ mod tests {
     fn plan(from: Millis, minutes: i64) -> DayPlan {
         DayPlan {
             block_id: "b".into(),
+            task_id: None,
             title: "Plotted".into(),
             project_colour: None,
             starts_at: from,

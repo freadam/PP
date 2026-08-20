@@ -1882,9 +1882,13 @@ select {
 
 /* Six summary cards. "Number card — 8px top/right/bottom, 12px left
    padding. Compact KPI dashboard tile." */
+/* Eight tracks, not seven: six duration cards at 1fr and the honesty card at
+   two, because it carries a bar and a sentence rather than one figure. Sizing
+   it differently is also what stops it reading as a seventh bucket — the six
+   partition the day and this one does not. */
 .cards {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(8, 1fr);
   gap: var(--s-8);
   flex: none;
   margin-bottom: var(--s-8);
@@ -1922,6 +1926,186 @@ select {
     var(--hatch) 6px,
     var(--hatch) 9px
   );
+}
+
+/* ─── C1: captured live (HonestyCard) ─────────────────────────────────── */
+
+.card.honesty {
+  grid-column: span 2;
+  /* Standalone in the Today header it is not in a grid at all, so it needs a
+     floor of its own or the flex header squeezes the sub-line to two words. */
+  min-width: 200px;
+}
+/* The gate reading, redundantly coded: the ✓ in the markup is what survives a
+   greyscale screenshot, and the colour is the fast read for everyone else. */
+.card.honesty > strong[data-met="true"] {
+  color: var(--done);
+}
+.card.honesty > strong[data-empty="true"] {
+  color: var(--faint);
+}
+.honesty-bar {
+  position: relative;
+  display: block;
+  height: 4px;
+  margin-top: var(--s-2);
+  background: var(--sunken);
+  border-radius: 2px;
+}
+.honesty-live {
+  display: block;
+  height: 100%;
+  max-width: 100%;
+  background: var(--done);
+  border-radius: 2px;
+}
+/* The 90% target, marked on the track rather than written out again. It stands
+   a little proud of the bar so it reads as a threshold and not as a join
+   between two fills. */
+.honesty-gate {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--line-strong);
+}
+.honesty-sub {
+  font-size: var(--t-micro);
+  line-height: 1.3;
+  color: var(--muted);
+}
+.honesty-sub .data {
+  font-size: var(--t-micro);
+  color: var(--paper);
+}
+.honesty-recovered,
+.honesty-recovered .data {
+  color: var(--faint);
+}
+.honesty-dot {
+  margin: 0 var(--s-4);
+  color: var(--faint);
+}
+
+/* ─── Today: the landing screen ───────────────────────────────────────── */
+
+.today {
+  max-width: 880px;
+}
+.today-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-16);
+  margin-bottom: var(--s-24);
+}
+.today-head-text {
+  min-width: 0;
+}
+.today-sub {
+  margin-top: var(--s-4);
+}
+.today-sub .data {
+  font-size: var(--t-caption);
+  color: var(--paper);
+}
+.today-dot {
+  margin: 0 var(--s-4);
+  color: var(--faint);
+}
+.today-block {
+  margin-bottom: var(--s-24);
+}
+.today-block > .title {
+  margin-bottom: var(--s-8);
+}
+.today-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.today-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  overflow: hidden;
+}
+.today-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-12);
+  padding: var(--s-8) var(--s-12);
+  background: var(--surface);
+}
+.today-row + .today-row {
+  border-top: 1px solid var(--rule);
+}
+/* The row that is running says so in the row itself, not only in the top bar:
+   the landing screen's whole job is to make the current trace obvious. */
+.today-row[data-running="true"] {
+  background: var(--track-surface);
+}
+/* The row body is the button that opens the task, so the hit area is the whole
+   line rather than the title's own width. It has to be stripped back to text:
+   a <button> here inherits centred, bordered control styling otherwise. */
+.today-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.today-row-main:disabled {
+  cursor: default;
+}
+.today-row-title {
+  font-size: var(--t-label);
+  font-weight: var(--w-medium);
+  color: var(--strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.today-row-meta .data {
+  font-size: var(--t-caption);
+  color: var(--muted);
+}
+.today-row-actions {
+  flex: none;
+}
+.today-untimeable {
+  color: var(--faint);
+}
+.today-totals {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--s-8);
+  margin: 0 0 var(--s-8) 0;
+}
+.today-stat {
+  min-width: 0;
+}
+.today-stat dt {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.today-stat dd {
+  margin: var(--s-2) 0 0 0;
+  color: var(--strong);
+}
+.today-reconcile {
+  padding-left: 0;
 }
 
 .day-body {
@@ -3195,6 +3379,9 @@ select {
   .cards {
     grid-template-columns: repeat(3, 1fr);
   }
+  .today-totals {
+    grid-template-columns: repeat(3, 1fr);
+  }
   /* At this width the day totals wrap and fight the date. Drop them; the
      numbers are still one keystroke away in Reports. */
   .dayname .totals {
@@ -3233,6 +3420,14 @@ select {
   }
   .cards {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .today-totals {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* The header stacks before the honesty card is squeezed: it is the reason
+     this screen exists, so it is the last thing that gives up room. */
+  .today-head {
+    flex-direction: column;
   }
 }
 

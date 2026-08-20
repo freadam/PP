@@ -34,6 +34,7 @@ export const COMMANDS: Command[] = [
   { id: "reconcile", title: "Reconcile a day", group: "Global", keys: "⌘R", run: () => app().setOverlay("reconcile") },
   { id: "shortcuts", title: "Shortcut sheet", group: "Global", keys: "?", run: () => app().setOverlay("shortcuts") },
   { id: "undo", title: "Undo", group: "Global", keys: "⌘Z", run: () => void app().undo() },
+  { id: "go-today", title: "Go to Today", group: "Global", keys: "G then Y", run: () => app().go("today") },
   { id: "go-day", title: "Go to Day", group: "Global", keys: "G then D", run: () => app().go("day") },
   { id: "go-planner", title: "Go to Planner", group: "Global", keys: "G then P", run: () => app().go("planner") },
   { id: "go-tasks", title: "Go to Projects", group: "Global", keys: "G then T", run: () => app().go("tasks") },

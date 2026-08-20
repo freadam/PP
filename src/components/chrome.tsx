@@ -27,7 +27,11 @@ export function BrandMark({ size = 20, state = "idle" }: { size?: number; state?
 }
 
 const NAV: { view: ViewName; label: string; key: string; icon: string }[] = [
-  // Day first: it is the primary operational screen (Plan Rev 3 §8.1).
+  // Today first: it is what someone opens the app to see. Day sits directly
+  // under it because it is where the day is *made honest* — the landing screen
+  // reports, the Day view reconciles, and the rail says which is which by
+  // putting them next to each other.
+  { view: "today", label: "Today", key: "Y", icon: "☀" },
   { view: "day", label: "Day", key: "D", icon: "▦" },
   { view: "planner", label: "Planner", key: "P", icon: "▤" },
   { view: "tasks", label: "Projects", key: "T", icon: "☰" },

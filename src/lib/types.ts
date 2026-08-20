@@ -446,6 +446,16 @@ export interface IcsImportSummary {
   note: string;
 }
 
+/**
+ * How a confirmed interval of work came to be recorded.
+ *
+ * `timer` and `pomodoro` were captured while the work happened; `manual` was
+ * asserted afterwards from memory; `recovered` was restored by the crash
+ * machinery rather than chosen by anyone. The distinction is the product's
+ * success metric, not bookkeeping — see `src/lib/honesty.ts`.
+ */
+export type SessionSource = "timer" | "pomodoro" | "manual" | "recovered";
+
 export interface SessionRow {
   id: string;
   taskId: string;
@@ -455,7 +465,7 @@ export interface SessionRow {
   endedAt: Millis | null;
   elapsedSec: number;
   heartbeatAt: Millis | null;
-  source: "timer" | "pomodoro" | "manual" | "recovered";
+  source: SessionSource;
   isConfirmed: boolean;
   note: string | null;
   /** Work contribution mode. Work records only — life entries have no such field. */
@@ -1080,6 +1090,10 @@ export type SlotOwner =
       projectName: string | null;
       projectColour: string | null;
       contribution: Contribution | null;
+      /** How the interval was captured — see `SessionSource`. Carried on the
+       *  segment, not looked up per session, so the live-versus-reconstructed
+       *  split is a partition of the very seconds the totals are summed from. */
+      source: SessionSource;
     }
   | { kind: "observed"; appId: string; domain: string | null; category: string | null }
   | { kind: "idle" }
@@ -1097,6 +1111,10 @@ export interface DaySegment {
 
 export interface DayPlan {
   blockId: string;
+  /** The task the interval was plotted for. `null` for a bare label ("Standup"),
+   *  which is why a caller that starts a timer from a plan has to cope with a
+   *  plan there is no task to time. */
+  taskId: string | null;
   title: string;
   projectColour: string | null;
   startsAt: Millis;

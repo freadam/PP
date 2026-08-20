@@ -14,8 +14,9 @@
     "app:build": "tauri build",
     "test:core": "cargo test --manifest-path Cargo.toml",
     "check:ui": "node scripts/check-ui.mjs",
+    "test:units": "node --experimental-strip-types --test scripts/check-units.mjs",
     "fixtures": "cargo run -p fruit-core --bin dump-fixtures",
-    "test": "cargo test && npm run build && npm run check:ui"
+    "test": "cargo test && npm run test:units && npm run build && npm run check:ui"
   },
   "dependencies": {
     "react": "^19.0.0",

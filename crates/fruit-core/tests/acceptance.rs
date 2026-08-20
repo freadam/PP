@@ -4094,3 +4094,139 @@ fn a_session_that_ends_when_it_starts_is_refused() {
         })
         .is_err());
 }
+
+// ─── Today: the loose ends, and how a day's hours were captured ────────
+
+fn manual(store: &mut Store, task_id: &str, from: i64, to: i64) {
+    store
+        .add_session(ManualSession {
+            task_id: task_id.into(),
+            block_id: None,
+            started_at: from,
+            ended_at: to,
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+}
+
+/// Interview 1's clause, and the reason time and tasks are one product:
+/// "tasks I logged time on yesterday but didn't mark complete". Nobody
+/// maintains that list — it is inferred from sessions, so the test is that the
+/// inference includes and excludes the right things rather than that a flag
+/// was read back.
+#[test]
+fn still_open_is_yesterdays_work_that_was_never_finished() {
+    let (mut store, _clock) = store_at(at(2026, 8, 20, 9, 0));
+
+    let hanging = task(&mut store, "Chase the vendor invoice");
+    manual(&mut store, &hanging.id, at(2026, 8, 19, 14, 0), at(2026, 8, 19, 14, 35));
+
+    let finished = task(&mut store, "Ship the migration");
+    manual(&mut store, &finished.id, at(2026, 8, 19, 9, 0), at(2026, 8, 19, 10, 0));
+    store.set_task_status(&finished.id, Status::Done).unwrap();
+
+    let today_only = task(&mut store, "This morning's work");
+    manual(&mut store, &today_only.id, at(2026, 8, 20, 8, 0), at(2026, 8, 20, 8, 30));
+
+    let stale = task(&mut store, "Something from last month");
+    manual(&mut store, &stale.id, at(2026, 7, 20, 9, 0), at(2026, 7, 20, 10, 0));
+
+    let untouched = task(&mut store, "Never started");
+
+    // Left hanging yesterday and already picked back up this morning. Not a
+    // loose end any more — it is what the user is doing.
+    let resumed = task(&mut store, "Picked back up");
+    manual(&mut store, &resumed.id, at(2026, 8, 19, 16, 0), at(2026, 8, 19, 17, 0));
+    manual(&mut store, &resumed.id, at(2026, 8, 20, 8, 30), at(2026, 8, 20, 8, 45));
+
+    let open = store.unfinished_before("2026-08-20", TZ).unwrap();
+    let ids: Vec<&str> = open.iter().map(|t| t.id.as_str()).collect();
+
+    assert_eq!(ids, vec![hanging.id.as_str()], "only the loose end from yesterday");
+    assert!(!ids.contains(&finished.id.as_str()), "marked done is not a loose end");
+    assert!(!ids.contains(&today_only.id.as_str()), "today is not 'before today'");
+    assert!(!ids.contains(&stale.id.as_str()), "a month back is backlog, not a loose end");
+    assert!(!ids.contains(&untouched.id.as_str()), "no time logged, nothing hanging");
+    assert!(
+        !ids.contains(&resumed.id.as_str()),
+        "already back on it today, so it is current work and not a loose end",
+    );
+
+    // The row can say what it cost without a second query.
+    assert_eq!(open[0].tracked_sec, 35 * 60);
+    assert!(open[0].last_session_at.is_some());
+}
+
+/// C1 — the day's confirmed hours carry how they were captured, so the ratio
+/// of live capture to memory can be read off the same segments the totals are
+/// summed from. Segment-level, deliberately: a session is clipped at midnight
+/// and outranked by confirmed life time, so summing session rows would produce
+/// a percentage of a number the Day view never shows.
+#[test]
+fn every_confirmed_work_segment_says_how_it_was_captured() {
+    let (mut store, clock) = store_at(at(2026, 8, 20, 9, 0));
+
+    let timed = task(&mut store, "Refactor the scheduler");
+    store.start_timer(&timed.id, None).unwrap();
+    clock.advance(30 * 60_000);
+    store.stop_timer().unwrap();
+
+    let remembered = task(&mut store, "The call I forgot to time");
+    manual(&mut store, &remembered.id, at(2026, 8, 20, 11, 0), at(2026, 8, 20, 11, 30));
+
+    let day = store.get_day("2026-08-20", TZ, None).unwrap();
+    let mut live = 0i64;
+    let mut reconstructed = 0i64;
+    let mut work_total = 0i64;
+    for seg in &day.segments {
+        if let SlotOwner::Work { source, .. } = &seg.owner {
+            let sec = (seg.to - seg.from) / 1000;
+            work_total += sec;
+            match source.as_str() {
+                "timer" | "pomodoro" => live += sec,
+                "manual" => reconstructed += sec,
+                _ => {}
+            }
+        }
+    }
+
+    assert_eq!(live, 30 * 60, "the timed half was captured live");
+    assert_eq!(reconstructed, 30 * 60, "the other half was filled in from memory");
+    // The invariant the card rests on: the split is a partition of the same
+    // seconds the Work card shows, not a second count of the day.
+    assert_eq!(work_total, day.totals.confirmed_work_sec);
+    assert_eq!(live + reconstructed, day.totals.confirmed_work_sec);
+}
+
+/// A plan has to be able to say what task it is for, or the landing screen
+/// cannot start a timer from it — and a block plotted with a bare label has to
+/// stay renderable rather than being dropped for having no task.
+#[test]
+fn a_plotted_block_carries_its_task_and_a_bare_label_carries_none() {
+    let (mut store, _clock) = store_at(at(2026, 8, 20, 9, 0));
+    let t = task(&mut store, "Refactor auth module");
+    block(&mut store, &t.id, at(2026, 8, 20, 9, 0), 60);
+    store
+        .schedule_block(NewBlock {
+            task_id: None,
+            label: Some("Standup".into()),
+            starts_at: at(2026, 8, 20, 10, 0),
+            duration_sec: 900,
+            tz: TZ.into(),
+            is_fixed: true,
+            rrule: None,
+            intent: None,
+        })
+        .unwrap();
+
+    let day = store.get_day("2026-08-20", TZ, None).unwrap();
+    let plans: Vec<&DayPlan> = day.slots.iter().flat_map(|s| s.plans.iter()).collect();
+
+    let refactor = plans.iter().find(|p| p.title == "Refactor auth module").unwrap();
+    assert_eq!(refactor.task_id.as_deref(), Some(t.id.as_str()));
+
+    let standup = plans.iter().find(|p| p.title == "Standup").unwrap();
+    assert_eq!(standup.task_id, None, "a bare label is plotted for no task");
+}

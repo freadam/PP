@@ -143,6 +143,72 @@ Two distinctions the block preserves:
 
 ---
 
+## ~~U3 · The app opens on a table, not on an answer~~ — **built**
+
+**Was:** launching landed on the Day view — twenty-four rows, every hour of the
+date, most of them empty. That is the right screen for *reconciling* a day and
+the wrong one for starting one. Interview 1 has asked the same question since
+before there was code: "top 3 tasks scheduled for the day, tasks I logged time
+on yesterday but didn't mark complete." Nothing in the build answered it in one
+glance, so the answer was assembled by hand every morning out of Planner and
+Projects.
+
+**Now:** a `Today` view is the landing route, with Day one keystroke below it
+(`G` `Y` / `G` `D`). Three sections: today's plotted work, work left hanging
+before today, and the day's totals with a way through to reconcile. Every row's
+primary action is start or resume, because the point of a landing screen in a
+capture tool is to put the next honest trace one keystroke away.
+
+It composes existing DTOs and adds no logic below the UI. Two display fields
+and one thin read were needed, and it is worth being precise about which:
+
+- `DayPlan.task_id` — a plan could name a task but not identify it, so no
+  caller could start a timer from one. `null` for a bare label ("Standup"), and
+  that row withdraws the offer rather than making it and then refusing.
+- `SlotOwner::Work.source` — see C1 below.
+- `Store::unfinished_before(date, tz)` — the "still open" clause. Not a list
+  anyone maintains: it is inferred from sessions, which is only possible
+  because time attaches to tasks. Bounded to seven days and five rows so it
+  stays a set of loose ends rather than a standing accusation, and it excludes
+  work already picked back up today, which is current work rather than a thing
+  you forgot. Covered by `still_open_is_yesterdays_work_that_was_never_finished`.
+
+**Found by driving it:** `G` `D` had never been wired. The rail's own tooltip
+promised it and the key map had no `d` entry — invisible for as long as Day was
+the landing route, because the view it failed to reach was already on screen.
+`check-ui.mjs` now walks Today as well, so the same class of gap fails loudly.
+
+---
+
+## ~~U4 · The 90% capture target was a promise nobody could check~~ — **built**
+
+**Was:** `time_session.source` recorded whether an interval was captured by the
+timer or typed in afterwards, and nothing ever showed the ratio. The plan's
+headline number — ≥90% of confirmed work captured live — could not be read off
+the app that was supposed to be achieving it.
+
+**Now:** a **Captured live** card on the Day summary strip and in the Today
+header, with the 90% gate marked on its bar and a `✓` that survives greyscale.
+
+The decision worth recording is what it counts. The obvious implementation sums
+`SessionRow.elapsed_sec` grouped by source; it is wrong in the one place being
+wrong matters most. A session row is the whole session, and the card sits beside
+a figure for one date: a session crossing midnight belongs to two days, and a
+session outranked by a confirmed life entry is not counted as work at all. So
+`source` is carried on the resolved **segment**, and the split is a partition of
+exactly the seconds `confirmedWorkSec` is summed from — the two agree by
+construction rather than by luck (`every_confirmed_work_segment_says_how_it_was_captured`).
+
+Recovered time is shown and deliberately left out of the ratio: its provenance
+is the crash-recovery machinery, not a choice anyone made about honesty. An
+empty day reads `—`, not 0%.
+
+See `ACCEPTANCE.md` § *Capture honesty (C)*. What the number reads on a real
+week is still V1's job; this item is that the number exists and is derived from
+the right seconds.
+
+---
+
 ## A3 · No YouTube/Twitch trend in reports
 
 **What the spec asks for.** §3.5, "Planned vs unplanned entertainment with
@@ -309,7 +375,9 @@ private/untracked · empty/unaccounted*.
   drawn. A Day slot knows a block was planned there and knows work happened;
   it does not say whether the two matched. Given the Day view is the primary
   operational screen and drift is the product's signature reading, this is the
-  most substantive of the three.
+  most substantive of the three. The Today screen (U3) does not close this
+  either, and deliberately: it reports totals, and plan-versus-actual on the
+  landing screen is the harder redesign. Carried, not cut.
 - **unplanned confirmed activity** is not distinguished from planned confirmed
   activity: both are `confirmedWork`. The Planned column being empty beside a
   filled Actual column carries it visually, which is arguably enough — but it

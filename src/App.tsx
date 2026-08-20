@@ -19,6 +19,7 @@ import { Reports } from "./views/Reports";
 import { Settings } from "./views/Settings";
 import { Activity } from "./views/Activity";
 import { Day } from "./views/Day";
+import { Today } from "./views/Today";
 import { ExcelExport } from "./views/ExcelExport";
 import { Import } from "./views/Import";
 import { Focus } from "./views/Focus";
@@ -117,6 +118,7 @@ export default function App() {
         <NavRail />
         <Sidebar />
         <main className="main">
+          {view === "today" && <Today />}
           {view === "day" && <Day />}
           {view === "planner" && <Planner />}
           {view === "tasks" && <Tasks />}

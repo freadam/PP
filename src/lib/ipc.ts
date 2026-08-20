@@ -496,6 +496,17 @@ export const installConnector = (extensionId: string) =>
 
 /* ─── the unified day and life time (Plan Rev 3 §7, §8.1) ──────────────── */
 
+/**
+ * Tasks with time logged before `date` that were never marked done — the
+ * "still open" clause of the Today screen (interview 1).
+ *
+ * A filter over the ordinary task projection, so the rows carry `trackedSec`
+ * and `lastSessionAt` already and the screen can say what the work cost and
+ * when it was last touched without a second call.
+ */
+export const getUnfinishedBefore = (date: LocalDate, tz: string) =>
+  call<TaskRow[]>("get_unfinished_before", { date, tz });
+
 export const getDay = (date: LocalDate, tz: string, slotMinutes?: number) =>
   call<DayView>("get_day", { date, tz, slotMinutes: slotMinutes ?? null });
 
