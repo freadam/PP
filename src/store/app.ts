@@ -448,30 +448,34 @@ export const useApp = create<AppState>((set, get) => ({
 
   /* Promote to the Top 3, or demote out of it. Invariant 25: this writes a
      daily plan item and nothing else — the task's estimate, blocks, sessions
-     and completion history are untouched. */
+     and completion history are untouched.
+
+     The reload happens *inside* the `run` closure, not after it on a truthy
+     return. These commands return `()`, which Tauri serialises as JSON `null`
+     — the same value `run` returns when the command threw. Testing the result
+     therefore reads every success as a failure, and the write lands while the
+     screen still shows the old list. Sequencing it here means success is
+     never inferred from a value that cannot carry it. */
   async setDaySection(taskId, section) {
-    const ok = await get().run(
-      () => ipc.addTaskToDay(taskId, get().todayDate, section),
-      "Couldn't change today's list.",
-    );
-    if (ok !== null) await get().loadToday();
+    await get().run(async () => {
+      await ipc.addTaskToDay(taskId, get().todayDate, section);
+      await get().loadToday();
+    }, "Couldn't change today's list.");
   },
 
   async removeFromDay(taskId) {
     const date = get().todayDate;
-    const ok = await get().run(
-      () => ipc.removeTaskFromDay(taskId, date),
-      "Couldn't take that off the day.",
-    );
-    if (ok !== null) await get().loadToday();
+    await get().run(async () => {
+      await ipc.removeTaskFromDay(taskId, date);
+      await get().loadToday();
+    }, "Couldn't take that off the day.");
   },
 
   async reorderDay(section, taskIds) {
-    const ok = await get().run(
-      () => ipc.reorderDayTasks(get().todayDate, section, taskIds),
-      "Couldn't reorder today's list.",
-    );
-    if (ok !== null) await get().loadToday();
+    await get().run(async () => {
+      await ipc.reorderDayTasks(get().todayDate, section, taskIds);
+      await get().loadToday();
+    }, "Couldn't reorder today's list.");
   },
 
   async loadDay() {
