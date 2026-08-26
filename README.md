@@ -53,7 +53,7 @@ npm run app          # the real thing: Tauri window + SQLite on disk
 
 ```bash
 npm run dev          # browser preview, reading recorded DTOs (see below)
-cargo test           # 332 tests, incl. the §8 acceptance criteria
+cargo test           # 339 tests, incl. the §8 acceptance criteria
 node scripts/check-ui.mjs      # I1, I3–I7, U10 against `npm run preview`
 ```
 

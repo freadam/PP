@@ -99,6 +99,7 @@ impl Store {
             tomorrow_preview,
             tomorrow_date: tomorrow,
             timer: self.timer_state()?,
+            active_focus: self.open_focus_interval()?,
         })
     }
 

@@ -82,6 +82,18 @@ The launch screen the three product documents describe, and the wireframe draws.
 | T15 | The rail is exactly §5.1's six destinations, in its order | `check-ui.mjs` navigates all six by keyboard; the Planner is measured separately as the expanded Today mode | ✅ |
 
 
+## Focus and verification (V) — FR-FOC-001, FR-REV-001
+
+| # | Criterion | Covered by | Runs |
+|---|---|---|---|
+| V1 | Focus intervals nest inside a tracked session; `0 ≤ focus ≤ tracked` and focus is never added to it (invariant 8) | `focus_is_contained_by_its_session_and_never_added_to_it`. Verified live: 15s focus inside a 45s session. | ✅ |
+| V2 | Stopping a session closes any open focus interval (§3.4, invariant 7) | `stopping_a_session_closes_its_open_focus`; enforced in `close_segment_inner`, the one path every close takes, in the same transaction | ✅ |
+| V3 | Focus cannot run without a task session (§5.3) | `focus_cannot_run_without_a_session` | ✅ |
+| V4 | Focus intervals may not overlap (invariant 7) | `a_second_focus_request_returns_the_running_one` | ✅ |
+| V5 | Only an explicit user action verifies a session (invariant 13, FR-REV-001) | `verifying_records_a_decision_with_its_evidence`. Verified live: clicking Verify wrote a `session_review` row with its evidence snapshot. | ✅ |
+| V6 | A new decision supersedes rather than deletes; the chain is the audit trail (§4.8) | `a_new_decision_supersedes_the_old_one_without_erasing_it`; `session_current_review` derives "current" from the chain | ✅ |
+| V7 | Classification recommends and never decides (invariant 12, §7.1) | `evidence_recommends_and_never_decides` — an hour of observed activity leaves the decision unmade | ✅ |
+
 ## Weekly goals (W) — proposed
 
 Not built. Planned in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), and

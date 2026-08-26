@@ -30,6 +30,7 @@ import type {
   TimerState,
   TodayWorkspace,
   DaySection,
+  FocusInterval,
   UndoToken,
   WeekView,
 } from "../lib/types";
@@ -131,6 +132,10 @@ interface AppState {
   /** One composed read model. The renderer never assembles the launch screen
    *  from four separate reads, because they could not be of the same instant. */
   today: TodayWorkspace | null;
+  /** The open focus interval (§4.5), or null. Held in the shell because the
+   *  timer chip, the Today row and the F key all need it, and re-deriving it
+   *  in three places is how they end up disagreeing. */
+  activeFocus: FocusInterval | null;
   /** The selected local date. Invariant 26: it drives BOTH columns. */
   todayDate: LocalDate;
 
@@ -190,6 +195,7 @@ interface AppState {
   loadProjects: () => Promise<void>;
   loadReports: () => Promise<void>;
   loadToday: () => Promise<void>;
+  toggleFocusInterval: () => Promise<void>;
   setTodayDate: (d: LocalDate) => void;
   shiftTodayWeek: (dir: -1 | 1) => void;
   setDaySection: (taskId: string, section: DaySection) => Promise<void>;
@@ -243,6 +249,7 @@ export const useApp = create<AppState>((set, get) => ({
   offline: true,
 
   today: null,
+  activeFocus: null,
   todayDate: fmt.today(),
 
   span: 7,
@@ -439,7 +446,23 @@ export const useApp = create<AppState>((set, get) => ({
 
   async loadToday() {
     const today = await get().run(() => ipc.todayWorkspace(get().todayDate, fmt.tz()));
-    if (today) set({ today });
+    if (today) set({ today, activeFocus: today.activeFocus });
+  },
+
+  /* §5.3 — F toggles focus inside the running session. Focus is a record
+     nested in the session, so this writes a `focus_interval`; it is not a mode
+     the timer enters, and it cannot start without a session to nest in. */
+  async toggleFocusInterval() {
+    const open = get().activeFocus;
+    await get().run(async () => {
+      if (open) {
+        await ipc.stopFocusInterval();
+        set({ activeFocus: null });
+      } else {
+        set({ activeFocus: await ipc.startFocusInterval() });
+      }
+      if (get().view === "today") await get().loadToday();
+    }, "Couldn't change focus.");
   },
 
   setTodayDate(todayDate) {

@@ -268,23 +268,32 @@ route" means in a keyboard-first app.
 
 ---
 
-## 13. Verified vs tracked-pending is read from `is_confirmed`
+## 13. Session review — resolved
 
-**ARCHITECTURE §2** separates a *verified* session — one the user reviewed and
-explicitly accepted — from a *tracked, pending* one, and §4.8 models the
-decision as its own `session_review` record.
+**Resolved.** `session_review` exists (migration 0015) with the fields §4.8
+names: the decision, when it was made, the evidence snapshot visible at the
+time, and `supersedes_review_id` chaining a new decision to the one it
+replaced. `session_current_review` is a view — "current" is derived from the
+chain rather than stored, so the two cannot drift.
 
-This build has no `session_review` table. `time_session.is_confirmed` carries the
-distinction: it is set to 0 when a session needs a human decision (a timer
-recovered after a crash), and the week allocation reads it to split confirmed
-work into verified and pending.
+`time_session.is_confirmed` is still written, in the same transaction, and is
+now a *cache* of the current decision rather than the record of it. Every
+existing query that reads the flag — the week allocation's verified/pending
+split among them — keeps working without being taught about the chain.
 
-The two differ in what they can tell you later. `is_confirmed` is a flag, so it
-cannot say *when* the decision was made, what evidence the user saw, or what an
-earlier decision said before this one superseded it — all of which §4.8 wants
-for audit. It is enough for the ledger's six states, which is what the launch
-screen needs, and not enough for the review history §7.1 describes.
+## 14. Focus intervals — resolved
 
-Adding `session_review` is additive: a new table, and the allocation reading
-"has a non-superseded accept decision" instead of "`is_confirmed = 1`". No
-stored duration changes, so no migration has to rewrite time.
+**Resolved.** `focus_interval` exists (migration 0015). Fruit previously had a
+"focus session" that was a scheduled block marked `is_focus` plus a timer
+deadline — a *plan*, which by invariant 5 cannot be a record of anything, and
+so could not answer "how much of that session was actually deep work".
+
+Both now exist and mean different things: the block is the intended window, the
+interval is the record. `F` opens or closes an interval inside the running
+session; with nothing running it falls back to the focus-mode overlay, because
+there is no deep work on nothing (§5.3).
+
+Containment is enforced in `close_segment_inner`, the single path every session
+close goes through — deliberate stop, detected sleep, idle challenge and crash
+recovery alike — inside the same transaction, so a closed session can never
+commit with a dangling focus interval.

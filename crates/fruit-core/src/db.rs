@@ -24,6 +24,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0012_life_series.sql"),
     include_str!("../migrations/0013_categories_daily_goals_focus.sql"),
     include_str!("../migrations/0014_daily_plan_item.sql"),
+    include_str!("../migrations/0015_focus_and_review.sql"),
 ];
 
 pub fn schema_version() -> i64 {

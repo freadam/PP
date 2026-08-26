@@ -30,7 +30,22 @@ export const COMMANDS: Command[] = [
   { id: "palette", title: "Command palette", group: "Global", keys: "⌘K", run: () => app().setOverlay("palette") },
   { id: "capture", title: "Quick capture", group: "Global", keys: "C", run: focusCapture },
   { id: "search", title: "Search", group: "Global", keys: "⌘F", run: () => app().setOverlay("palette") },
-  { id: "focus", title: "Focus mode", group: "Global", keys: "F", run: () => app().setOverlay("focus") },
+  /* §5.3 — "Start/stop focus, F when a task is running." With a session
+     running this opens or closes a focus *interval* nested in it; with nothing
+     running there is nothing to nest in, so F falls back to the focus-mode
+     overlay, which plots an intended focus window and starts the timer. */
+  {
+    id: "focus",
+    title: "Start or stop focus",
+    group: "Timer",
+    keys: "F",
+    run: () => {
+      const { timer, toggleFocusInterval, setOverlay } = app();
+      if (timer.runTaskId) return void toggleFocusInterval();
+      setOverlay("focus");
+    },
+  },
+  { id: "focus-mode", title: "Focus mode…", group: "Global", run: () => app().setOverlay("focus") },
   { id: "reconcile", title: "Reconcile a day", group: "Global", keys: "⌘R", run: () => app().setOverlay("reconcile") },
   { id: "shortcuts", title: "Shortcut sheet", group: "Global", keys: "?", run: () => app().setOverlay("shortcuts") },
   { id: "undo", title: "Undo", group: "Global", keys: "⌘Z", run: () => void app().undo() },

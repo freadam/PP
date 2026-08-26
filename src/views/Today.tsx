@@ -424,10 +424,16 @@ function TaskLine({
   const openDetail = useApp((s) => s.openDetail);
   const startDrag = useStartTaskDrag();
 
+  const activeFocus = useApp((s) => s.activeFocus);
+  const toggleFocusInterval = useApp((s) => s.toggleFocusInterval);
+
   const done = task.status === "done";
   const running =
     timer.phase !== "idle" && (timer.session?.taskId ?? timer.runTaskId) === task.id;
-  const inFocus = running && timer.focusEndsAt != null;
+  /* The real nested interval (§4.5), not the timer's intended deadline. A
+     planned 45-minute window and 45 minutes of actual deep work are different
+     claims, and this row is reporting the second one. */
+  const inFocus = running && activeFocus?.taskId === task.id;
 
   const promote = section === "more";
   const canPromote = promote && !topFull;
@@ -490,7 +496,9 @@ function TaskLine({
               {planned.scheduledBlockCount > 1 && ` +${planned.scheduledBlockCount - 1}`}
             </span>
           )}
-          {inFocus && <span className="focus-tag">focus</span>}
+          {inFocus && (
+            <span className="focus-tag">focus {fmt.duration(activeFocus!.elapsedSec)}</span>
+          )}
         </span>
       </button>
 
@@ -501,6 +509,20 @@ function TaskLine({
           title={running ? "Stop (Space)" : "Start (Space)"}
         >
           {running ? "Stop" : "Start"}
+        </button>
+      )}
+
+      {/* Focus only exists inside a running session (§5.3), so the control
+          only exists there too — rather than being present and refusing. */}
+      {running && (
+        <button
+          className="btn btn-quiet btn-icon"
+          aria-pressed={inFocus}
+          aria-label={inFocus ? `Stop focus on ${task.title}` : `Start focus on ${task.title}`}
+          title={inFocus ? "Stop focus (F)" : "Start focus (F)"}
+          onClick={() => void toggleFocusInterval()}
+        >
+          ◎
         </button>
       )}
 

@@ -577,6 +577,54 @@ export interface DaySchedule {
   visibleDayStartMinute: number;
 }
 
+/** §4.5 — deep work nested inside one tracked session. Never added to it. */
+export interface FocusInterval {
+  id: string;
+  sessionId: string;
+  taskId: string;
+  startedAt: Millis;
+  endedAt: Millis | null;
+  interruptionReason: string | null;
+  elapsedSec: number;
+}
+
+/** §4.8 — what the user decided about a session. */
+export type ReviewDecision = "verified" | "pending" | "voided";
+
+export interface SessionReview {
+  id: string;
+  sessionId: string;
+  supersedesReviewId: string | null;
+  decision: ReviewDecision;
+  reviewedAt: Millis;
+  observedWorkSec: number;
+  observedOtherSec: number;
+  idleSec: number;
+  unobservedSec: number;
+  note: string | null;
+}
+
+/** §7.1 — a neutral recommendation. It orders the queue; it decides nothing. */
+export type EvidenceStrength = "strong" | "mixed" | "little" | "conflicting";
+
+export interface SessionEvidence {
+  sessionId: string;
+  taskId: string;
+  taskTitle: string;
+  startedAt: Millis;
+  endedAt: Millis | null;
+  durationSec: number;
+  observedWorkSec: number;
+  observedOtherSec: number;
+  idleSec: number;
+  unobservedSec: number;
+  focusSec: number;
+  strength: EvidenceStrength;
+  /** `null` means never reviewed — a different state from explicitly pending. */
+  decision: ReviewDecision | null;
+  reviewedAt: Millis | null;
+}
+
 export interface TodayWorkspace {
   selectedDate: LocalDate;
   today: LocalDate;
@@ -591,6 +639,7 @@ export interface TodayWorkspace {
   tomorrowDate: LocalDate;
   schedule: DaySchedule;
   timer: TimerState;
+  activeFocus: FocusInterval | null;
 }
 
 export interface TaskDetail {

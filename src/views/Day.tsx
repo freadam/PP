@@ -36,6 +36,9 @@ import type {
   RrulePreset,
   SlotOwner,
   SlotState,
+  SessionEvidence,
+  SessionReview,
+  ReviewDecision,
 } from "../lib/types";
 import { Empty } from "../components/chrome";
 
@@ -831,6 +834,7 @@ function IntervalDetail({
               personal time has no such field.
             </span>
           </div>
+          <VerifyPanel sessionId={owner.sessionId} onDone={reload} />
         </>
       )}
 
@@ -1555,5 +1559,113 @@ function FillDialog({
         </div>
       </div>
     </>
+  );
+}
+
+
+/**
+ * Verification (§3.6, §7.1; FR-REV-001).
+ *
+ * The evidence is shown, a neutral recommendation orders it, and then the user
+ * decides. Nothing on this panel can verify anything on its own — the
+ * recommendation is a sentence, not a threshold, and invariant 13 says the
+ * decision comes from an explicit action or not at all.
+ *
+ * A session with no machine evidence is still verifiable: paper work and
+ * meetings are real, and refusing them would make the record less honest, not
+ * more.
+ */
+function VerifyPanel({ sessionId, onDone }: { sessionId: string; onDone: () => void }) {
+  const [evidence, setEvidence] = useState<SessionEvidence | null>(null);
+  const [history, setHistory] = useState<SessionReview[]>([]);
+  const [note, setNote] = useState("");
+
+  const load = () => {
+    void ipc.getSessionEvidence(sessionId).then(setEvidence).catch(() => setEvidence(null));
+    void ipc.getSessionReviews(sessionId).then(setHistory).catch(() => setHistory([]));
+  };
+  useEffect(load, [sessionId]);
+
+  if (!evidence) return null;
+
+  const decide = async (decision: ReviewDecision) => {
+    const ok = await useApp
+      .getState()
+      .run(
+        () => ipc.reviewSession(sessionId, decision, note.trim() || undefined),
+        "Couldn't record that decision.",
+      );
+    if (ok) {
+      setNote("");
+      load();
+      onDone();
+    }
+  };
+
+  const STRENGTH: Record<string, string> = {
+    strong: "Strong supporting evidence — most observed time matches work.",
+    mixed: "Mixed evidence — work and other categories both overlap this session.",
+    little: "Little machine evidence — mostly idle, private, or unobserved.",
+    conflicting: "Conflicting evidence — most observed time is not work.",
+  };
+
+  return (
+    <div className="field">
+      <label>Verification</label>
+      <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
+        <span className="tag">
+          {evidence.decision === "verified"
+            ? "Verified"
+            : evidence.decision === "voided"
+              ? "Voided"
+              : evidence.decision === "pending"
+                ? "Returned to pending"
+                : "Not reviewed"}
+        </span>
+        {evidence.focusSec > 0 && (
+          <span className="tag data">{fmt.duration(evidence.focusSec)} focus</span>
+        )}
+      </div>
+
+      <span className="caption">{STRENGTH[evidence.strength]}</span>
+
+      {/* The arithmetic, not just the verdict (§10.2). These four are the
+          session's own duration split by what the machine could see. */}
+      <div className="row" style={{ flexWrap: "wrap", gap: 4 }}>
+        <span className="tag data">{fmt.duration(evidence.observedWorkSec)} work</span>
+        <span className="tag data">{fmt.duration(evidence.observedOtherSec)} other</span>
+        <span className="tag data">{fmt.duration(evidence.idleSec)} idle</span>
+        <span className="tag data">{fmt.duration(evidence.unobservedSec)} unobserved</span>
+      </div>
+
+      <input
+        className="fake-input"
+        placeholder="Note — e.g. worked on paper"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        aria-label="Verification note"
+      />
+
+      <div className="row" style={{ gap: 4 }}>
+        <button className="btn btn-primary" onClick={() => void decide("verified")}>
+          Verify
+        </button>
+        <button className="btn" onClick={() => void decide("pending")}>
+          Needs another look
+        </button>
+        <button className="btn" onClick={() => void decide("voided")}>
+          Void
+        </button>
+      </div>
+
+      {history.length > 0 && (
+        <span className="caption">
+          {/* §4.8 — a superseded decision is history, not a deleted row. */}
+          {history.length === 1
+            ? `Decided ${fmt.clock(history[0]!.reviewedAt)}.`
+            : `${history.length} decisions, most recently ${fmt.clock(history[0]!.reviewedAt)}.`}
+        </span>
+      )}
+    </div>
   );
 }

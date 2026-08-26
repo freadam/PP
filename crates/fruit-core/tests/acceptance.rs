@@ -4457,3 +4457,197 @@ fn a_mid_second_boundary_does_not_lose_the_week() {
     );
     assert!(a.unaccounted_sec >= 0, "the complement is never negative");
 }
+
+// ─── focus intervals and session review (FR-FOC-001, FR-REV-001) ───────
+
+/// FR-FOC-001 / invariant 8 — focus is a subset of tracked time and is never
+/// added to it. The whole reason the interval nests inside the session.
+#[test]
+fn focus_is_contained_by_its_session_and_never_added_to_it() {
+    let (mut store, clock) = store_at(at(2026, 8, 26, 10, 0));
+    let t = task(&mut store, "Design the ledger");
+    store.start_timer(&t.id, None).unwrap();
+
+    clock.advance(5 * 60_000);
+    let f = store.start_focus_interval().unwrap();
+    assert!(f.ended_at.is_none(), "focus is running");
+    assert_eq!(
+        store.open_focus_interval().unwrap().unwrap().id,
+        f.id,
+        "the open interval is findable"
+    );
+
+    clock.advance(20 * 60_000);
+    let closed = store.stop_focus_interval(None).unwrap().unwrap();
+    assert!(closed.ended_at.is_some());
+
+    clock.advance(5 * 60_000);
+    let state = store.stop_timer().unwrap();
+    let session_id = state.session.map(|s| s.id).unwrap_or_default();
+    let session_id = if session_id.is_empty() {
+        store.get_task_detail(&t.id).unwrap().sessions[0].id.clone()
+    } else {
+        session_id
+    };
+
+    let tracked = store.get_task_detail(&t.id).unwrap().task.tracked_sec;
+    let focus = store.focus_sec_for_session(&session_id).unwrap();
+    assert!(focus > 0, "focus was recorded");
+    assert!(
+        focus <= tracked,
+        "0 <= focus ({focus}) <= tracked ({tracked}) — invariant 8"
+    );
+}
+
+/// §3.4 — stopping a task session stops any open focus interval. Containment
+/// is not left to the caller to remember.
+#[test]
+fn stopping_a_session_closes_its_open_focus() {
+    let (mut store, clock) = store_at(at(2026, 8, 26, 10, 0));
+    let t = task(&mut store, "Interrupted");
+    store.start_timer(&t.id, None).unwrap();
+    store.start_focus_interval().unwrap();
+
+    clock.advance(15 * 60_000);
+    store.stop_timer().unwrap();
+
+    assert!(
+        store.open_focus_interval().unwrap().is_none(),
+        "no focus interval outlives its session"
+    );
+}
+
+/// §5.3 — focus cannot run without a task session. There is no deep work on
+/// nothing, and allowing it would create tracked time the containment rule
+/// could not police.
+#[test]
+fn focus_cannot_run_without_a_session() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 10, 0));
+    assert!(store.start_focus_interval().is_err());
+}
+
+/// Invariant 7 — focus intervals may not overlap each other. Asking twice
+/// returns the one that is running rather than opening a second.
+#[test]
+fn a_second_focus_request_returns_the_running_one() {
+    let (mut store, clock) = store_at(at(2026, 8, 26, 10, 0));
+    let t = task(&mut store, "One at a time");
+    store.start_timer(&t.id, None).unwrap();
+
+    let first = store.start_focus_interval().unwrap();
+    clock.advance(60_000);
+    let second = store.start_focus_interval().unwrap();
+    assert_eq!(first.id, second.id, "one open interval, not two");
+}
+
+/// Invariant 13 / FR-REV-001 — only an explicit user action verifies a
+/// session, and the decision is recorded with the evidence behind it.
+#[test]
+fn verifying_records_a_decision_with_its_evidence() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 18, 0));
+    let t = task(&mut store, "Verify me");
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 26, 10, 0),
+            ended_at: at(2026, 8, 26, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    let session_id = store.get_task_detail(&t.id).unwrap().sessions[0].id.clone();
+
+    // Never reviewed is a different state from explicitly pending.
+    assert!(store.session_evidence(&session_id).unwrap().decision.is_none());
+
+    let review = store
+        .review_session(&session_id, ReviewDecision::Verified, Some("Paper notes"))
+        .unwrap();
+    assert_eq!(review.decision, ReviewDecision::Verified);
+    assert!(review.supersedes_review_id.is_none(), "the first decision supersedes nothing");
+    assert_eq!(
+        store.session_evidence(&session_id).unwrap().decision,
+        Some(ReviewDecision::Verified)
+    );
+}
+
+/// §4.8 — a new decision supersedes rather than deletes. The chain is the
+/// audit trail: what was believed, and when.
+#[test]
+fn a_new_decision_supersedes_the_old_one_without_erasing_it() {
+    let (mut store, clock) = store_at(at(2026, 8, 26, 18, 0));
+    let t = task(&mut store, "Reconsidered");
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 26, 10, 0),
+            ended_at: at(2026, 8, 26, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    let session_id = store.get_task_detail(&t.id).unwrap().sessions[0].id.clone();
+
+    let first = store
+        .review_session(&session_id, ReviewDecision::Verified, None)
+        .unwrap();
+    clock.shift_wall(60_000);
+    let second = store
+        .review_session(&session_id, ReviewDecision::Pending, Some("Was not this task"))
+        .unwrap();
+
+    assert_eq!(second.supersedes_review_id.as_deref(), Some(first.id.as_str()));
+    let history = store.session_reviews(&session_id).unwrap();
+    assert_eq!(history.len(), 2, "the earlier decision is history, not a deleted row");
+    assert_eq!(history[0].decision, ReviewDecision::Pending, "newest first");
+    assert_eq!(
+        store.session_evidence(&session_id).unwrap().decision,
+        Some(ReviewDecision::Pending),
+        "the current decision is the one nothing supersedes"
+    );
+}
+
+/// Invariant 12 — a classification may produce a recommendation, never a
+/// verified session. Observation alone leaves the decision unmade.
+#[test]
+fn evidence_recommends_and_never_decides() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 18, 0));
+    let t = task(&mut store, "Observed but unjudged");
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, serde_json::Value::Bool(true))
+        .unwrap();
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 26, 10, 0),
+            ended_at: at(2026, 8, 26, 11, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    let base = at(2026, 8, 26, 10, 0);
+    for step in 0..(55 * 3) {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                domain: None,
+                at: base + step * 20_000,
+            })
+            .unwrap();
+    }
+
+    let session_id = store.get_task_detail(&t.id).unwrap().sessions[0].id.clone();
+    let e = store.session_evidence(&session_id).unwrap();
+    assert!(
+        e.observed_work_sec + e.observed_other_sec > 0,
+        "there is evidence to look at"
+    );
+    assert!(e.decision.is_none(), "and it verified nothing on its own");
+}

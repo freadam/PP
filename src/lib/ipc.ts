@@ -62,6 +62,10 @@ import type {
   WireError,
   TodayWorkspace,
   DaySection,
+  FocusInterval,
+  SessionReview,
+  SessionEvidence,
+  ReviewDecision,
 } from "./types";
 import type {
   ActivityDay,
@@ -189,6 +193,30 @@ export const getDeleted = () => call<DeletedRow[]>("get_deleted", {});
 export const getTimerState = () => call<TimerState>("get_timer_state", {});
 
 /* ─── write ────────────────────────────────────────────────────────────── */
+
+/* ─── focus intervals (§3.4) ─────────────────────────────────────────── */
+
+/** Opens a focus interval inside the running session. Refuses when no task
+ *  session is running — there is no deep work on nothing (§5.3). */
+export const startFocusInterval = () => call<FocusInterval>("start_focus_interval", {});
+
+export const stopFocusInterval = (reason?: string) =>
+  call<FocusInterval | null>("stop_focus_interval", { reason: reason ?? null });
+
+export const getFocusIntervals = (sessionId: string) =>
+  call<FocusInterval[]>("get_focus_intervals", { sessionId });
+
+/* ─── session review (§3.6) ──────────────────────────────────────────── */
+
+/** The only thing that can verify a session (invariant 13). */
+export const reviewSession = (sessionId: string, decision: ReviewDecision, note?: string) =>
+  call<SessionReview>("review_session", { sessionId, decision, note: note ?? null });
+
+export const getSessionEvidence = (sessionId: string) =>
+  call<SessionEvidence>("get_session_evidence", { sessionId });
+
+export const getSessionReviews = (sessionId: string) =>
+  call<SessionReview[]>("get_session_reviews", { sessionId });
 
 /** Promote or demote a task inside one local day's list. Never touches the
  *  task's estimate, blocks, sessions or completion history (invariant 25). */

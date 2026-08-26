@@ -2612,4 +2612,117 @@ pub struct TodayWorkspace {
     pub tomorrow_date: String,
     pub schedule: DaySchedule,
     pub timer: TimerState,
+    /// §7.5 `active_execution` — the running focus interval, when one is open.
+    /// Separate from `timer` because focus is a record nested inside the
+    /// session, not a mode the timer is in.
+    pub active_focus: Option<FocusInterval>,
+}
+
+// ─── focus intervals and session review (ARCHITECTURE §4.5, §4.8) ──────
+
+/// Deliberate deep work inside one tracked session (§4.5).
+///
+/// Nested, never additive: `0 ≤ focus ≤ tracked` is invariant 8, and it is the
+/// reason this is a child of the session rather than a second kind of session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusInterval {
+    pub id: String,
+    pub session_id: String,
+    pub task_id: String,
+    pub started_at: Millis,
+    pub ended_at: Option<Millis>,
+    pub interruption_reason: Option<String>,
+    /// Derived from the timestamps, clamped to now while still running.
+    pub elapsed_sec: i64,
+}
+
+/// What the user decided about a session (§4.8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReviewDecision {
+    /// Reviewed and accepted as an accurate task record.
+    Verified,
+    /// Explicitly returned to the queue — not the same as never reviewed.
+    Pending,
+    /// Accidental time. Keeps its history; contributes to no total.
+    Voided,
+}
+
+impl ReviewDecision {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "verified" => Self::Verified,
+            "pending" => Self::Pending,
+            "voided" => Self::Voided,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Verified => "verified",
+            Self::Pending => "pending",
+            Self::Voided => "voided",
+        }
+    }
+}
+
+/// One verification decision and the evidence visible when it was made.
+///
+/// The coverage fields are a snapshot, not a recomputation: they record what
+/// the user was shown. The observations stay where they are, so a later
+/// reclassification is visibly later rather than silently rewriting what was
+/// believed at review time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionReview {
+    pub id: String,
+    pub session_id: String,
+    pub supersedes_review_id: Option<String>,
+    pub decision: ReviewDecision,
+    pub reviewed_at: Millis,
+    pub observed_work_sec: i64,
+    pub observed_other_sec: i64,
+    pub idle_sec: i64,
+    pub unobserved_sec: i64,
+    pub note: Option<String>,
+}
+
+/// The neutral recommendation §7.1 permits — an ordering aid, never a verdict.
+///
+/// No threshold here can verify anything (invariant 12). It exists to put the
+/// session that needs attention at the top of the queue and to say why.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EvidenceStrength {
+    /// Most observed time matches work categories.
+    Strong,
+    /// Work and other categories both overlap the session.
+    Mixed,
+    /// Much of the session was idle, private, or unobserved.
+    Little,
+    /// Most observed time is classified distraction or unrelated.
+    Conflicting,
+}
+
+/// A pending session with its evidence, ready to be judged (§7.1).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEvidence {
+    pub session_id: String,
+    pub task_id: String,
+    pub task_title: String,
+    pub started_at: Millis,
+    pub ended_at: Option<Millis>,
+    pub duration_sec: i64,
+    pub observed_work_sec: i64,
+    pub observed_other_sec: i64,
+    pub idle_sec: i64,
+    pub unobserved_sec: i64,
+    pub focus_sec: i64,
+    pub strength: EvidenceStrength,
+    /// The current decision, when one exists. `None` means never reviewed,
+    /// which is a different state from explicitly returned to pending.
+    pub decision: Option<ReviewDecision>,
+    pub reviewed_at: Option<Millis>,
 }

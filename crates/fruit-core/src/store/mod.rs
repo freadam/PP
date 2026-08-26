@@ -25,6 +25,7 @@ mod categories;
 mod day;
 mod domain_rules;
 mod excel;
+mod focus;
 mod goals;
 mod projects;
 mod reconcile;

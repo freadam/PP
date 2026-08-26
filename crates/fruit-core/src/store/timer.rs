@@ -242,6 +242,19 @@ impl Store {
         let elapsed_sec = self.timer.segment_ms / 1000;
 
         let tx = self.conn.transaction()?;
+        /* §3.4 — stopping a task session automatically stops any open focus
+           interval. Done here rather than in `stop_timer` because this is the
+           one path every close goes through: a deliberate stop, a detected
+           sleep, an idle challenge and a crash recovery all land here, and a
+           focus interval left open by any of them would outlive its parent and
+           break containment (invariant 7). Inside the same transaction, so a
+           closed session never commits with a dangling focus. */
+        tx.execute(
+            "UPDATE focus_interval
+                SET ended_at = MAX(?2, started_at + 1000), updated_at = ?2
+              WHERE session_id = ?1 AND ended_at IS NULL",
+            params![id, end.max(0)],
+        )?;
         if elapsed_sec <= 0 && may_delete {
             tx.execute("DELETE FROM time_session WHERE id = ?1", [&id])?;
         } else {

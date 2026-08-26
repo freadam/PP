@@ -802,6 +802,50 @@ fn clear_activity(state: State<'_, AppState>) -> Res<i64> {
     with(&state, |s| s.clear_activity())
 }
 
+// ─── focus intervals and session review (§3.4, §3.6) ───────────────────
+
+/// `StartFocus` — open a focus interval inside the running task session.
+#[tauri::command]
+fn start_focus_interval(state: State<'_, AppState>) -> Res<FocusInterval> {
+    with(&state, |s| s.start_focus_interval())
+}
+
+/// `StopFocus`. Idempotent: stopping the session already stopped the focus.
+#[tauri::command]
+fn stop_focus_interval(
+    state: State<'_, AppState>,
+    reason: Option<String>,
+) -> Res<Option<FocusInterval>> {
+    with(&state, |s| s.stop_focus_interval(reason.as_deref()))
+}
+
+#[tauri::command]
+fn get_focus_intervals(state: State<'_, AppState>, session_id: String) -> Res<Vec<FocusInterval>> {
+    with(&state, |s| s.focus_intervals_for_session(&session_id))
+}
+
+/// `VerifySession` — the only thing that can make a session verified
+/// (invariant 13). Records the decision with the evidence behind it.
+#[tauri::command]
+fn review_session(
+    state: State<'_, AppState>,
+    session_id: String,
+    decision: ReviewDecision,
+    note: Option<String>,
+) -> Res<SessionReview> {
+    with(&state, |s| s.review_session(&session_id, decision, note.as_deref()))
+}
+
+#[tauri::command]
+fn get_session_evidence(state: State<'_, AppState>, session_id: String) -> Res<SessionEvidence> {
+    with(&state, |s| s.session_evidence(&session_id))
+}
+
+#[tauri::command]
+fn get_session_reviews(state: State<'_, AppState>, session_id: String) -> Res<Vec<SessionReview>> {
+    with(&state, |s| s.session_reviews(&session_id))
+}
+
 // ─── the Today workspace (ARCHITECTURE §3.0, §7.5) ──────────────────────
 
 /// The default launch route. One composed DTO, so the launch screen is a
@@ -1425,6 +1469,12 @@ pub fn run() {
             get_reconcile_items,
             get_day,
             today_workspace,
+            start_focus_interval,
+            stop_focus_interval,
+            get_focus_intervals,
+            review_session,
+            get_session_evidence,
+            get_session_reviews,
             add_task_to_day,
             remove_task_from_day,
             reorder_day_tasks,
