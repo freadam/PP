@@ -34,9 +34,14 @@ export const COMMANDS: Command[] = [
   { id: "reconcile", title: "Reconcile a day", group: "Global", keys: "⌘R", run: () => app().setOverlay("reconcile") },
   { id: "shortcuts", title: "Shortcut sheet", group: "Global", keys: "?", run: () => app().setOverlay("shortcuts") },
   { id: "undo", title: "Undo", group: "Global", keys: "⌘Z", run: () => void app().undo() },
+  { id: "go-today", title: "Go to Today", group: "Global", keys: "G then T", run: () => app().go("today") },
   { id: "go-day", title: "Go to Day", group: "Global", keys: "G then D", run: () => app().go("day") },
-  { id: "go-planner", title: "Go to Planner", group: "Global", keys: "G then P", run: () => app().go("planner") },
-  { id: "go-tasks", title: "Go to Projects", group: "Global", keys: "G then T", run: () => app().go("tasks") },
+  /* PRODUCT-SPEC §5.3 names two of these letters: Today is `G then T` and
+     Projects is `G then P`. Projects therefore moves off T, and the Planner —
+     which §14 folds into Today rather than keeping as a top-level route —
+     takes L. Recorded in docs/SPEC-DEVIATIONS.md. */
+  { id: "go-planner", title: "Go to Planner", group: "Global", keys: "G then L", run: () => app().go("planner") },
+  { id: "go-tasks", title: "Go to Projects", group: "Global", keys: "G then P", run: () => app().go("tasks") },
   { id: "go-activity", title: "Go to Activity", group: "Global", keys: "G then A", run: () => app().go("activity") },
   { id: "go-reports", title: "Go to Reports", group: "Global", keys: "G then R", run: () => app().go("reports") },
   { id: "go-settings", title: "Settings", group: "Global", keys: "⌘,", run: () => app().go("settings") },

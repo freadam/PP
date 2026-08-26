@@ -27,10 +27,14 @@ export function BrandMark({ size = 20, state = "idle" }: { size?: number; state?
 }
 
 const NAV: { view: ViewName; label: string; key: string; icon: string }[] = [
-  // Day first: it is the primary operational screen (Plan Rev 3 §8.1).
+  /* Today first, and it receives the default focus after launch
+     (ARCHITECTURE §14): the primary daily job is choosing, scheduling,
+     starting and completing work — not reading a dashboard. Day remains
+     behind it as the 24-hour reconciliation table. */
+  { view: "today", label: "Today", key: "T", icon: "◨" },
   { view: "day", label: "Day", key: "D", icon: "▦" },
-  { view: "planner", label: "Planner", key: "P", icon: "▤" },
-  { view: "tasks", label: "Projects", key: "T", icon: "☰" },
+  { view: "planner", label: "Planner", key: "L", icon: "▤" },
+  { view: "tasks", label: "Projects", key: "P", icon: "☰" },
   { view: "activity", label: "Activity", key: "A", icon: "◷" },
   { view: "reports", label: "Reports", key: "R", icon: "◫" },
   { view: "settings", label: "Settings", key: "S", icon: "⚙" },

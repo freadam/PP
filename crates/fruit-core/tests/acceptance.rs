@@ -4418,3 +4418,42 @@ fn a_plan_is_not_an_account_of_the_week() {
     assert_eq!(a.verified_work_sec, 0, "a block is not work and a tick is not time");
     assert_eq!(a.accounted_ratio, 0.0);
 }
+
+/// Invariant 19 — unaccounted time is the **final complement**, and the six
+/// states still close on the exact week when a boundary lands mid-second.
+///
+/// Five independent sums each truncate their own sub-second tail, and five
+/// truncations do not add up to one. This is the case that caught it.
+#[test]
+fn a_mid_second_boundary_does_not_lose_the_week() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 23, 0));
+    let t = task(&mut store, "Ragged edges");
+    // 250ms past the minute on each side, twice, so the truncation is real.
+    for (from, to) in [(9, 10), (14, 15)] {
+        store
+            .add_session(ManualSession {
+                task_id: t.id.clone(),
+                block_id: None,
+                started_at: at(2026, 8, 26, from, 0) + 250,
+                ended_at: at(2026, 8, 26, to, 0) + 750,
+                note: None,
+                contribution: None,
+                replace_existing: false,
+            })
+            .unwrap();
+    }
+
+    let a = store.today_workspace("2026-08-26", TZ).unwrap().week_allocation;
+    assert_eq!(
+        a.verified_work_sec
+            + a.verified_life_sec
+            + a.sleep_rest_sec
+            + a.private_sec
+            + a.tracked_pending_sec
+            + a.observed_unconfirmed_sec
+            + a.unaccounted_sec,
+        a.period_sec,
+        "the six states must still tile the week: {a:?}"
+    );
+    assert!(a.unaccounted_sec >= 0, "the complement is never negative");
+}

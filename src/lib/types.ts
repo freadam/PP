@@ -505,6 +505,94 @@ export interface WeekView {
   now: Millis;
 }
 
+/* ─── the Today workspace (ARCHITECTURE §3.0, §7.5, §7.6) ──────────────── */
+
+/** §4.15 — `top` is the protected three, `more` is the rest of the day's list. */
+export type DaySection = "top" | "more";
+
+/** Why a task is on the selected day at all. A plan item is a choice, an
+ *  intended date is a plan, and a block is a booking; the row says which. */
+export type PlanSource = "planned" | "intendedDate" | "scheduled";
+
+export interface PlannedTask {
+  task: TaskRow;
+  section: DaySection;
+  source: PlanSource;
+  /** Absent until the task is explicitly placed in the day (§4.15). */
+  planItemId: string | null;
+  rank: number;
+  projectName: string | null;
+  projectColour: string | null;
+  /** Tracked **on this date**, not the task's lifetime total. */
+  trackedTodaySec: number;
+  scheduledStartsAt: Millis | null;
+  scheduledSec: number;
+  scheduledBlockCount: number;
+  isRunning: boolean;
+}
+
+/** One cell of the Monday–Sunday strip. Every count is distinct **tasks** —
+ *  never sessions, never duration (invariant 27). */
+export interface WeekDayCell {
+  localDate: LocalDate;
+  weekday: string;
+  dayOfMonth: number;
+  isToday: boolean;
+  isSelected: boolean;
+  hasHappened: boolean;
+  plannedTaskCount: number;
+  trackedTaskCount: number;
+  completedTaskCount: number;
+  untrackedPlannedCount: number;
+  isReconciled: boolean;
+}
+
+/** The week in the six mutually exclusive Day Ledger states (invariant 18).
+ *  These sum to `periodSec` exactly — 167 or 169 hours included. */
+export interface WeekAllocation {
+  from: LocalDate;
+  to: LocalDate;
+  periodSec: number;
+  verifiedWorkSec: number;
+  verifiedLifeSec: number;
+  sleepRestSec: number;
+  privateSec: number;
+  trackedPendingSec: number;
+  observedUnconfirmedSec: number;
+  unaccountedSec: number;
+  elapsedSec: number;
+  accountedRatio: number;
+  reviewedDays: number;
+  elapsedDays: number;
+}
+
+export interface DaySchedule {
+  localDate: LocalDate;
+  blocks: BlockView[];
+  plannedSec: number;
+  unplannedSec: number;
+  /** Minutes into the local day, or null when the selected date is not today —
+   *  the current-time marker belongs to today and nowhere else (§7.6). */
+  currentMinute: number | null;
+  visibleDayStartMinute: number;
+}
+
+export interface TodayWorkspace {
+  selectedDate: LocalDate;
+  today: LocalDate;
+  tz: string;
+  now: Millis;
+  weekDays: WeekDayCell[];
+  weekAllocation: WeekAllocation;
+  topThree: PlannedTask[];
+  moreToday: PlannedTask[];
+  completedToday: PlannedTask[];
+  tomorrowPreview: PlannedTask[];
+  tomorrowDate: LocalDate;
+  schedule: DaySchedule;
+  timer: TimerState;
+}
+
 export interface TaskDetail {
   task: TaskRow;
   note: string;

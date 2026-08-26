@@ -60,6 +60,8 @@ import type {
   UndoToken,
   WeekView,
   WireError,
+  TodayWorkspace,
+  DaySection,
 } from "./types";
 import type {
   ActivityDay,
@@ -149,6 +151,12 @@ export async function listen<T>(event: string, handler: (payload: T) => void): P
 export const getWeek = (from: LocalDate, to: LocalDate, tz: string) =>
   call<WeekView>("get_week", { range: { from, to }, tz });
 
+/** The default launch route (§7.5). One round trip, so the week strip, the
+ *  allocation, the task column and the schedule cannot be assembled from four
+ *  reads of a database that changed between them. */
+export const todayWorkspace = (date: LocalDate, tz: string) =>
+  call<TodayWorkspace>("today_workspace", { date, tz });
+
 export const getBacklog = (tz: string, projectId?: string | null, unscheduledOnly = false) =>
   call<BacklogView>("get_backlog", { filter: { projectId, unscheduledOnly }, tz });
 
@@ -181,6 +189,17 @@ export const getDeleted = () => call<DeletedRow[]>("get_deleted", {});
 export const getTimerState = () => call<TimerState>("get_timer_state", {});
 
 /* ─── write ────────────────────────────────────────────────────────────── */
+
+/** Promote or demote a task inside one local day's list. Never touches the
+ *  task's estimate, blocks, sessions or completion history (invariant 25). */
+export const addTaskToDay = (taskId: string, date: LocalDate, section: DaySection) =>
+  call<void>("add_task_to_day", { taskId, date, section });
+
+export const removeTaskFromDay = (taskId: string, date: LocalDate) =>
+  call<void>("remove_task_from_day", { taskId, date });
+
+export const reorderDayTasks = (date: LocalDate, section: DaySection, taskIds: string[]) =>
+  call<void>("reorder_day_tasks", { date, section, taskIds });
 
 export const createTask = (input: NewTask) => call<TaskRow>("create_task", { input });
 

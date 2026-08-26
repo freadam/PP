@@ -28,12 +28,16 @@ import type {
   TaskDetail,
   TaskRow,
   TimerState,
+  TodayWorkspace,
+  DaySection,
   UndoToken,
   WeekView,
 } from "../lib/types";
 
-/** Day first: it is the primary operational screen (Plan Rev 3 §8.1). */
+/** Today first: it is the default launch route (ARCHITECTURE §3.0, §14).
+ *  Day remains the 24-hour reconciliation surface behind it. */
 export type ViewName =
+  | "today"
   | "day"
   | "planner"
   | "tasks"
@@ -112,7 +116,14 @@ interface AppState {
   taskDrag: TaskDrag | null;
   blockDialog: BlockDialog | null;
 
-  // ─── the day (Plan Rev 3 §8.1) — the primary screen ──────────────────
+  // ─── the Today workspace (ARCHITECTURE §3.0) — the launch screen ─────
+  /** One composed read model. The renderer never assembles the launch screen
+   *  from four separate reads, because they could not be of the same instant. */
+  today: TodayWorkspace | null;
+  /** The selected local date. Invariant 26: it drives BOTH columns. */
+  todayDate: LocalDate;
+
+  // ─── the day (Plan Rev 3 §8.1) — the 24-hour reconciliation table ─────
   day: DayView | null;
   dayDate: LocalDate;
   slotMinutes: number;
@@ -167,6 +178,13 @@ interface AppState {
   loadTasks: () => Promise<void>;
   loadProjects: () => Promise<void>;
   loadReports: () => Promise<void>;
+  loadToday: () => Promise<void>;
+  setTodayDate: (d: LocalDate) => void;
+  shiftTodayWeek: (dir: -1 | 1) => void;
+  setDaySection: (taskId: string, section: DaySection) => Promise<void>;
+  removeFromDay: (taskId: string) => Promise<void>;
+  reorderDay: (section: DaySection, taskIds: string[]) => Promise<void>;
+
   loadDay: () => Promise<void>;
   setDayDate: (d: LocalDate) => void;
   setSlotMinutes: (m: number) => void;
@@ -205,13 +223,16 @@ interface AppState {
 let toastSeq = 0;
 
 export const useApp = create<AppState>((set, get) => ({
-  view: "day",
+  view: "today",
   overlay: null,
   theme: "light",
   sidebarWidth: 260,
   sidebarCollapsed: false,
   ready: false,
   offline: true,
+
+  today: null,
+  todayDate: fmt.today(),
 
   span: 7,
   anchor: fmt.today(),
@@ -281,6 +302,7 @@ export const useApp = create<AppState>((set, get) => ({
       get().loadTasks(),
       get().loadProjects(),
       get().loadDay(),
+      get().loadToday(),
     ]);
     const timer = await ipc.getTimerState().catch(() => get().timer);
     const unreconciled = await ipc.getUnreconciledDays(fmt.today()).catch(() => []);
@@ -301,6 +323,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (view === "reports") void get().loadMonth();
     if (view === "activity") void get().loadActivity();
     if (view === "day") void get().loadDay();
+    if (view === "today") void get().loadToday();
   },
 
   setOverlay(overlay) {
@@ -401,6 +424,56 @@ export const useApp = create<AppState>((set, get) => ({
    * precedence rule, and a second copy of it here is exactly the drift this
    * architecture exists to prevent.
    */
+  /* ─── the Today workspace (§7.5) ─────────────────────────────────── */
+
+  async loadToday() {
+    const today = await get().run(() => ipc.todayWorkspace(get().todayDate, fmt.tz()));
+    if (today) set({ today });
+  },
+
+  setTodayDate(todayDate) {
+    /* Invariant 26 — one selected date drives the task column and the schedule
+       column both. They are two lenses on one day, not two screens that happen
+       to sit beside each other. */
+    set({ todayDate });
+    void get().loadToday();
+  },
+
+  shiftTodayWeek(dir) {
+    /* §7.3 — moving between weeks moves the selection with it and never
+       changes the report period, which is a different control on a different
+       screen. */
+    get().setTodayDate(fmt.addDays(get().todayDate, dir * 7));
+  },
+
+  /* Promote to the Top 3, or demote out of it. Invariant 25: this writes a
+     daily plan item and nothing else — the task's estimate, blocks, sessions
+     and completion history are untouched. */
+  async setDaySection(taskId, section) {
+    const ok = await get().run(
+      () => ipc.addTaskToDay(taskId, get().todayDate, section),
+      "Couldn't change today's list.",
+    );
+    if (ok !== null) await get().loadToday();
+  },
+
+  async removeFromDay(taskId) {
+    const date = get().todayDate;
+    const ok = await get().run(
+      () => ipc.removeTaskFromDay(taskId, date),
+      "Couldn't take that off the day.",
+    );
+    if (ok !== null) await get().loadToday();
+  },
+
+  async reorderDay(section, taskIds) {
+    const ok = await get().run(
+      () => ipc.reorderDayTasks(get().todayDate, section, taskIds),
+      "Couldn't reorder today's list.",
+    );
+    if (ok !== null) await get().loadToday();
+  },
+
   async loadDay() {
     const [day, areas, entries] = await Promise.all([
       get().run(() => ipc.getDay(get().dayDate, fmt.tz(), get().slotMinutes)),
@@ -640,6 +713,8 @@ export const useApp = create<AppState>((set, get) => ({
     if (view === "activity") await get().loadActivity();
     // The Day view reads sessions and blocks, so any mutation can change it.
     if (view === "day") await get().loadDay();
+    // Today reads tasks, blocks, sessions and the ledger — everything.
+    if (view === "today") await get().loadToday();
   },
 }));
 

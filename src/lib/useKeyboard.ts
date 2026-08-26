@@ -80,8 +80,12 @@ export function useKeyboard() {
       if (pendingG.current) {
         pendingG.current = false;
         const map: Record<string, string> = {
-          p: "go-planner",
-          t: "go-tasks",
+          t: "go-today",
+          // `d` was missing, so `G then D` fell through to the single-key map
+          // and duplicated a block instead of opening the Day view.
+          d: "go-day",
+          l: "go-planner",
+          p: "go-tasks",
           a: "go-activity",
           r: "go-reports",
           s: "go-settings",

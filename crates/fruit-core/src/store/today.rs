@@ -294,11 +294,28 @@ impl Store {
                     }
                     SlotOwner::Observed { .. } => a.observed_unconfirmed_sec += sec,
                     // Idle is the machine saying nobody was here, which is not
-                    // an account of the time — it is the absence of one.
-                    SlotOwner::Idle | SlotOwner::Empty => a.unaccounted_sec += sec,
+                    // an account of the time — it is the absence of one. It is
+                    // not accumulated here: unaccounted is the complement, and
+                    // it is taken once, below.
+                    SlotOwner::Idle | SlotOwner::Empty => {}
                 }
             }
         }
+
+        /* Invariant 19 — unaccounted time is the **final complement**, not a
+           sixth sum. Taking it as the remainder is what makes the six states
+           close on the exact local week: five independent sums each truncate
+           their own sub-second tail, and five truncations do not add up to
+           one. The remainder is at most a few seconds, and it belongs in the
+           bucket that means "no record of any kind" rather than being
+           smuggled into a confirmed total. */
+        a.unaccounted_sec = a.period_sec
+            - (a.verified_work_sec
+                + a.verified_life_sec
+                + a.sleep_rest_sec
+                + a.private_sec
+                + a.tracked_pending_sec
+                + a.observed_unconfirmed_sec);
 
         let confirmed = a.verified_work_sec + a.verified_life_sec + a.sleep_rest_sec + a.private_sec;
         a.accounted_ratio = if a.elapsed_sec > 0 {
@@ -441,14 +458,27 @@ impl Store {
         let current_minute = is_today.then(|| minutes_into_day(self.now(), &zone));
         let configured = self.day_start_hour() * 60;
 
+        /* Never open below the first thing plotted on the day. A canvas that
+           opens at 07:00 on a day whose first block starts at 06:44 hides the
+           block, and the user's first act on the launch screen becomes
+           scrolling up to find work they already plotted. */
+        let earliest = column
+            .as_ref()
+            .and_then(|c: &DayColumn| {
+                c.blocks
+                    .iter()
+                    .map(|b| minutes_into_day(b.block.starts_at, &zone))
+                    .min()
+            })
+            .unwrap_or(configured);
+
         Ok(DaySchedule {
             local_date: date.to_string(),
-            // Open near the current hour on today, at the configured day start
-            // otherwise — and never *past* the day start, so an early morning
-            // does not open the canvas below the first thing on it (§3.0).
+            // The configured day start, pulled earlier by anything plotted
+            // before it, and earlier again to keep the current hour in view.
             visible_day_start_minute: match current_minute {
-                Some(m) => configured.min((m - 60).max(0)),
-                None => configured,
+                Some(m) => configured.min(earliest).min((m - 60).max(0)).max(0),
+                None => configured.min(earliest).max(0),
             },
             planned_sec: column.as_ref().map(|c| c.planned_sec).unwrap_or(0),
             unplanned_sec: column.as_ref().map(|c| c.unplanned_sec).unwrap_or(0),

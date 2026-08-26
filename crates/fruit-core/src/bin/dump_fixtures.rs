@@ -397,6 +397,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // A Top 3 for today, so the launch screen opens on the thing the wireframe
+    // draws rather than on an empty list. Three tasks are promoted and the rest
+    // of the day's work falls into "More for today" on its own, through the
+    // intended dates and blocks already seeded above — which is exactly how a
+    // real day's list assembles itself.
+    {
+        let day_tasks = store.get_tasks(TaskQuery {
+            limit: Some(200),
+            ..Default::default()
+        })?;
+        let open_today: Vec<String> = day_tasks
+            .rows
+            .iter()
+            .filter(|t| t.status == Status::Open)
+            .take(3)
+            .map(|t| t.id.clone())
+            .collect();
+        store.reorder_day_tasks(&today, DaySection::Top, &open_today)?;
+        // And one for tomorrow, so the preview is a preview of something.
+        let tomorrow = format_date(today_date + Duration::days(1));
+        if let Some(first) = day_tasks
+            .rows
+            .iter()
+            .find(|t| t.status == Status::Open && !open_today.contains(&t.id))
+        {
+            store.add_task_to_day(&first.id, &tomorrow, DaySection::Top)?;
+        }
+    }
+
     let range = DateRange {
         from: format_date(monday),
         to: format_date(sunday),
@@ -444,6 +473,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     out.insert("get_timer_state".into(), json!(store.timer_state()?));
     out.insert("get_day".into(), json!(store.get_day(&today, &tz, None)?));
+    // The launch screen. Recorded after the plan items below so the preview
+    // opens on a Top 3 that was genuinely chosen rather than one asserted by
+    // the fixture — the whole point of recording real DTOs.
+    out.insert(
+        "today_workspace".into(),
+        json!(store.today_workspace(&today, &tz)?),
+    );
     out.insert("get_month".into(), json!(store.get_month(&today[..7], &tz)?));
     out.insert("get_life_areas".into(), json!(store.get_life_areas(&tz, false)?));
     out.insert(

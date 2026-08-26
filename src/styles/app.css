@@ -3268,3 +3268,506 @@ select {
     --checkbox: var(--checkbox-touch);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Today — the launch workspace (ARCHITECTURE §3.0, §7.5; wireframe)
+
+   Two rows over two columns: the week strip beside the allocation ring, then
+   the day's tasks beside the same day's schedule. The proportions come from
+   the wireframe — the strip is a band, the ring is a corner, and the two
+   working columns take the rest of the height between them.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.today {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--ink);
+}
+
+.today-head {
+  display: grid;
+  /* The allocation card is sized by its legend, not by taste: seven states
+     each need a name and a duration, and a card that truncates "Unaccounted"
+     to "Una…" is a card that hides the state it most needs to show. */
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 400px);
+  gap: var(--s-16);
+  padding: var(--s-12) var(--s-20);
+  border-bottom: 1px solid var(--rule);
+}
+
+.today-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* The task column is the one you read; the schedule is the one you scan.
+     Equal halves make the schedule's hour labels fight the task titles for
+     the same eye, so the tasks get the larger share. */
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+}
+
+/* ─── week strip ───────────────────────────────────────────────────────── */
+
+.week-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-8);
+  min-width: 0;
+}
+
+.week-strip-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-6);
+}
+
+.week-days {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--s-6);
+}
+
+/* One cell carries five independent states, and none of them is colour alone
+   (§7.6): the weekday and date are text, tracked volume is a filled counter,
+   completion is a check with a number, an untracked plan is a hollow ring,
+   today is a persistent underline and selection is a border. */
+.week-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--s-6) var(--s-4) var(--s-12);
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--surface);
+  color: var(--paper);
+  cursor: pointer;
+  min-width: 0;
+}
+.week-day:hover {
+  background: var(--subtle);
+}
+.week-day[data-selected="true"] {
+  border-color: var(--strong);
+  box-shadow: inset 0 0 0 1px var(--strong);
+}
+.week-day[data-today="true"] .num {
+  font-weight: var(--w-bold);
+  color: var(--strong);
+}
+/* The today indicator is persistent and independent of every activity mark
+   (§7.6): navigation state must stay legible whatever the week looks like. */
+.week-day[data-today="true"]::after {
+  content: "";
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 3px;
+  height: 2px;
+  border-radius: var(--r-bar);
+  background: var(--strong);
+}
+
+.week-day .wd {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-ui);
+}
+.week-day .num {
+  font-size: var(--t-title);
+  line-height: 1.1;
+}
+
+.week-day .marks {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 14px;
+}
+.week-day .mark {
+  font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.week-day .mark[data-on="false"] {
+  display: none;
+}
+/* Tracked volume: a filled counter whose shade steps through four buckets.
+   The numeral is inside it, so the shade is a redundancy and never the
+   message. */
+.week-day .mark.fill {
+  padding: 2px 4px;
+  border-radius: var(--r-pill);
+  background: var(--track-surface);
+  color: var(--track);
+}
+.week-day[data-intensity="2"] .mark.fill {
+  background: var(--track-graphic);
+  color: var(--app-ink);
+}
+.week-day[data-intensity="3"] .mark.fill {
+  background: var(--track);
+  color: var(--app-ink);
+}
+.week-day .mark.check {
+  color: var(--done);
+}
+/* Planned, nothing tracked. Deliberately the quietest mark on the cell: it is
+   a reminder to start a timer, not an error, and there is no penalty for a
+   day that stays empty. */
+.week-day .mark.pending {
+  color: var(--faint);
+}
+
+/* ─── week allocation ──────────────────────────────────────────────────── */
+
+.alloc {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: var(--s-4) var(--s-12);
+  padding: var(--s-8) var(--s-12);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+}
+
+.alloc-ring {
+  grid-row: 1 / 3;
+  width: 72px;
+  height: 72px;
+}
+.alloc-ring svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* One column, not two. Seven states each need a name and a duration, and two
+   columns cost enough width that "Unaccounted" — the state the ledger most
+   needs to keep visible — was the one that ellipsed. */
+.alloc-legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--s-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--t-micro);
+}
+.alloc-legend li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--paper);
+}
+/* Pending, private, observed and unaccounted stay on the legend rather than
+   being hidden or folded into a confirmed total — but they are set quieter,
+   because the confirmed states are the headline (§3.0). */
+.alloc-legend li[data-quiet="true"] {
+  color: var(--faint);
+}
+.alloc-legend .swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+.alloc-legend .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alloc-legend .val {
+  margin-left: auto;
+  padding-left: var(--s-4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.alloc-foot {
+  grid-column: 2;
+  color: var(--faint);
+}
+
+/* ─── the task column ──────────────────────────────────────────────────── */
+
+.today-tasks,
+.today-schedule {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.today-tasks {
+  overflow: auto;
+  padding-bottom: var(--s-32);
+  border-right: 1px solid var(--rule);
+}
+
+.today-col-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  padding: var(--s-12) var(--s-16) var(--s-4);
+}
+
+.today-hint {
+  margin: 0 var(--s-16) var(--s-8);
+  color: var(--faint);
+}
+
+.today-fold {
+  border: none;
+  width: calc(100% - var(--s-16) * 2);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.today-task {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  margin: 0 var(--s-16);
+  padding: var(--s-6) var(--s-8);
+  border-bottom: 1px solid var(--rule);
+}
+.today-task:hover {
+  background: var(--subtle);
+}
+.today-task[data-done="true"] .t {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.today-task[data-running="true"] {
+  box-shadow: inset 2px 0 0 var(--track-graphic);
+}
+
+.today-task-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  align-items: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.today-task-title .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.today-task .meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.today-task .meta .data {
+  font-variant-numeric: tabular-nums;
+}
+.today-task .meta .tracked {
+  color: var(--track);
+}
+.today-task .proj {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.today-task .proj .dot {
+  width: var(--pill-dot);
+  height: var(--pill-dot);
+  border-radius: var(--r-pill);
+}
+.today-task .focus-tag {
+  padding: 0 5px;
+  border-radius: var(--r-pill);
+  background: var(--plot-surface);
+  color: var(--plot);
+}
+
+.tomorrow {
+  margin: 0 var(--s-16);
+  padding: 0;
+  list-style: none;
+}
+.tomorrow li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-8);
+  color: var(--muted);
+}
+.tomorrow-open {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tomorrow .data {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── the schedule column ──────────────────────────────────────────────── */
+
+.today-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.today-grid {
+  position: relative;
+  padding-left: var(--gutter-w);
+}
+
+.today-hour {
+  position: relative;
+  border-top: 1px solid var(--rule);
+}
+.today-hour-label {
+  position: absolute;
+  left: calc(var(--gutter-w) * -1);
+  top: -0.6em;
+  width: calc(var(--gutter-w) - 6px);
+  text-align: right;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A plotted block. Cool edge, quiet plate — it is the plan, and the tracked
+   bar underneath is the record beside it rather than a redrawing of it. */
+.today-block {
+  position: absolute;
+  left: calc(var(--gutter-w) + 4px);
+  right: var(--s-8);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-6);
+  overflow: hidden;
+  padding: 3px var(--s-6) 3px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-plate);
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+}
+.today-block[data-running="true"] {
+  border-color: var(--track-graphic);
+}
+.today-block[data-drift="overrun"] {
+  border-color: var(--over);
+}
+.today-block[data-drift="underrunPast"] {
+  border-style: dashed;
+}
+.today-block .edge {
+  align-self: stretch;
+  width: 3px;
+  flex: none;
+  border-radius: var(--r-bar);
+}
+.today-block-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--t-caption);
+}
+.today-block-body .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--strong);
+}
+.today-block-body .data {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.today-block .tracked-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--sunken);
+}
+.today-block .tracked-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--track-graphic);
+}
+.today-block .start {
+  flex: none;
+}
+
+.today-now {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid var(--strong);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 3;
+}
+.today-now::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--gutter-w) - 10px);
+  top: -3px;
+  border-left: 6px solid var(--strong);
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+}
+
+.today-drop {
+  position: absolute;
+  left: calc(var(--gutter-w) + 4px);
+  right: var(--s-8);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--s-6);
+  border: 1px dashed var(--plot);
+  border-radius: var(--r-plate);
+  background: var(--plot-surface);
+  color: var(--plot);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* §18.4 — below 1280px the two columns stack, and the selected date is the
+   same one in both. No P0 action becomes hover-only at any width. */
+@media (max-width: 1279px) {
+  .today-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .today-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: min-content;
+    overflow: auto;
+  }
+  .today-tasks {
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  .today-scroll {
+    max-height: 60vh;
+  }
+}

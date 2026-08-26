@@ -31,6 +31,8 @@ src-tauri/             The shell: windows, tray, clock loop, IPC. Its own worksp
 src/                   React renderer. Holds no SQL and no business logic.
   styles/tokens.css    The §5 design system, one file
   components/DriftRail.tsx   The signature, at all three scales (§5.6)
+  views/Today.tsx      The launch workspace: week strip, allocation, Top 3,
+                       and the day's schedule (ARCHITECTURE §3.0, §7.5)
 scripts/check-ui.mjs   The UI half of §8 that a headless browser can check
 scripts/gen-icons.py   Regenerates every bundle icon from the brand mark
 ```
@@ -49,7 +51,7 @@ npm run app          # the real thing: Tauri window + SQLite on disk
 
 ```bash
 npm run dev          # browser preview, reading recorded DTOs (see below)
-cargo test           # 276 tests, incl. the §8 acceptance criteria
+cargo test           # 332 tests, incl. the §8 acceptance criteria
 node scripts/check-ui.mjs      # I1, I3–I7, U10 against `npm run preview`
 ```
 

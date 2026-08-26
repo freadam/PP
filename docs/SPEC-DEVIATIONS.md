@@ -231,3 +231,58 @@ enabled-sentinel, all covered by tests in `fruit_core::spool`.
 If latency ever matters — it does not for a twenty-second signal — the pipe is a
 drop-in replacement for `spool::append` and `spool::drain`, and nothing above
 them changes.
+
+---
+
+## 12. Today is added beside Day, not in place of it
+
+**ARCHITECTURE §14** lists six routes — Today, Projects, Activity, Reports,
+Review, Settings — and folds the Planner into Today rather than keeping it as a
+top-level destination.
+
+This build adds Today as the first destination and the default launch route, and
+leaves Day and Planner where they were.
+
+Day is this codebase's 24-hour reconciliation table: it is the surface §12 of
+the product spec calls Daily Review, under an older name. Deleting it to satisfy
+a route list would remove the reconciliation screen, not rename it. The Planner
+is the multi-day timeboxing canvas; Today now carries the single-day version of
+it, which is what §14 actually asks for ("The complete timeboxing canvas may be
+opened in an expanded Today mode"), and the multi-day canvas remains reachable
+until that expanded mode exists.
+
+The renaming is a docs-and-labels change with no domain content. It is deferred
+rather than smuggled into the change that built the workspace.
+
+### 12.1 The navigation letters moved
+
+**PRODUCT-SPEC §5.3** names two: Today is `G then T`, Projects is `G then P`.
+Both are now true. Projects therefore gave up `T`, and the Planner — which §14
+says should not be a top-level route at all — gave up `P` and took `L`.
+
+`G then D` was previously bound to nothing at all: the sequence map had no `d`,
+so it fell through to the single-key map and duplicated a block. It now opens
+Day, as its own shortcut sheet had always claimed.
+
+---
+
+## 13. Verified vs tracked-pending is read from `is_confirmed`
+
+**ARCHITECTURE §2** separates a *verified* session — one the user reviewed and
+explicitly accepted — from a *tracked, pending* one, and §4.8 models the
+decision as its own `session_review` record.
+
+This build has no `session_review` table. `time_session.is_confirmed` carries the
+distinction: it is set to 0 when a session needs a human decision (a timer
+recovered after a crash), and the week allocation reads it to split confirmed
+work into verified and pending.
+
+The two differ in what they can tell you later. `is_confirmed` is a flag, so it
+cannot say *when* the decision was made, what evidence the user saw, or what an
+earlier decision said before this one superseded it — all of which §4.8 wants
+for audit. It is enough for the ledger's six states, which is what the launch
+screen needs, and not enough for the review history §7.1 describes.
+
+Adding `session_review` is additive: a new table, and the allocation reading
+"has a non-superseded accept decision" instead of "`is_confirmed = 1`". No
+stored duration changes, so no migration has to rewrite time.

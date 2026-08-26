@@ -59,6 +59,26 @@ silently would be indistinguishable from a bug. `two_touching_entries_become_one
 
 ---
 
+## Today workspace (T) — ARCHITECTURE §3.0, §7.5, §7.6; PRODUCT-SPEC §7
+
+The launch screen the three product documents describe, and the wireframe draws.
+
+| # | Criterion | Covered by | Runs |
+|---|---|---|---|
+| T1 | Fruit opens into Today with the current local date selected, and the week strip shows the week containing it (FR-TOD-001) | `today_opens_on_the_current_local_date`; `view: "today"` is the store's initial route and Today is first in the rail | ✅ |
+| T2 | One selected date drives the task column and the schedule column both (invariant 26) | `selecting_a_day_moves_both_columns_together` — both are read off one `today_workspace` DTO, so they cannot be of different instants | ✅ |
+| T3 | A weekday cell carries planned, tracked, completed, untracked-planned, today and selected as **independent** states, none inferred from another (FR-TOD-002, invariant 29) | `the_weekday_cue_counts_tasks_not_sessions`; six separate marks in `.week-day`, each with its own glyph and numeral | ✅ |
+| T4 | Tracked intensity counts distinct **tasks**, never sessions and never duration (invariant 27) | `the_weekday_cue_counts_tasks_not_sessions` — two sessions on one task read as one tracked task | ✅ |
+| T5 | Machine observation never marks a day tracked (invariant 28) | `observation_alone_never_marks_a_day_tracked` — an hour of observed activity leaves the cue untracked and lands in `observedUnconfirmedSec` | ✅ |
+| T6 | Top 3 holds at most three tasks, and a task appears at most once per date (invariants 23, 24) | `the_top_three_holds_three_and_a_task_appears_once`; the second is a unique index, not a check somebody remembered | ✅ |
+| T7 | Promoting, demoting or removing a plan item never changes the task's estimate, blocks, sessions or completion history (invariant 25) | `a_plan_item_never_rewrites_the_task` | ✅ |
+| T8 | The week's six accounting states sum to the exact local week, daylight-saving weeks included (invariant 18) | `the_week_allocation_tiles_the_week_exactly`, `a_daylight_saving_week_is_not_168_hours`, `a_mid_second_boundary_does_not_lose_the_week` | ✅ |
+| T9 | The allocation comes from the Day Ledger, never from scheduled blocks or task checkboxes (§7.5) | `a_plan_is_not_an_account_of_the_week` — a plotted, ticked day with no session confirms nothing | ✅ |
+| T10 | The current-time marker appears only when viewing today (§7.6) | `today_opens_on_the_current_local_date` asserts `currentMinute` is null on any other date | ✅ |
+| T11 | Ticking, starting and plotting stay three different commands (§7.5) | Structural: the checkbox calls `set_task_status`, Start calls `start_timer`, a drop calls `schedule_block`. No path calls two. | ✅ |
+| T12 | Today stacks below 1280px with the same selected date in both columns (§18.4) | `check-ui.mjs` I5 at 960, 1130, 1200, 1280, 1490 and at 125% text | ✅ |
+
+
 ## Weekly goals (W) — proposed
 
 Not built. Planned in [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md), and
