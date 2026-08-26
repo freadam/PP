@@ -25,7 +25,18 @@ export function Sidebar() {
   // switches too, not only the width, or it would just overflow its box.
   const collapsed = manuallyCollapsed || viewport < BREAK_SIDEBAR_COLLAPSE;
 
-  if (view === "reports" || view === "settings" || view === "activity") return null;
+  /* Today shows no sidebar. The screen already carries the day's tasks, the
+     week strip and the schedule; a second list of every project beside them is
+     one more thing to read before the question "what now?" gets answered, and
+     that question is the whole point of the launch route. Projects remains one
+     keystroke away (G then P). */
+  if (
+    view === "today" ||
+    view === "reports" ||
+    view === "settings" ||
+    view === "activity"
+  )
+    return null;
 
   return (
     <aside

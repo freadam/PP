@@ -3720,8 +3720,22 @@ select {
   height: 100%;
   background: var(--track-graphic);
 }
-.today-block .start {
+/* Both plate actions. `align-self: center` so they stay centred in a tall
+   block; `flex: none` so a long task title never squeezes them out. On a
+   30-minute block the plate is only ~28px high, which is exactly one control
+   — so they sit side by side horizontally and the title truncates instead. */
+.today-block .start,
+.today-block .remove {
   flex: none;
+  align-self: center;
+}
+
+/* Destructive, so it earns the danger colour on hover and focus — but only
+   then. At rest it is as quiet as everything else on the canvas. */
+.today-block .remove:hover,
+.today-block .remove:focus-visible {
+  color: var(--danger);
+  background: var(--danger-surface);
 }
 
 .today-now {

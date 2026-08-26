@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useApp } from "../store/app";
+import { useApp, undoableDelete } from "../store/app";
 import * as ipc from "../lib/ipc";
 import * as fmt from "../lib/format";
 import type { BlockView, DaySection, PlannedTask, WeekAllocation, WeekDayCell } from "../lib/types";
@@ -729,6 +729,29 @@ function hourMs(date: string, hour: number): number {
  */
 function BlockPlate({ block, hourHeight }: { block: BlockView; hourHeight: number }) {
   const toggleTimer = useApp((s) => s.toggleTimer);
+  const setBlockDialog = useApp((s) => s.setBlockDialog);
+
+  /* Removing a plotted block. Undoable, because unplotting an afternoon by
+     mis-clicking is exactly the kind of loss that makes someone stop trusting
+     a planner.
+
+     A series member never guesses the scope (§4.3): "just this Tuesday" and
+     "every Tuesday until March" are different enough that inferring which was
+     meant is a data-loss bug with a friendly name. The scope dialog already
+     exists in the shell, so this asks it rather than deciding. */
+  const remove = async () => {
+    if (block.block.seriesId) {
+      setBlockDialog({ kind: "scope", blockId: block.block.id, title: block.title });
+      return;
+    }
+    const token = await useApp
+      .getState()
+      .run(() => ipc.unscheduleBlock(block.block.id), "Couldn't remove that block.");
+    if (token) {
+      undoableDelete(token.label, token);
+      await useApp.getState().refresh();
+    }
+  };
   const startMin = fmt.minutesIntoDay(block.block.startsAt);
   const height = Math.max(18, (block.plannedSec / 3600) * hourHeight);
   const filled = block.plannedSec > 0 ? Math.min(1, block.trackedSec / block.plannedSec) : 0;
@@ -765,6 +788,16 @@ function BlockPlate({ block, hourHeight }: { block: BlockView; hourHeight: numbe
           {block.isRunning ? "■" : "▶"}
         </button>
       )}
+      {/* Not hover-only: a hover-only destructive control is unreachable by
+          keyboard, and this one removes a plan. */}
+      <button
+        className="btn btn-quiet btn-icon remove"
+        aria-label={`Remove the ${fmt.clockRange(block.block.startsAt, block.plannedSec)} block for ${block.title}`}
+        title="Remove this block. The task, its estimate and any tracked time are untouched."
+        onClick={remove}
+      >
+        ×
+      </button>
     </div>
   );
 }
