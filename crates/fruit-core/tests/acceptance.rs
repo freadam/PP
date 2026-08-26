@@ -4094,3 +4094,327 @@ fn a_session_that_ends_when_it_starts_is_refused() {
         })
         .is_err());
 }
+
+// ─── the Today workspace (ARCHITECTURE §3.0, §7.5, §7.6) ───────────────
+
+/// FR-TOD-001 — Today opens on the current local date, and the strip is the
+/// week containing it.
+#[test]
+fn today_opens_on_the_current_local_date() {
+    let (store, _clock) = store_at(at(2026, 8, 26, 9, 30)); // a Wednesday
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+
+    assert_eq!(w.today, "2026-08-26");
+    assert_eq!(w.selected_date, "2026-08-26");
+    assert_eq!(w.tomorrow_date, "2026-08-27");
+    assert_eq!(w.week_days.len(), 7);
+    assert_eq!(w.week_days[0].local_date, "2026-08-24", "the week starts Monday");
+    assert_eq!(w.week_days[6].local_date, "2026-08-30");
+    assert!(w.week_days.iter().filter(|d| d.is_today).count() == 1);
+    assert!(w.week_days.iter().filter(|d| d.is_selected).count() == 1);
+    // §7.6 — the current-time marker belongs to today and nowhere else.
+    assert_eq!(w.schedule.current_minute, Some(9 * 60 + 30));
+    assert!(store
+        .today_workspace("2026-08-27", TZ)
+        .unwrap()
+        .schedule
+        .current_minute
+        .is_none());
+}
+
+/// Invariant 26 — the task column and the schedule column always use the same
+/// selected local date, and selecting a day never leaves the week that holds it.
+#[test]
+fn selecting_a_day_moves_both_columns_together() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 9, 0));
+    let t = task(&mut store, "Draft the proposal");
+    block(&mut store, &t.id, at(2026, 8, 28, 10, 0), 120);
+
+    let w = store.today_workspace("2026-08-28", TZ).unwrap();
+    assert_eq!(w.selected_date, "2026-08-28");
+    assert_eq!(w.schedule.local_date, "2026-08-28");
+    assert_eq!(w.schedule.blocks.len(), 1);
+    // The block put the task on the day without a plan item ever being created.
+    assert_eq!(w.more_today.len(), 1);
+    assert_eq!(w.more_today[0].source, PlanSource::Scheduled);
+    assert!(w.more_today[0].plan_item_id.is_none());
+    assert_eq!(w.more_today[0].scheduled_sec, 2 * 3600);
+}
+
+/// Invariants 23 and 24 — one plan item per task per date, at most three in Top 3.
+#[test]
+fn the_top_three_holds_three_and_a_task_appears_once() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 9, 0));
+    let ids: Vec<String> = ["One", "Two", "Three", "Four"]
+        .iter()
+        .map(|t| task(&mut store, t).id)
+        .collect();
+
+    for id in &ids[..3] {
+        store
+            .add_task_to_day(id, "2026-08-26", DaySection::Top)
+            .unwrap();
+    }
+    assert!(
+        store
+            .add_task_to_day(&ids[3], "2026-08-26", DaySection::Top)
+            .is_err(),
+        "a fourth task cannot join the Top 3"
+    );
+
+    // Re-adding a task already in Top 3 is a move, not a duplicate.
+    store
+        .add_task_to_day(&ids[0], "2026-08-26", DaySection::Top)
+        .unwrap();
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    assert_eq!(w.top_three.len(), 3);
+    assert_eq!(w.top_three.iter().filter(|p| p.task.id == ids[0]).count(), 1);
+
+    // Demoting frees a slot without touching the task.
+    store
+        .add_task_to_day(&ids[0], "2026-08-26", DaySection::More)
+        .unwrap();
+    store
+        .add_task_to_day(&ids[3], "2026-08-26", DaySection::Top)
+        .unwrap();
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    assert_eq!(w.top_three.len(), 3);
+    assert_eq!(w.more_today.len(), 1);
+}
+
+/// Invariant 25 — promoting, demoting or removing a plan item never changes the
+/// task's estimate, blocks, sessions or completion history.
+#[test]
+fn a_plan_item_never_rewrites_the_task() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 18, 0));
+    let t = store
+        .create_task(NewTask {
+            title: "Design the ledger".into(),
+            estimate_sec: Some(2 * 3600),
+            due_date: Some("2026-08-26".into()),
+            ..Default::default()
+        })
+        .unwrap();
+    let b = block(&mut store, &t.id, at(2026, 8, 26, 10, 0), 120);
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: Some(b.id.clone()),
+            started_at: at(2026, 8, 26, 10, 8),
+            ended_at: at(2026, 8, 26, 10, 54),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    let before = store.get_task_detail(&t.id).unwrap();
+
+    store
+        .add_task_to_day(&t.id, "2026-08-26", DaySection::Top)
+        .unwrap();
+    store
+        .add_task_to_day(&t.id, "2026-08-26", DaySection::More)
+        .unwrap();
+    store.remove_task_from_day(&t.id, "2026-08-26").unwrap();
+
+    let after = store.get_task_detail(&t.id).unwrap();
+    assert_eq!(after.task.estimate_sec, before.task.estimate_sec);
+    assert_eq!(after.task.due_date, before.task.due_date);
+    assert_eq!(after.task.tracked_sec, before.task.tracked_sec);
+    assert_eq!(after.sessions.len(), before.sessions.len());
+    assert_eq!(after.blocks.len(), before.blocks.len());
+
+    // And it is still on the day, because its intended date says so — removing
+    // a plan item is not editing a date the plan item never owned.
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    assert_eq!(w.more_today.len(), 1);
+    assert_eq!(w.more_today[0].source, PlanSource::IntendedDate);
+}
+
+/// Invariant 27 — a weekday's tracked count is distinct **tasks**, not sessions
+/// and not duration. Invariant 29 — tracked, completed and planned stay
+/// independent.
+#[test]
+fn the_weekday_cue_counts_tasks_not_sessions() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 20, 0));
+    let tracked_twice = task(&mut store, "Firefight");
+    let planned_only = task(&mut store, "Never started");
+
+    store
+        .add_task_to_day(&planned_only.id, "2026-08-26", DaySection::Top)
+        .unwrap();
+    store
+        .add_task_to_day(&tracked_twice.id, "2026-08-26", DaySection::Top)
+        .unwrap();
+
+    for (from, to) in [(9, 10), (14, 15)] {
+        store
+            .add_session(ManualSession {
+                task_id: tracked_twice.id.clone(),
+                block_id: None,
+                started_at: at(2026, 8, 26, from, 0),
+                ended_at: at(2026, 8, 26, to, 0),
+                note: None,
+                contribution: None,
+                replace_existing: false,
+            })
+            .unwrap();
+    }
+
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    let cell = w
+        .week_days
+        .iter()
+        .find(|d| d.local_date == "2026-08-26")
+        .unwrap();
+    assert_eq!(cell.planned_task_count, 2);
+    assert_eq!(cell.tracked_task_count, 1, "two sessions, one task");
+    assert_eq!(cell.untracked_planned_count, 1);
+    assert_eq!(cell.completed_task_count, 0, "tracked is not completed");
+
+    store.set_task_status(&tracked_twice.id, Status::Done).unwrap();
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    let cell = w
+        .week_days
+        .iter()
+        .find(|d| d.local_date == "2026-08-26")
+        .unwrap();
+    assert_eq!(cell.completed_task_count, 1);
+    assert_eq!(cell.tracked_task_count, 1, "completion did not invent tracking");
+    // The completed task leaves the working list without leaving the day.
+    assert_eq!(w.completed_today.len(), 1);
+    assert_eq!(w.top_three.len(), 1);
+}
+
+/// Invariant 28 — machine observation never increments the tracked-task count.
+/// The cue exists to say "you forgot to start a timer", so a day full of
+/// observed activity and no session has to keep looking untracked.
+#[test]
+fn observation_alone_never_marks_a_day_tracked() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 20, 0));
+    let t = task(&mut store, "Write the guide");
+    store
+        .add_task_to_day(&t.id, "2026-08-26", DaySection::Top)
+        .unwrap();
+
+    store
+        .set_activity_setting(fruit_core::store::ACTIVITY_ENABLED, serde_json::Value::Bool(true))
+        .unwrap();
+    let base = at(2026, 8, 26, 9, 0);
+    for step in 0..(60 * 3) {
+        store
+            .record_activity(ActivitySample {
+                app_id: "code.exe".into(),
+                window_title: None,
+                domain: None,
+                at: base + step * 20_000,
+            })
+            .unwrap();
+    }
+
+    let w = store.today_workspace("2026-08-26", TZ).unwrap();
+    let cell = w
+        .week_days
+        .iter()
+        .find(|d| d.local_date == "2026-08-26")
+        .unwrap();
+    assert_eq!(cell.tracked_task_count, 0);
+    assert_eq!(cell.untracked_planned_count, 1);
+    // The observation is not lost — it is in the ledger as evidence awaiting a
+    // decision, which is a different claim from tracked work.
+    assert!(w.week_allocation.observed_unconfirmed_sec > 0);
+    assert_eq!(w.week_allocation.verified_work_sec, 0);
+}
+
+/// Invariant 18 — the week's six accounting states sum to the exact local week,
+/// and nothing is counted twice.
+#[test]
+fn the_week_allocation_tiles_the_week_exactly() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 20, 0));
+    let t = task(&mut store, "Design the ledger");
+    store
+        .add_session(ManualSession {
+            task_id: t.id.clone(),
+            block_id: None,
+            started_at: at(2026, 8, 26, 10, 0),
+            ended_at: at(2026, 8, 26, 12, 0),
+            note: None,
+            contribution: None,
+            replace_existing: false,
+        })
+        .unwrap();
+    let sleep = store
+        .create_life_area(NewLifeArea {
+            name: "Sleep/Rest".into(),
+            colour: None,
+            kind: Some("rest".into()),
+            monthly_target_sec: None,
+        })
+        .unwrap();
+    store
+        .add_life_entry(NewLifeEntry {
+            life_area_id: sleep.id,
+            label: None,
+            started_at: at(2026, 8, 26, 0, 0),
+            ended_at: at(2026, 8, 26, 7, 0),
+            tz: TZ.into(),
+            is_private: false,
+            note: None,
+            replace_existing: false,
+        })
+        .unwrap();
+
+    let a = store.today_workspace("2026-08-26", TZ).unwrap().week_allocation;
+    assert_eq!(a.period_sec, 7 * 24 * 3600, "an ordinary week is 168 hours");
+    assert_eq!(
+        a.verified_work_sec
+            + a.verified_life_sec
+            + a.sleep_rest_sec
+            + a.private_sec
+            + a.tracked_pending_sec
+            + a.observed_unconfirmed_sec
+            + a.unaccounted_sec,
+        a.period_sec,
+        "the six states must tile the week: {a:?}"
+    );
+    assert_eq!(a.verified_work_sec, 2 * 3600);
+    assert_eq!(a.sleep_rest_sec, 7 * 3600);
+    assert!(a.elapsed_sec < a.period_sec, "a Wednesday evening is not a whole week");
+}
+
+/// Invariant 18 again, across a daylight-saving transition: the week that loses
+/// an hour is 167 hours long and still tiles exactly.
+#[test]
+fn a_daylight_saving_week_is_not_168_hours() {
+    let (store, _clock) = store_at(at(2026, 3, 25, 12, 0));
+    let a = store.today_workspace("2026-03-25", TZ).unwrap().week_allocation;
+    assert_eq!(
+        a.period_sec,
+        7 * 24 * 3600 - 3600,
+        "the clocks went forward on Sunday the 29th"
+    );
+    assert_eq!(
+        a.verified_work_sec
+            + a.verified_life_sec
+            + a.sleep_rest_sec
+            + a.private_sec
+            + a.tracked_pending_sec
+            + a.observed_unconfirmed_sec
+            + a.unaccounted_sec,
+        a.period_sec,
+    );
+}
+
+/// §7.5 — the allocation comes from the Day Ledger, never from scheduled blocks
+/// or task checkboxes. A plotted day with nothing tracked confirms nothing.
+#[test]
+fn a_plan_is_not_an_account_of_the_week() {
+    let (mut store, _clock) = store_at(at(2026, 8, 26, 20, 0));
+    let t = task(&mut store, "Plotted, never done");
+    block(&mut store, &t.id, at(2026, 8, 26, 10, 0), 240);
+    store.set_task_status(&t.id, Status::Done).unwrap();
+
+    let a = store.today_workspace("2026-08-26", TZ).unwrap().week_allocation;
+    assert_eq!(a.verified_work_sec, 0, "a block is not work and a tick is not time");
+    assert_eq!(a.accounted_ratio, 0.0);
+}

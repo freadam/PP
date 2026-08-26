@@ -2446,3 +2446,170 @@ pub struct ExcelExportResult {
     pub rows_written: i64,
     pub variances: Vec<ExcelVariance>,
 }
+
+// ─── the Today workspace (ARCHITECTURE §7.5, §7.6; PRODUCT-SPEC §7) ─────
+
+/// Where a task sits in one local day's working list (§4.15).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DaySection {
+    /// The protected three. At most three per local date (invariant 24).
+    Top,
+    More,
+}
+
+impl DaySection {
+    pub fn parse(s: &str) -> Option<Self> {
+        Some(match s {
+            "top" => Self::Top,
+            "more" => Self::More,
+            _ => return None,
+        })
+    }
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Top => "top",
+            Self::More => "more",
+        }
+    }
+}
+
+/// Why a task is on the selected day's list at all.
+///
+/// Carried to the renderer because the two are genuinely different claims and
+/// the row reads differently: a task with a plan item was *chosen* for today, a
+/// task that merely has an intended date *landed* here. Promoting the second
+/// creates a plan item for it (§4.15), and the UI has to know which it is
+/// holding before it can say so.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PlanSource {
+    /// An explicit daily plan item.
+    Planned,
+    /// `task.due_date` falls on this date.
+    IntendedDate,
+    /// A scheduled block for this task starts on this date.
+    Scheduled,
+}
+
+/// One row of the Today task column.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannedTask {
+    pub task: TaskRow,
+    pub section: DaySection,
+    pub source: PlanSource,
+    /// Present only when the task holds an explicit plan item for the date.
+    pub plan_item_id: Option<String>,
+    pub rank: f64,
+    pub project_name: Option<String>,
+    pub project_colour: Option<String>,
+    /// Tracked seconds **on this local date**, not the task's lifetime total.
+    /// The row is answering "am I tracking this today", and the lifetime figure
+    /// answers a different question — it is on the task, separately.
+    pub tracked_today_sec: i64,
+    /// The task's scheduled blocks on this date, earliest first, as
+    /// `starts_at` millis paired with their duration. The row shows the first;
+    /// the count tells the user there are others without shipping the blocks
+    /// twice (they are already in `selected_day_schedule`).
+    pub scheduled_starts_at: Option<Millis>,
+    pub scheduled_sec: i64,
+    pub scheduled_block_count: i64,
+    pub is_running: bool,
+}
+
+/// One cell of the Monday–Sunday strip (§7.6).
+///
+/// Every count is a **distinct task count**, never a session count and never a
+/// duration: multiple sessions on one task still make one tracked task, which
+/// is what invariant 27 says and what makes the cue mean "did I log this" rather
+/// than "did I work a lot".
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekDayCell {
+    pub local_date: String,
+    pub weekday: String,
+    pub day_of_month: i64,
+    pub is_today: bool,
+    pub is_selected: bool,
+    /// The day has ended. A day that has not arrived is not a gap in the record.
+    pub has_happened: bool,
+    pub planned_task_count: i64,
+    pub tracked_task_count: i64,
+    pub completed_task_count: i64,
+    pub untracked_planned_count: i64,
+    pub is_reconciled: bool,
+}
+
+/// The week's exact accounting, in the six mutually exclusive states of the
+/// Day Ledger (§3.8, invariant 18).
+///
+/// These sum to `period_sec` exactly, including 23- and 25-hour days, because
+/// they are counted off the same tiling segments the Day view draws. Nothing
+/// here is derived from scheduled blocks or task checkboxes (§7.5).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeekAllocation {
+    pub from: String,
+    pub to: String,
+    /// The week's exact local length in seconds — 168 hours except across a
+    /// daylight-saving transition, which is the whole reason it is reported.
+    pub period_sec: i64,
+    pub verified_work_sec: i64,
+    pub verified_life_sec: i64,
+    pub sleep_rest_sec: i64,
+    pub private_sec: i64,
+    pub tracked_pending_sec: i64,
+    pub observed_unconfirmed_sec: i64,
+    pub unaccounted_sec: i64,
+    /// How much of the week has actually elapsed. A week reporting itself 14%
+    /// accounted on Tuesday morning is arithmetically true and useless.
+    pub elapsed_sec: i64,
+    /// `(verified work + verified life/sleep + private) / elapsed` (§6.1).
+    pub accounted_ratio: f64,
+    /// Closed day reviews among the elapsed days — reported separately from
+    /// `accounted_ratio`, because they answer different questions (§6.1).
+    pub reviewed_days: i64,
+    pub elapsed_days: i64,
+}
+
+/// The selected day's timeboxing canvas (§7.5).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DaySchedule {
+    pub local_date: String,
+    pub blocks: Vec<BlockView>,
+    pub planned_sec: i64,
+    /// Sessions on this date belonging to no block.
+    pub unplanned_sec: i64,
+    /// Minutes into the local day, or `None` when the selected date is not
+    /// today — the current-time marker appears only on today (§7.6).
+    pub current_minute: Option<i64>,
+    /// Minutes into the local day the canvas should open at: the user's
+    /// configured day start, or the current hour when viewing today.
+    pub visible_day_start_minute: i64,
+}
+
+/// The launch screen's composition read model (§7.5).
+///
+/// A **composition**, not a new source of truth: the week allocation comes from
+/// Day Ledger projections, the task list from daily plan items and tasks, the
+/// schedule from scheduled blocks, and the running session from the timer. No
+/// figure here is computed twice.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodayWorkspace {
+    pub selected_date: String,
+    pub today: String,
+    pub tz: String,
+    pub now: Millis,
+    pub week_days: Vec<WeekDayCell>,
+    pub week_allocation: WeekAllocation,
+    pub top_three: Vec<PlannedTask>,
+    pub more_today: Vec<PlannedTask>,
+    pub completed_today: Vec<PlannedTask>,
+    pub tomorrow_preview: Vec<PlannedTask>,
+    pub tomorrow_date: String,
+    pub schedule: DaySchedule,
+    pub timer: TimerState,
+}

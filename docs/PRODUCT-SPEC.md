@@ -1,548 +1,1450 @@
-# Product Specification
+# Fruit — Product Specification
 
-**Working name:** Fruit (repository name; the plan calls it *Harmonized Offline
-Time Planner and Tracker*)
-**Baseline:** Project Plan Revision 3 — 4 August 2026
-**Release target:** Windows-first MVP, 12 weeks
-**Status of this document:** the specification of record. Where it disagrees
-with anything else in this repository, this document wins and the other file
-needs updating. The one exception is *direction*: [`VISION.md`](VISION.md)
-argues why this product should exist and where it is going, and this document
-does not overrule it on that. It overrules it on every fact.
+**Version:** 1.0  
+**Updated:** 26 August 2026  
+**Owner:** Product owner  
+**Status:** Build specification  
+**Platforms:** Windows desktop first  
+**Data model:** Offline and local-only  
+**Related documents:** [`VISION.md`](VISION.md),
+[`ARCHITECTURE.md`](ARCHITECTURE.md)
+
+This document specifies the intended complete Fruit application. It is the
+product contract for design, implementation, and acceptance. It does not imply
+that every described requirement is already implemented. Priority labels are:
+
+- **P0** — required for the trustworthy core product;
+- **P1** — important after the core loop is dependable; and
+- **P2** — optional enhancement that must not weaken the core.
 
 ---
 
-## 0. How this document relates to what is already built
+## 1. Product summary
 
-The repository currently contains a working implementation of *Fruit —
-Technical Product Specification v2*: a planner, timer, reconciler and
-calibrator with opt-in application-level activity observation. That build is
-**one of four inputs** to this product, not the product itself.
+Fruit is a private personal productivity desktop application that unifies:
 
-| Input | What it contributes |
+- projects and actionable tasks;
+- estimates, intended dates, and time blocks;
+- multi-session task timers and focus intervals;
+- local foreground-application and browser-website evidence;
+- explicit user classification and verification;
+- a complete daily time ledger; and
+- explainable weekly and monthly reports.
+
+The product's canonical lifecycle is:
+
+```text
+PROJECT → TASK → ESTIMATE → DATE → SCHEDULE → TRACK → FOCUS
+                                                │
+                                                ├── OBSERVE APP/WEBSITE
+                                                ▼
+                                      REVIEW → VERIFY → COMPLETE
+                                                │
+                                                ▼
+                                         WEEK / MONTH REPORT
+```
+
+Plans, timers, observations, verification, and completion remain separate
+facts. Fruit helps the user reconcile them; it never edits one to make another
+look correct.
+
+---
+
+## 2. Product objectives
+
+### 2.1 Primary objectives
+
+1. Make the current priority and next action obvious within five seconds of
+   opening the app.
+2. Make starting and stopping task tracking fast enough to become habitual.
+3. Preserve an honest comparison between estimated, scheduled, tracked,
+   focused, observed, and verified time.
+4. Let the user understand and classify locally observed application and
+   website activity without surrendering privacy.
+5. Reduce daily reconciliation to a short, comprehensible review.
+6. Produce week and month reports that lead to a realistic planning change.
+7. Work fully offline with user-controlled local storage, backup, and export.
+
+### 2.2 Non-goals
+
+Fruit is not intended to provide:
+
+- team projects, assignments, comments, shared workspaces, or manager reports;
+- cloud accounts, cross-device synchronization, or a hosted dashboard;
+- billing, invoicing, timesheets for clients, or payroll;
+- website blocking, punishment, or enforced focus;
+- screenshots, keystroke capture, page-content capture, or surveillance;
+- a general calendar replacement;
+- an opaque AI productivity score; or
+- a mobile application in the initial product.
+
+---
+
+## 3. User and operating assumptions
+
+### 3.1 Primary user
+
+A single privacy-conscious knowledge worker on a Windows computer who manages
+several personal or professional projects and wants to understand the gap
+between intention and actual attention.
+
+### 3.2 Assumptions
+
+- One local person uses one Fruit profile.
+- The system timezone and first day of week are configurable.
+- The user may work away from the computer and must be able to add time manually.
+- The user sometimes forgets to start a timer.
+- Activity capture may be disabled, paused, incomplete, or unavailable.
+- A browser application alone is not meaningfully Productive or Distracting;
+  website context usually provides the more specific rule.
+- The user is willing to make classification decisions when the product keeps
+  them concise and remembers prospective rules.
+- No network connection is required for any P0 use case.
+
+---
+
+## 4. Product principles translated into requirements
+
+| Principle | Product requirement |
 |---|---|
-| **Fruit v2** (built, in this repo) | The Plan→Track→Reconcile→Calibrate loop, plan/record separation, drift, the timer state machine, privacy architecture, the testable core |
-| **The workbook** (client's Excel) | The 24-hour day table, life areas, targets vs actual, monthly reporting, the Excel export format |
-| **Rize** | Automatic PC activity observation, including browser domains |
-| **Super Productivity** | Projects, tasks, estimates, timers |
-
-The plan reorders the product around the workbook's day table. That is the
-single biggest change: **the Planner stops being the primary screen.**
-
----
-
-## 1. What does the app do?
-
-> **A local-first Windows application that shows how the user planned to spend
-> the month, what they actually did across work and life, where PC
-> entertainment displaced intention, and how to make the next plan more
-> realistic.**
-
-### The primary outcome
-
-**Reduce unplanned PC entertainment**, while producing a trustworthy monthly
-account of work, personal activities, sleep/rest, and unaccounted time.
-
-That is a behaviour-change goal, not a reporting goal, and it is what
-distinguishes this product from a time tracker. The reports exist to make the
-behaviour visible; the Day view exists to make the record cheap enough to keep.
-
-### Secondary outcomes
-
-- More accurate project estimates, via planned-versus-tracked drift.
-- Less daily effort to maintain the monthly record than the workbook costs today.
-- One offline replacement for tracking currently spread across several tools.
-- The user's existing Excel reporting workflow preserved.
-
-### The loop
-
-```
-PLAN ──▶ TRACK ──▶ RECONCILE ──▶ CALIBRATE ──▶ PLAN BETTER
-  │        │           │             │
-  │        │           │             └─ estimate accuracy, recurring patterns
-  │        │           └─ confirm gaps, overruns, unplanned and observed-only time
-  │        └─ timers, manual life entries, and automatic PC observation
-  └─ projects, tasks, life targets, scheduled blocks
-```
-
-### What it deliberately does not do
-
-No sync, accounts, cloud, web, mobile, macOS or Linux. No collaboration, team
-workspaces, or manager reporting. No personal-notes system, wiki, Markdown
-editor, or Obsidian integration. No role/KPI/value scoring. No expense, loan or
-income tracking. No AI scheduling. No telemetry or crash uploads. No calendar
-write-back, plugin API, website blocking, or tamper prevention.
+| Local ownership | Core data is stored locally; no account or remote service is required. |
+| User authority | Only the user verifies sessions and completes tasks. |
+| Honest layers | Planned, tracked, observed, and verified values are visually and semantically distinct. |
+| Low maintenance | Common actions are available inline and from the keyboard. |
+| Calm feedback | No streak loss, shame language, or coercive notifications. |
+| Explainable reports | Every conclusion and chart can reveal its formula and source records. |
+| Privacy before storage | Exclusions and capture-level limits run before activity is persisted. |
+| Reversibility | Classification, completion, archive, and review actions can be corrected without destroying history. |
 
 ---
 
-## 2. Who uses it?
+## 5. Information architecture
 
-A **privacy-conscious solo knowledge worker on Windows** who plans and reports
-their own time, and who wants both project tracking and a broader account of
-where their life's hours go.
+### 5.1 Primary navigation
 
-They:
+The global navigation order is:
 
-- want automatic evidence of PC use, but the final say on every classification;
-- use the keyboard heavily and will learn shortcuts;
-- need tasks only to support planning and tracking — not GTD, not kanban;
-- need a **detailed day** for correction and a **month-first dashboard** for
-  seeing patterns;
-- expect every byte of activity data to stay on the machine.
+1. **Today** — default launch destination.
+2. **Projects** — portfolio and project task management.
+3. **Activity** — observed applications and websites.
+4. **Reports** — Week and Month reflection.
+5. **Review** — daily reconciliation queue.
+6. **Settings** — privacy, capture, behavior, data, and appearance.
 
-### The primary task
+### 5.2 Persistent shell
 
-> **Plan the month. During each day, let the timer and the observer do most of
-> the recording. At the end of the day, spend ninety seconds confirming what
-> the app got right and filling in what it could not see.**
+The shell contains:
 
-The design target for daily reconciliation is **90 seconds**; the accepted
-ceiling after the learning period is **five minutes**. If reconciliation stops
-happening, the monthly account stops being trustworthy and the product's whole
-claim fails — so every feature is judged partly on whether it makes those
-ninety seconds shorter.
+- product mark and navigation;
+- local date/time context;
+- global quick capture;
+- active task timer with elapsed time and Stop;
+- active focus state when applicable;
+- activity-capture state;
+- unresolved review count; and
+- an explicit Offline / Local-only status in onboarding and Settings.
 
-### Non-users
+The active timer remains visible when changing routes. Navigating never stops a
+timer, focus interval, or activity capture.
 
-Teams, managers reporting on someone else's time, anyone wanting automated
-tracking with no confirmation step. Observation never becomes a confirmed
-record on its own.
+### 5.3 Global commands
 
----
+| Command | Default shortcut | Behavior |
+|---|---:|---|
+| Quick capture task | `Ctrl+N` | Opens compact capture with title focused. |
+| Search/jump | `Ctrl+K` | Searches projects and tasks and navigates locally. |
+| Start/stop selected task | `Space` when row-focused | Starts the task or requests confirmation to switch from another running task. |
+| Start/stop focus | `F` when a task is running | Toggles focus within the active session. |
+| Go to Today | `G`, then `T` | Opens Today with the current date selected. |
+| Go to Projects | `G`, then `P` | Opens Projects. |
+| Go to Activity | `G`, then `A` | Opens Activity for today. |
+| Go to Reports | `G`, then `R` | Opens the current week report. |
+| Undo last reversible action | `Ctrl+Z` | Restores the most recent supported local mutation. |
 
-## 3. What are the key screens?
-
-Navigation order, which is also priority order:
-
-**Day · Planner · Projects/Tasks · Activity · Reports · Settings**
-
-Persistent shell throughout: timer chip, OFFLINE indicator, Recording
-indicator, Reconcile action, Focus action.
-
-### 3.1 Day view — the primary operational screen
-
-A complete 24-hour table for one date, modelled on the workbook's time grid.
-This is where the user spends their reconciliation time, and it is the screen
-the product is organised around.
-
-- **One row per 30-minute slot** by default; zoom to 5, 15, 30 or 60 minutes
-  **without changing stored precision**. The slot size is a lens, never a
-  quantisation of the data.
-- **Aligned layers per row**: planned block · confirmed actual (project/task or
-  life activity) · observed PC app/domain · classification.
-- **All 24 hours are always present, including empty ones.** Empty time is a
-  real state with its own visual treatment. It is never silently rendered as
-  "None", and it never disappears because nothing happened.
-- Non-colour indicators for planned, confirmed, observed, idle, private and
-  empty — the states must survive a greyscale screenshot.
-- Current-day and current-time marker.
-- Editing: drag, keyboard, split, merge, fill, repeat, multi-select.
-- **Filling an interval records either kind of confirmed time**: a life area, or
-  **work on a project/task**. Both are confirmed records, both appear in the same
-  Actual column, and the Day view is where a gap is noticed — so both have to be
-  reachable from the gap. Work done away from this PC is the ordinary case, not
-  the exception: another machine, an offline meeting, a task done on paper. The
-  observer cannot see any of it, which is precisely why the manual path must be
-  as short as the automatic one.
-- **Start and end are typed, not only nudged.** A stepper that moves in fixed
-  increments is fine for trimming what the app already guessed; it is the wrong
-  control for entering a two-hour meeting that ran 14:20 to 16:05. Both are
-  offered: type the times, or nudge them.
-- Selected-day totals: work, each life area, sleep/rest, entertainment, PC use,
-  and gaps.
-- Filters: project, life area, work contribution, entertainment, confidence
-  state.
-- Previous/next date and "go to today".
-
-### 3.2 Planner — secondary
-
-The existing 24-hour planning grid, at **1-day, 3-day, 7-day and month** spans.
-Blocks are intentions; actual sessions draw a drift rail against them. Drag and
-resize with 15-minute snap and full keyboard equivalents. Fixed and repeating
-blocks. Planned-but-unstarted and unplanned-but-tracked both stay visible.
-
-*(**Revised after use.** This document previously dropped the 1-day span on the
-reasoning that "the Day view replaces it and does more". Using the built app
-showed that reasoning to be wrong, and the distinction is worth writing down:
-the Day view is a **ledger** — a fixed 24-hour table you read down and correct,
-one row per slot. The Planner's 1-day span is a **canvas** — you drag a block
-onto it, resize it, push it later. Those are different jobs, and the Day view
-does not in fact do the second one. Removing the span would take away the only
-place a single day can be laid out by hand. It stays.)*
-
-### 3.3 Projects and tasks
-
-Projects with colour, archive state, weekly/monthly target and **one compact
-plain-text note**. Tasks with title, project, status, estimate, priority, due
-date/time, tags and **one compact plain-text note**. Subtasks to three levels,
-tracked independently, rolled up for display. Backlog groups: Overdue · Today ·
-This week · No date · Someday · Completed. Quick capture, timer, manual session
-correction, Pomodoro and Focus.
-
-No wiki, no Markdown editor, no attachments, no general notes area.
-
-### 3.4 Activity
-
-Opt-in foreground application and idle observation. **Window titles are a
-separate control, off by default.** A local browser-domain connector for
-supported browsers, communicating only with the local application. An
-against-the-plan view showing which apps and domains appeared during a planned
-block. Per-app and per-domain totals on the same time axis as the Planner.
-Exclusions applied before storage, retention choices, a pause that survives
-restart, delete-recent and delete-all.
-
-### 3.5 Reports and reconciliation
-
-**Dashboards and reports open to the month horizon by default**, with day and
-week drill-down. Daily reconciliation covering overruns, unstarted plans,
-unplanned work, observed-only PC time and empty hours. Trailing 30-day estimate
-calibration (median ratio, minimum sample threshold). Planned vs tracked by
-project and week. Life-area and sleep/rest target vs actual. Planned vs
-unplanned entertainment with YouTube/Twitch trends. Work contribution
-summaries — **which never apply to personal time**.
-
-**The week horizon** (planned — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md)):
-a goal is a target with a **direction**, so "at most 5h of entertainment" is a
-goal you succeed at by being under it rather than a bar you are failing to fill.
-Reported by **pace** rather than as a scoreboard — where you should be right now,
-and what the rest of the week has to look like. Fragmentation reported as its
-components — longest unbroken stretch, planned versus unplanned switches, time in
-fragments — and deliberately **not** synthesised into a score, because every other
-number in this app can be checked by hand. A weekly review and report artifact,
-read at a fixed moment, headline first. Next week's goals pre-filled from what
-happened, at the same n ≥ 5 median discipline the estimate calibration uses.
-
-**Observation categories are user-definable** (built, migration 0007). The fixed
-`core`/`entertainment`/`other` split becomes a table a user can extend, spanning
-**both applications and domains**, with a `counts_as` roll-up so adding a category
-never moves an existing total. This is the one place the plan changes an existing
-component rather than adding beside it, and it is there because the most valuable
-thing in the source review was a category its user invented to answer a question
-no shipped report could have anticipated.
-
-An **off-plan nudge** — "you are on youtube.com during a block you plotted for the
-auth refactor" — silenceable for the session and never fired on time nobody
-plotted. It is a notice, not a block: Fruit will not close a tab or deny a
-navigation, and the connector has no `host_permissions` with which to try.
-
-Blocking, focus scores, per-URL rules, focus sounds, billing and team visibility
-are out of scope; see the plan document for why each was rejected rather than
-deferred.
-
-### 3.6 Settings
-
-General · Planner/month · Timer · Pomodoro · Activity privacy · Entertainment
-rules · Data and backup · Excel · Shortcuts · About.
-
-One command registry powers the palette, the keyboard handler and the shortcut
-sheet, so an action that is not reachable both ways cannot exist.
+Shortcuts must not fire while the user is typing in a text field unless the
+shortcut explicitly includes a modifier.
 
 ---
 
-## 4. What data does it handle?
+## 6. First-run onboarding
 
-### 4.1 Four record types, one timeline
+### 6.1 Onboarding goals
 
-This is the central data decision and everything else follows from it.
+Onboarding explains the local-only promise, establishes essential settings, and
+gets the user to a useful Today screen without demanding activity permissions.
 
-| Record | Meaning | Confirmed actual time? |
-|---|---|---|
-| `scheduled_block` | What the user intended to do, and when | **No** — it is the plan |
-| `time_session` | Confirmed work on a project/task | **Yes** |
-| `life_entry` | Confirmed non-work time: life area, sleep/rest, routine | **Yes** |
-| `activity_span` | Automatic foreground app/domain observation | **Observed only** — confirmed only by reconciliation or an explicit rule |
+### 6.2 Flow
 
-**Precedence when sources overlap:**
+1. **Welcome and local guarantee**
+   - Explain that data stays on the computer.
+   - Show the local data directory and a link to change it when supported.
+2. **Workweek preferences**
+   - Timezone, first day of week, preferred workday start/end, daily work target.
+3. **Starter planning choice**
+   - Start empty or create an optional private starter project with example tasks.
+4. **Activity capture choice**
+   - Enable later, enable application-only capture, or begin browser connector
+     setup.
+   - Explicitly state what is and is not captured.
+5. **Backup reminder**
+   - Choose a local backup folder now or defer.
+6. **Open Today**
+   - Focus the first task capture action.
 
-1. confirmed `life_entry`
-2. confirmed `time_session`
-3. observed `activity_span`
-4. empty / unaccounted
+Activity capture is opt-in. Declining it does not reduce project, timer, review,
+or task-report functionality.
 
-The planned block is a **separate overlay** and is never substituted for actual
-time. An observation overlapping a confirmed session **enriches** it with
-application evidence — it does not add a second duration.
+### 6.3 Acceptance criteria
 
-### 4.2 The counting invariant
-
-> For any local date, the confirmed, observed-only, idle, private and empty
-> durations **sum to exactly the length of that day** — 24 hours, or 23 or 25
-> across a DST transition — and no interval is counted twice.
-
-This is enforced in the core as a property test over random overlapping
-records, not asserted in the UI. It is the technical form of the product's
-promise, and MVP acceptance criteria 2, 4 and 8 all reduce to it.
-
-### 4.3 Required slot states
-
-Every Day-view slot can visibly be:
-
-planned and completed as intended · planned with overrun · planned with
-underrun · planned but never started · unplanned confirmed activity ·
-observed but unconfirmed · idle/away · sleep/rest · intentionally
-private/untracked · **empty/unaccounted**.
-
-Empty time stays visible until the user fills it, marks it private, or
-deliberately accepts the gap.
-
-### 4.4 Entity map
-
-```
-    ┌──────────┐                      ┌────────────┐
-    │ project  │ target               │ life_area  │ target, kind, colour
-    └────┬─────┘                      └─────┬──────┘
-         │ 0..1                             │ 1
-    ┌────▼─────┐   ┌─────┐                  │
- ┌──│   task   │──▶│ tag │            ┌─────▼──────┐
- └─▶│          │   └─────┘            │ life_entry │  CONFIRMED LIFE TIME
-    └──┬────┬──┘                      │ is_private │
-       │    └──▶ note (plain text)    └────────────┘
-       │ 0..n
-┌──────▼──────────┐  block_id  ┌────────────────┐
-│ scheduled_block │◀───────────│  time_session  │  CONFIRMED WORK TIME
-│  THE PLAN       │  nullable  │  contribution  │
-└─────────────────┘            └───────┬────────┘
-                                       │ running_session_id
-  ┌───────────────┐  ┌──────────────┐  │  ┌────────────┐
-  │  day_review   │  │ activity_span│  └─▶│ app_state  │
-  │ 1 per date    │  │ OBSERVED     │     └────────────┘
-  └───────────────┘  │ app, domain, │
-                     │ category     │     ┌────────────┐
-                     └──────────────┘     │  setting   │
-                                          └────────────┘
-```
-
-### 4.5 Entities
-
-| Entity | Answers | Key fields |
-|---|---|---|
-| `project` | what body of work | `name`, `colour`, `weekly_target_sec`, `monthly_target_sec`, `note`, `is_archived` |
-| `task` | what am I trying to get done | `title`, `status`, `estimate_sec`, `is_rollover`, `due_date`/`due_at`, `priority`, `parent_id`, `note` |
-| `tag` / `task_tag` | what kind of work | a real table — renamable and queryable |
-| **`life_area`** | which part of life | `name`, `colour`, `kind` (core / entertainment / rest / other), `monthly_target_sec` |
-| `scheduled_block` | **what I meant to do, and when** | `starts_at`, `duration_sec`, `local_date`, `tz`, `is_fixed`, `rrule`, `series_id`, `external_uid` |
-| `time_session` | **confirmed work** | `started_at`, `ended_at`, `elapsed_sec`, `heartbeat_at`, `source`, `contribution`, `block_id` |
-| **`life_entry`** | **confirmed non-work time** | `life_area_id`, `label`, `started_at`, `ended_at`, `local_date`, `tz`, `is_private`, `note` |
-| `activity_span` | **observed PC use** | `started_at`, `ended_at`, `app_id`, `window_title`, `domain`, `category`, `is_idle` |
-| `day_review` | this day is reconciled | one row per local date, plus the day's totals |
-| `app_state` | is a timer running | singleton |
-| `setting` | preferences, rules, undo tombstones | typed key/value |
-
-**Default life areas**, from the workbook: Personal/Spiritual · Family ·
-Wellbeing · Personal Development · Community Participation · Side Gig/Personal
-Admin · Friendship · Team Time · Fun · Sleep/Rest. Users may add their own.
-
-**Work contribution modes**, work records only: None · Attend · Support · Own ·
-Assist. Converting a work record to a life entry clears its contribution after
-confirmation. Life-area reports never group by contribution.
-
-### 4.6 Data rules
-
-1. Instants are `INTEGER` milliseconds, UTC.
-2. Calendar dates are `TEXT 'YYYY-MM-DD'`, **local**.
-3. Durations are `INTEGER` seconds.
-4. Ids are UUIDv7.
-5. Anything derivable is derived; caches are rebuildable from source records.
-6. Deletes are soft, with one documented exception (sessions carry a tombstone).
-7. **Plans and records never merge.**
-8. **The four record types never merge**, and precedence resolves overlap at
-   read time rather than by mutating anything.
-9. A session covers one contiguous *awake* interval.
-10. Activity exclusions are applied **before storage**, never on read.
-
-### 4.7 Entertainment classification
-
-`youtube.com`, `youtu.be` and `twitch.tv` are Entertainment by default, applied
-to observed browser time when domain tracking is on. The user can override any
-interval, domain, application, project, task or recurring pattern. A correction
-may create a **prospective** local rule; it never rewrites prior records
-without confirmation.
-
-Full URLs, page contents, searches, messages and video titles are **not
-required for the default rule and are not stored by default.**
-
-### 4.8 Data in and out — Excel first
-
-**Export** is a real `.xlsx` workbook: a month sheet visually close to the
-client's workbook, the complete time matrix *including blank slots*, daily and
-weekly totals, work by project/task and contribution, life-area and sleep/rest
-target vs actual, core / planned-entertainment / unplanned-entertainment /
-YouTube-Twitch totals, auditable formulas, and a note identifying which records
-are confirmed, observed or imported.
-
-**The export must never depend on cell fill colours for calculation.** Colour
-communicates category; structured values produce totals. Correcting that is one
-of the main reasons to replace the workbook.
-
-**Import** starts with a mapping and variance preview, never alters the source
-file, and requires the user to resolve duplicate or inconsistent periods before
-commit. **JSON** remains the exact backup/restore format. **CSV** is secondary.
-Automatic local snapshots daily, seven retained.
+- The user can complete onboarding with networking disabled.
+- No capture adapter starts before explicit consent.
+- Closing onboarding saves progress and can resume safely.
+- Every choice remains editable in Settings.
 
 ---
 
-## 5. What are the constraints?
+## 7. Today page
 
-### 5.1 Platform
+### 7.1 Purpose
 
-Windows 10+ only for MVP. macOS and Linux are explicitly out of scope. The
-existing cross-platform code is retained but untested and unsupported — see
-§5.8.
+Today answers: **What matters now, when will I do it, and am I tracking it?**
 
-### 5.2 Stack
+### 7.2 Layout
 
+```text
+┌────────────────────── This week ───────────────────┬─ Week allocation ─┐
+│ Mon  Tue  Wed  Thu  Fri  Sat  Sun                  │ verified/pending  │
+├────────────────────────────────┬────────────────────────────────────────┤
+│ Tasks for selected day         │ Schedule for selected day              │
+│ Top 3                          │ vertical timeline                       │
+│ More for today                 │ scheduled blocks                       │
+│ Completed (collapsed)          │ current-time line                      │
+│ Tomorrow preview               │ active timer/focus state               │
+└────────────────────────────────┴────────────────────────────────────────┘
 ```
-UI          React 19 · TypeScript · Vite · Zustand · Tailwind v4
-Desktop     Tauri v2
-Core        Rust, no UI dependency — fruit-core
-Storage     Embedded SQLite (rusqlite, bundled), forward-only migrations
-Browser     Minimal local Chrome/Edge connector          — MV3 extension + native-messaging host
-Export      Offline XLSX generation + JSON backup        — rust_xlsxwriter
-Infra       None. No backend, account, telemetry, CDN or database server.
+
+### 7.3 Week strip requirements
+
+- Defaults to the week containing today.
+- Selecting a day updates both tasks and schedule.
+- Each day displays independent states for:
+  - distinct tasks planned;
+  - distinct tasks with tracked time;
+  - tasks completed on that date;
+  - planned tasks with no tracked session;
+  - today; and
+  - selected date.
+- Activity intensity uses distinct tracked task count, not session count.
+- Completion uses a separate check and count.
+- Status is readable without color and has an accessible label.
+- Previous/next week navigation does not change the report period.
+
+### 7.4 Task groups
+
+**Top 3** contains at most three daily plan items. **More for today** contains
+additional planned tasks. **Completed** is collapsed by default. **Tomorrow
+preview** is read-only except for opening the task.
+
+Each active task row supports:
+
+- completion checkbox;
+- title and project identity;
+- estimate and tracked total;
+- intended date and scheduled time, when present;
+- Start or Stop action;
+- focus indicator when the active task is in focus;
+- overflow menu for edit, schedule, move, remove from day, and archive; and
+- drag handle plus keyboard reorder for daily rank.
+
+### 7.5 Quick capture
+
+Minimum input is a title. Optional fields are project, estimate, intended date,
+priority, and scheduled start. Capture from Today defaults the intended date to
+the selected date; capture from another page defaults to Inbox with no date.
+
+The task appears immediately after a successful local transaction. Invalid
+optional syntax never discards the typed title.
+
+### 7.6 Schedule
+
+- Shows the same date selected in the week strip.
+- Supports creating, moving, resizing, and deleting task blocks.
+- Allows multiple blocks for one task across dates.
+- Snaps to 15 minutes by default with a five-minute precision option.
+- Shows estimate, scheduled total, and difference without forcing equality.
+- A block can start its linked task but never starts automatically.
+- Moving a block changes the plan only.
+- Past blocks remain visible and visually distinct from tracked sessions.
+- Current-time marker appears only when viewing today.
+- Overlapping blocks are allowed with a warning because plans can conflict.
+
+### 7.7 Timer and focus behavior
+
+- Only one task session can run at a time.
+- Starting another task offers **Stop and switch** or **Cancel**.
+- Stopping closes the session at the host timestamp.
+- Starting the same task again creates a new session.
+- Focus can start only during a running task session.
+- Stopping a session closes its active focus interval.
+- App restart recovers a running session and asks the user to confirm or edit
+  implausibly long elapsed time.
+
+### 7.8 Empty and attention states
+
+- No tasks: invite quick capture or selection from Projects.
+- Planned but untracked day: show a neutral “No task time tracked yet” reminder.
+- Timer running beyond scheduled block: show overrun without stopping it.
+- Activity capture disabled: do not present the day as missing evidence; state
+  that observation is off.
+- Selected historical day: Start remains available but warns that a new session
+  records now, not in the past.
+
+---
+
+## 8. Projects page
+
+### 8.1 Purpose
+
+Projects is the durable planning and management surface. It answers: **What
+outcomes exist, what remains, and how much effort has the project consumed?**
+
+### 8.2 Portfolio view
+
+The left project navigation and main portfolio include:
+
+- Inbox;
+- active projects in manual order;
+- archived projects in a collapsed section;
+- local search;
+- New project action; and
+- recently archived/deleted recovery entry where applicable.
+
+Each project card or row shows:
+
+- name and color;
+- open and completed task counts;
+- remaining estimate;
+- future scheduled time;
+- tracked and verified time for the selected period;
+- last activity date; and
+- current running task indicator if relevant.
+
+The portfolio supports List and Compact views. It does not assign a synthetic
+percentage unless the denominator is explicit. Task-count progress and
+estimate-weighted progress, if shown, are labeled separately.
+
+### 8.3 Create project
+
+Required field:
+
+- name.
+
+Optional fields:
+
+- description;
+- color;
+- manual sort position; and
+- initial tasks.
+
+Rules:
+
+- trim leading/trailing whitespace;
+- reject a blank name;
+- prevent case-insensitive duplicate active names;
+- create locally in one transaction; and
+- open the new project page with task capture focused.
+
+### 8.4 Project detail
+
+Header actions:
+
+- edit name, description, and color;
+- create task;
+- choose summary period: This week, This month, All time;
+- archive/restore project; and
+- open project report filtered to this project.
+
+Summary metrics:
+
+- open tasks;
+- completed in selected period;
+- remaining estimate;
+- scheduled future time;
+- tracked time;
+- verified time;
+- focused time; and
+- pending-review time.
+
+Metrics clearly name the selected period. “Remaining estimate” is a current
+inventory measure and is not compared directly to period actuals.
+
+### 8.5 Project task groups
+
+Default groups:
+
+1. Overdue — intended date before today and not complete.
+2. Today — intended today or in today's daily plan.
+3. Upcoming — intended after today.
+4. No date — no intended date.
+5. Completed — completed tasks, newest first.
+
+The user can switch to a flat sortable list. Filters include status, intended
+date, priority, estimate range, tracked/untracked, reviewed/pending, and text.
+
+### 8.6 Task row behavior
+
+Each row supports:
+
+- select and multi-select;
+- complete/reopen;
+- inline title edit;
+- estimate edit;
+- intended-date picker;
+- scheduled-time summary;
+- tracked and verified totals;
+- Start/Stop;
+- open details;
+- move to another project;
+- archive; and
+- overflow actions.
+
+Bulk actions: set project, date, priority, archive, complete, and add/remove from
+selected day. Bulk completion asks for confirmation when any selected task has a
+running session.
+
+### 8.7 Task creation and editing
+
+Task fields:
+
+| Field | Required | Notes |
+|---|---:|---|
+| Title | Yes | Outcome-oriented plain text; maximum 500 characters. |
+| Project | Yes | Defaults to current project or Inbox. |
+| Notes | No | Local plain text/Markdown; no remote embeds. |
+| Estimate | No | Positive duration; displayed as unset rather than zero. |
+| Intended date | No | Planning date, not a deadline guarantee. |
+| Priority | No | None, Low, Medium, High. |
+| Parent task | No, P1 | Enables subtasks without separate timing semantics. |
+| Work kind | No | User-owned classification such as Deep Work or Admin. |
+| Daily rank | No | Top 3 or additional position for a specific date. |
+| Scheduled blocks | No | Zero or more independent planned intervals. |
+
+Changing a task never rewrites its sessions. Estimate changes are timestamped in
+history by P1 so calibration can distinguish original and current estimates.
+
+### 8.8 Archive, delete, and restore
+
+- Archive is the normal reversible removal action.
+- Archived projects and tasks retain all historical report contributions.
+- Restore returns the entity to active state without recreating records.
+- Permanent deletion is available only in Settings/Data or a deliberate danger
+  flow. It previews dependent records and offers a backup first.
+- Deleting a project with sessions must offer: cancel, archive, move tasks, or
+  permanently delete the entire dependency graph.
+
+### 8.9 Acceptance criteria
+
+- A project and ten tasks can be created without leaving Projects.
+- A task can be estimated, dated, scheduled, started, stopped, and completed
+  from the project workbench.
+- Multiple sessions appear under one task and sum correctly.
+- Archiving never removes historical time from reports.
+- Project totals equal the relevant task/session drill-down.
+- All actions persist across restart without network access.
+
+---
+
+## 9. Task detail and lifecycle
+
+### 9.1 Task detail sections
+
+- identity: title, project, status, priority;
+- plan: estimate, intended date, daily rank, scheduled blocks;
+- execution: active timer, tracked total, verified total, focus total;
+- sessions: chronological list with review state and edit action;
+- notes and subtasks;
+- history: created, moved, estimate changes, completion/reopen, archive; and
+- report link filtered to the task.
+
+### 9.2 State rules
+
+```text
+OPEN → IN_PROGRESS → COMPLETED
+  └────────────────→ COMPLETED
+COMPLETED → IN_PROGRESS when reopened
+ANY NON-ARCHIVED → ARCHIVED
 ```
 
-### 5.3 Architectural rules
+- First session moves Open to In progress.
+- Completion is explicit and permitted with pending review.
+- Completing a running task first asks whether to stop the session.
+- Reopening preserves completion history and all time records.
+- Scheduled blocks after completion remain history and can be removed manually.
 
-- The UI does not own elapsed time, execute SQL, or compute authoritative
-  totals.
-- Time, overlap, idle, recovery, recurrence, reconciliation and export
-  invariants live in the testable core.
-- Plans and records never merge; the four record types never merge.
-- Activity exclusions are applied before storage.
-- **No unexpected outbound network request, ever.**
-- Every derived summary can be regenerated from source records.
+### 9.3 Session editing
 
-The `fruit-core` / `src-tauri` split is load-bearing: because the core has no
-Tauri dependency, the counting invariant in §4.2 is a property test rather than
-something verified by clicking around an app on a machine with a webview.
+Allowed actions:
 
-### 5.4 Third-party integrations
+- edit start/end;
+- split at a chosen time;
+- merge adjacent sessions for the same task when no conflict exists;
+- reassign all or part to another task;
+- add a manual session;
+- void accidental time; and
+- verify or return to pending.
 
-| Integration | Direction | Notes |
-|---|---|---|
-| Windows foreground window + idle | Read | `GetForegroundWindow`, `QueryFullProcessImageNameW`, `GetLastInputInfo`. No permissions, no new crates. |
-| **Browser domain connector** | Read, local only | A minimal Chrome/Edge MV3 extension talking to the local app over **native messaging** — no listening socket, no host permissions, so it cannot read a page. **Required** for the YouTube/Twitch goal: application-level observation cannot distinguish them from any other tab. Built and spiked; see [`SPIKE-BROWSER-CONNECTOR.md`](SPIKE-BROWSER-CONNECTOR.md). |
-| `.ics` calendar files | **In only** | Local file, user-picked. No URL, no CalDAV, no account, no write-back. |
-| Excel `.xlsx` | In and out | Offline generation and parsing. No Office installation required. |
-| Everything else | — | None. |
+Edits touching a closed day reopen that day review. Voided sessions remain in
+audit history and can be restored until retention rules remove them.
 
-Fonts are bundled, never fetched — a font request is a network request.
+---
 
-### 5.5 Security and privacy
+## 10. Activity capture
 
-- No SQL reaches the renderer; `src/lib/ipc.ts` is the only path to the
-  backend and every command is typed and intent-based.
-- The capability file lists exactly the commands in use — no `sql:*`, no broad
-  `fs:*`. File pickers are Rust commands, so the webview receives a chosen path
-  and nothing else.
-- Explicit CSP, `default-src 'self'`, asset protocol disabled.
-- The browser connector is local-only, minimum-permission, and transmits a
-  **registrable domain and nothing else** — no URL, no query, no page content,
-  no title. The reduction happens twice: in the extension before anything is
-  sent, and again below the IPC boundary, because the extension is the part a
-  user can swap. It has its own switch, off even when application tracking is
-  on, and its own exclusion list matched after reduction so an entry covers
-  every subdomain. Its transport is native messaging rather than a localhost
-  port: an app badged OFFLINE cannot open a listening socket.
+### 10.1 Capture levels
 
-### 5.6 Performance and quality budgets
+| Level | Captured | Default |
+|---|---|---:|
+| Off | No foreground evidence | Available |
+| Applications | Foreground executable identity and active/idle boundaries | Opt-in |
+| Websites | Registrable domain while a supported browser is foreground | Separate opt-in |
+| Page identity | Normalized path/title label without query or fragment | Off; advanced opt-in |
+| Window title | Foreground window title | Off; advanced opt-in |
 
-| Budget | Target |
+Fruit never captures screenshots, keystrokes, clipboard content, page content,
+form values, search queries, full browser history, or microphone/camera data.
+
+### 10.2 Capture controls
+
+Global states:
+
+- Recording;
+- Paused until resumed;
+- Paused for a chosen duration;
+- Disabled; and
+- Needs attention because a connector or permission failed.
+
+Pause and resume create explicit capture boundaries. A paused interval does not
+pretend to be Unaccounted while the Activity page is presenting observation
+coverage; it is shown as Capture paused.
+
+### 10.3 Privacy exclusions
+
+Before storage, the user can exclude:
+
+- application identity;
+- domain;
+- page match pattern when enabled;
+- chosen clock schedule;
+- private interval started manually; and
+- all capture while a specific app is foreground.
+
+Exclusion choices are **Do not store detail**, not just hide in the interface.
+The timeline may retain a generic Private interval so period totals remain
+complete.
+
+### 10.4 Browser connector
+
+- Runs locally and communicates only with the desktop host.
+- Shows Connected, Disconnected, Unsupported, or Permission needed.
+- Sends an event only when active browser context changes or heartbeat/recovery
+  requires it.
+- Does not upload favicons or fetch remote metadata.
+- If disconnected, application capture continues and browser time remains known
+  only as browser-app time.
+
+### 10.5 Reliability
+
+- Foreground changes are reflected within a target of five seconds.
+- Idle threshold is configurable, default five minutes.
+- Suspend, sleep, shutdown, and clock changes close spans safely.
+- A crash can lose only the bounded in-memory batch; stale spans are recovered
+  conservatively and marked uncertain if necessary.
+- Observer failure never stops a deliberate task timer.
+
+---
+
+## 11. Activity page
+
+### 11.1 Purpose
+
+Activity answers: **Which applications and websites were active, when were they
+active, and how should that evidence be interpreted?**
+
+### 11.2 Page structure
+
+1. Date navigation and capture status.
+2. Coverage summary: observed, active, idle, private, paused, missing.
+3. Applications / Websites tabs with duration and share.
+4. Classification summary: Productive, Communication, Neutral, Distraction,
+   Private, Unclassified.
+5. Zoomable timeline.
+6. Selected-interval inspector.
+7. Classification rule manager.
+
+### 11.3 Source lists
+
+Application rows show icon when locally available, display name, duration,
+share of observed active time, effective classification mix, and rule state.
+
+Website rows show domain, local cached icon when available without a network
+request, duration, share, classification mix, and rule state.
+
+Sorting: duration, name, Productive duration, Distraction duration, and
+Unclassified duration. Filters: classification, source, minimum duration,
+task-session overlap, and text.
+
+Browser application time and website time overlap. The UI explicitly warns that
+their totals are alternate breakdowns and must not be added.
+
+### 11.4 Classification actions
+
+Quick labels:
+
+- Productive;
+- Communication;
+- Neutral;
+- Distraction;
+- Private; and
+- Clear / Unclassified.
+
+Every label action requires an explicit scope:
+
+1. **Only this selected interval** — creates an interval override.
+2. **Future activity from this app** — creates an application rule.
+3. **Future activity on this website** — creates a domain rule.
+4. **Future activity matching this page** — available only with page identity
+   enabled; creates a page rule.
+5. **Apply to a displayed historical range** — separate bulk action with impact
+   preview; never implied by creating a rule.
+
+Default from a timeline selection is interval-only. Default from a source-row
+rule control is future rule. Button text must include the scope.
+
+### 11.5 Rule precedence
+
+```text
+interval override > page rule > domain rule > application rule > unclassified
+```
+
+Examples:
+
+- Chrome = Neutral, `docs.example.com` = Productive: the domain wins.
+- `youtube.com` = Distraction, a selected lecture interval = Productive: the
+  interval override wins without changing YouTube's future rule.
+- Browser disconnected: only the browser application rule can apply.
+
+Conflicting rules are shown in the selected span inspector with the effective
+winner and reason.
+
+### 11.6 Timeline behavior
+
+- Default zoom shows the configured waking/work range; full 24 hours is
+  available.
+- Spans display application, website when known, classification, and task-timer
+  overlap.
+- Drag selection snaps to observed boundaries but permits manual precision.
+- Applying an interval label splits source spans without changing total time.
+- Multiple selected spans can be labeled together.
+- Private spans hide source identity immediately.
+- Idle and capture gaps cannot be labeled Productive or Distraction unless the
+  user first converts them to a manual work/life record in Review.
+
+### 11.7 Empty and error states
+
+- Capture disabled: explain how to enable it; do not call the day empty.
+- No observed activity: show whether the computer was off, capture paused, or
+  data is unavailable when known.
+- Browser connector missing: show application totals and connector setup.
+- Unclassified sources: prioritize by total duration to reduce review work.
+- Corrupt/invalid batch: isolate it, preserve valid data, and provide a local
+  diagnostic export without sensitive details by default.
+
+### 11.8 Acceptance criteria
+
+- The user can see all observed apps for a selected day and all supported
+  websites when connector data exists.
+- Labeling one website does not relabel the entire browser.
+- Interval-only classification does not create a future rule.
+- New rules do not silently rewrite history.
+- Productive observed time never becomes verified task time automatically.
+- All source totals and timeline spans reconcile to observed coverage.
+
+---
+
+## 12. Daily Review page
+
+### 12.1 Purpose
+
+Review turns plans, deliberate tracking, machine evidence, and manual life time
+into a record the user accepts.
+
+### 12.2 Review queue
+
+Prioritized items:
+
+1. recovered or implausibly long running sessions;
+2. overlapping verified work/life conflicts;
+3. closed task sessions pending verification;
+4. observed time that conflicts with the running task;
+5. long observed-only intervals;
+6. unclassified high-duration sources;
+7. unstarted scheduled blocks and large overruns; and
+8. unaccounted gaps.
+
+### 12.3 Aligned lanes
+
+- scheduled blocks;
+- tracked sessions;
+- focus intervals;
+- application/website evidence;
+- manual work and life entries;
+- private intervals; and
+- Day Ledger state.
+
+### 12.4 Session review actions
+
+- Verify as recorded.
+- Edit boundaries.
+- Split or merge.
+- Reassign to another task.
+- Add offline explanation.
+- Void accidental timer.
+- Classify selected evidence.
+- Create a separate future rule.
+- Mark sensitive interval private.
+
+The Verify action records the decision and evidence snapshot. Evidence can be
+absent; paper work and meetings remain verifiable by the user.
+
+### 12.5 Close day
+
+Closing the day means the user has seen the remaining gaps, not that every
+minute is categorized. The close confirmation shows:
+
+- verified work;
+- verified life/sleep;
+- private;
+- tracked pending;
+- observed unconfirmed;
+- unaccounted; and
+- review coverage percentage.
+
+Editing any source record later reopens affected days.
+
+---
+
+## 13. Reports page
+
+### 13.1 Purpose
+
+Reports answers: **What did this week or month say, how reliable is the record,
+and what should change next?**
+
+### 13.2 Period controls
+
+- Week / Month segmented control.
+- Previous, next, and Current period actions.
+- Date anchor picker.
+- Comparison: previous equivalent period or rolling four-period baseline.
+- Filters: project, task, work kind, classification, application, website, and
+  reviewed-only/all tracked.
+- Export visible report.
+
+Current incomplete periods show elapsed-day context. Future periods do not show
+fabricated zeros.
+
+### 13.3 Reading order
+
+1. What this period says.
+2. Core totals and review completeness.
+3. Against plan and goals.
+4. Shape of work and focus.
+5. Project/task allocation.
+6. Activity classification and source evidence.
+7. Full period allocation.
+8. Arithmetic and source drill-down.
+
+### 13.4 Core cards
+
+P0 cards:
+
+- verified work;
+- tracked pending;
+- focus time;
+- reviewed days / total elapsed days;
+- completed tasks;
+- average verified working day; and
+- full-period accounted percentage.
+
+Every card names its state. “Work” means verified work unless the user switches
+to an explicitly labeled tracked view.
+
+### 13.5 Report metrics and formulas
+
+| Metric | Definition |
 |---|---|
-| Cold start to interactive | < 1.5s |
-| **Day view, populated 24-hour day** | **< 100ms** |
-| **Month dashboard, populated 31-day month** | **< 250ms** |
-| Week load, 500 blocks | < 100ms |
-| Idle CPU, no timer and no sample due | ~0% |
-| Data loss after forced close, sleep/wake or restart with a running timer | none |
+| Verified work | Sum of non-overlapping verified task-session duration in period. |
+| Tracked pending | Closed, non-voided session duration not yet verified after ledger overlap resolution. |
+| Focus time | Focus-interval overlap within included verified sessions; never added to work total. |
+| Focus ratio | Verified focus time / verified work time with zero-denominator empty state. |
+| Average working day | Verified work / count of local dates with verified work. |
+| Scheduled time | Sum of scheduled-block overlap in period; can overlap and therefore also exposes conflicted scheduled time. |
+| Estimate variance | Verified duration − estimate for completed tasks in selected cohort. |
+| Estimate ratio | Verified duration / estimate, excluding unset or zero estimates. |
+| Plan adherence | Scheduled time with qualifying tracked overlap / eligible scheduled time; does not imply completion. |
+| Completion count | Tasks whose `completed_at` falls inside period. |
+| Longest task stretch | Longest continuous verified interval on one task after configured short-gap tolerance. |
+| Short-run time | Verified session duration occurring in runs below 15 minutes by default. |
+| Task switches | Transition between distinct task sessions within configured gap threshold. |
+| Observed context switches | Transition between effective app/domain context, reported separately from task switches. |
+| Productive observation | Active observed duration effectively classified Productive; evidence only. |
+| Distraction observation | Active observed duration effectively classified Distraction; evidence only. |
+| Observation coverage | Retained observed active/idle/private boundaries / eligible computer-on evidence window when measurable. |
+| Review completeness | Closed reviewed local days / elapsed local days in report scope, plus ledger-state breakdown. |
+| Accounted percentage | (verified work + verified life/sleep + private + intentionally accepted states) / exact period duration; component definition is displayed. |
 
-Full keyboard operation, visible focus, reduced-motion support, no important
-state by colour alone, usable from 960×640 and at 125% Windows text scaling.
+No metric silently treats scheduled blocks, checkboxes, or productive app labels
+as verified work.
 
-### 5.7 Success measures
+### 13.6 Weekly report
 
-Baselined over the first seven days of production use:
+The week view emphasizes actionability:
 
-1. ≥90% of active PC time observed automatically when Activity is enabled.
-2. ≥80% of waking time classified or deliberately left unaccounted by daily
-   reconciliation.
-3. Daily reconciliation ≤5 minutes after the learning period; target 90 seconds.
-4. Every 30-minute slot accounted for without double-counting.
-5. ≥95% correct YouTube/Twitch classification after user exceptions.
-6. A measurable four-week reduction in unplanned entertainment.
-7. Excel exports reconcile to application totals with no unexplained variance.
-8. The product works with no account, server or internet connection.
+- work hours by day;
+- daily target deviation;
+- focus sessions and average length;
+- planned vs tracked/verified by project;
+- Top 3 tracked/completed consistency;
+- longest uninterrupted task stretch;
+- short runs and task switches;
+- work timing and work outside preferred hours;
+- goal pacing for the remaining days;
+- Productive/Distraction evidence by day;
+- top applications and websites;
+- largest divergence from plan; and
+- one to three explainable conclusions.
 
-### 5.8 Open decisions
+### 13.7 Monthly report
 
-Carried from the plan's §17 and still unanswered. Defaults chosen for now are
-in bold; each is reversible.
+The month view emphasizes pattern and allocation:
 
-1. Windows-only, or must future macOS/Linux shape the architecture now?
-   *Working assumption:* **Windows-only for MVP, cross-platform code retained
-   but unsupported** — deleting it would cost more than leaving it.
-2. Supported browsers: Chrome, Edge, or both? *Working assumption:* **both**,
-   since a single Chromium extension covers them.
-3. Final contribution list, and what "None" means versus non-work time.
-   *Working assumption:* **None · Attend · Support · Own · Assist**, with
-   "None" meaning *work with no contribution mode recorded*, distinct from
-   non-work time, which has no contribution field at all.
-4. Day view default resolution and how empty time reads. *Working assumption:*
-   **30-minute rows; empty renders as a hatched, labelled "Unaccounted" row**,
-   because blank is indistinguishable from "not loaded".
-5. Entertainment intervention: notification-only, or a soft continue/cancel?
-   *Working assumption:* **notification-only for MVP.**
-6. Which historical month is the accepted Excel import/export reference?
-   **Blocked on the client.**
-7. Is the Fruit source in scope for reuse, or only its specification?
-   **Answered by the repository: the source exists here and is being reused.**
+- verified work and focus trend by week;
+- active and completed projects;
+- completed task volume;
+- estimate-calibration cohorts and sample size;
+- project and work-kind allocation;
+- productive/distraction trends;
+- day-of-week and time-of-day patterns;
+- reviewed-day consistency without streak framing;
+- life/sleep allocation where recorded;
+- goal result for completed weeks/month; and
+- comparison with previous month or rolling baseline.
+
+### 13.8 Conclusions
+
+Conclusions are generated from deterministic local rules in P0. Examples:
+
+- “You verified 3h 20m less work than your previous four-week average.”
+- “Project Atlas used 1.28× its completed-task estimates across 8 tasks.”
+- “Four scheduled blocks had no tracked session; open the blocks.”
+- “Distraction-classified activity was concentrated after 21:00.”
+
+Each statement includes period, comparison, sample size where relevant, and a
+drill-down. Fruit suppresses weak conclusions when data or review completeness
+is insufficient.
+
+### 13.9 Scores
+
+A composite score is P2 and excluded from the initial release. If added later,
+the complete formula, weights, completeness penalty, and source records must be
+visible. Reports must remain useful without it.
+
+### 13.10 Report drill-down
+
+- Clicking a bar or total opens the exact tasks, sessions, observations, days,
+  or gaps behind it.
+- The drill-down retains the report's period and filters.
+- Edited source data invalidates and refreshes affected metrics.
+- A visible breadcrumb returns to the original report state.
+
+### 13.11 Export
+
+P0:
+
+- CSV tables for tasks, sessions, activity summary, and metrics;
+- JSON report package with period, filters, timezone, completeness, formulas,
+  and source identifiers; and
+- print-friendly local HTML or PDF in P1.
+
+Export never requires upload. Private source detail is excluded by default.
+
+### 13.12 Acceptance criteria
+
+- Week and month totals derive from the same source records and terminology.
+- A full week allocation equals its exact local duration.
+- Pending and unreviewed data is visible and never merged into verified work.
+- Filters update every compatible card and chart consistently.
+- Every P0 headline drills down to its source.
+- Partial periods and incomplete review are clearly identified.
+- Exported totals match the visible report.
 
 ---
 
-## 6. Where the current build stands against this specification
+## 14. Goals and estimate calibration
 
-| Area | State |
+### 14.1 Directed goals
+
+Supported goal directions:
+
+- At least duration/count.
+- At most duration/count.
+
+Initial goal measures:
+
+- verified work;
+- verified focus;
+- selected project/work-kind time;
+- distraction observation;
+- sleep/rest life entry;
+- completed task count; and
+- closed review days.
+
+Pacing shows achieved, remaining, days remaining, and required average. At-most
+goals are not “behind” while below the cap.
+
+### 14.2 Calibration
+
+Calibration uses completed tasks with verified sessions and a positive estimate.
+It groups by estimate bucket and optionally project/work kind. The default
+statistic is median actual/estimate ratio. Minimum sample:
+
+- 5 comparable tasks for a tentative observation;
+- 10 for a recommendation.
+
+The user can open every source task. Fruit proposes an estimate adjustment but
+never edits future tasks automatically.
+
+---
+
+## 15. Settings
+
+### 15.1 General
+
+- timezone;
+- first day of week;
+- 12/24-hour time format;
+- preferred day start/end;
+- preferred work window;
+- daily work target;
+- idle threshold;
+- launch at login; and
+- minimize/close-to-tray behavior.
+
+### 15.2 Focus
+
+- default focus duration;
+- optional short/long break durations;
+- sound and local notification choices;
+- auto-start next focus interval, off by default; and
+- distraction notice, off by default and non-blocking.
+
+### 15.3 Activity and privacy
+
+- master capture toggle;
+- application capture;
+- browser connector status;
+- page-level capture;
+- window-title capture;
+- exclusions;
+- private schedules;
+- application/domain/page rules;
+- retention period; and
+- delete activity history by range/source.
+
+Changing capture detail affects future records. Historical deletion or
+reclassification is always a separate explicit action.
+
+### 15.4 Categories
+
+- work kinds;
+- life areas;
+- classification labels and colors while preserving stable semantic kinds; and
+- project colors.
+
+### 15.5 Data
+
+- local database location;
+- database size and observation record count;
+- create backup;
+- automatic local backup schedule;
+- restore backup;
+- export data;
+- retention cleanup preview; and
+- permanent deletion/reset.
+
+### 15.6 Appearance and accessibility
+
+- dark/light/system theme;
+- compact/comfortable density;
+- reduced motion;
+- high contrast;
+- week-strip intensity scale; and
+- chart pattern/label options independent of color.
+
+---
+
+## 16. Local data management
+
+### 16.1 Storage
+
+The production store is an embedded SQLite database managed by the desktop host.
+The web UI never accesses the database or filesystem directly.
+
+### 16.2 Backup
+
+A complete backup includes source records, rules, settings, schema version, and
+locally cached icons required to render saved identities. Derived caches may be
+excluded because they are rebuildable.
+
+Requirements:
+
+- transactional snapshot;
+- optional automatic daily/weekly local schedule;
+- retention count;
+- last successful backup visible;
+- restore validation before replacing current data;
+- safety backup of current data before restore; and
+- checksum plus schema compatibility validation.
+
+### 16.3 Export
+
+- Full structured JSON for portability.
+- CSV by major entity and report table.
+- Private intervals export without hidden source detail.
+- Observation export warns about sensitivity and supports date/source filters.
+- Export contains timezone and units.
+
+### 16.4 Retention and deletion
+
+- Tasks and verified work persist until explicitly deleted.
+- Raw observation retention is user-configurable; default proposed value is 180
+  days, pending user choice.
+- Aggregates derived solely from deleted raw evidence must either be rebuilt or
+  marked unavailable; they must not preserve secretly deleted detail.
+- Deletion preview states affected dates, durations, rules, reviews, and reports.
+- Secure deletion cannot be absolutely guaranteed on SSD/storage snapshots; the
+  product explains this limitation honestly.
+
+---
+
+## 17. Notifications and reminders
+
+All reminders are local and configurable.
+
+P0 notifications:
+
+- timer still running after configurable duration;
+- recovered running session after restart;
+- optional scheduled-block start reminder;
+- optional end-of-day review reminder; and
+- capture adapter needs attention.
+
+P1:
+
+- optional weekly review reminder;
+- optional long continuous-work break suggestion; and
+- optional mismatch notice when sustained Distraction evidence overlaps a focus
+  interval.
+
+Notifications never expose website/page detail on the lock screen by default.
+They do not block access or shame the user.
+
+---
+
+## 18. Accessibility and interaction quality
+
+### 18.1 Keyboard
+
+Every primary action is keyboard reachable with visible focus. Drag operations
+have equivalent move/resize/reorder commands.
+
+### 18.2 Screen readers
+
+- Week cells announce date, selected/today state, planned count, tracked count,
+  completed count, and pending count.
+- Charts have a text summary and data table.
+- Timer updates do not announce every second; status changes are announced.
+- Classification controls announce scope and current effective rule.
+
+### 18.3 Color and motion
+
+- No status depends only on color.
+- Productive and Distraction use text/icon/pattern in addition to hue.
+- Reduced-motion setting removes non-essential transitions.
+- Minimum text and control contrast follows WCAG 2.2 AA targets.
+
+### 18.4 Responsiveness
+
+Primary target is desktop width 1280px and above. At narrower widths, Today
+stacks tasks above schedule while preserving the common selected date. No P0
+action becomes hover-only.
+
+---
+
+## 19. Error, recovery, and diagnostic behavior
+
+### 19.1 General rules
+
+- Never discard typed task/project content after a recoverable error.
+- State whether an operation failed, remained pending, or was rolled back.
+- Use stable, non-technical messages with expandable local diagnostics.
+- Do not place sensitive activity names in generic logs.
+
+### 19.2 Recovery cases
+
+| Case | Required behavior |
 |---|---|
-| Core, schema, migrations, timers, recovery, backups | **Built** — Phase 2 complete |
-| Plan/record separation, drift, reconcile, calibration | **Built** |
-| Planner (1/3/7-day/month) | **Built**, all four spans. The 1-day span is **kept** — see §3.2; it is a canvas, and the Day view is a ledger. |
-| Projects, tasks, subtasks, estimates, backlog | **Built** |
-| Recurring blocks, `.ics` import | **Built** |
-| Activity: app observation, idle, exclusions, retention | **Built** |
-| Life areas and life entries | **Built** |
-| Work contribution modes | **Built** — on `time_session` only, so "never on personal time" is structural |
-| Day view | **Built** — the primary screen, at 5/15/30/60-minute resolution |
-| Month dashboard | **Built** — `get_month` is `get_day` summed, so the two cannot disagree |
-| Browser domain connector and entertainment rules | **Built** — three field assumptions remain, listed in the spike report |
-| Entertainment **budgets** | **Built** — a weekly goal with `direction = atMost`, migration 0008 |
-| Planned entertainment **windows** | **Not built** — the other half of M11 |
-| **Weekly goals and pacing** (W1/W2) | **Built** — migration 0008. Direction is first-class; the future is never a shortfall. |
-| The rest of the week horizon — fragmentation, weekly review and report, focus sessions, notices, templates | **Built** — [`PLAN-WEEKLY-GOALS.md`](PLAN-WEEKLY-GOALS.md) W3–W6, W9, W10. The report is an `.xlsx` and a card that waits until it has been read; not a PDF and not an email, because an offline app has no mailer. |
-| **User-defined observation categories** and the uncategorised surface | **Built** — migration 0007. Work · Study · Distraction · Life, extensible, per app **and** per site. `counts_as` keeps every existing total stable. |
-| **Focus sessions with an intended length**, extendable in one key | **Built** — W3. The intended length is a plotted block, so extending shows as an overrun rather than as a larger plan. |
-| **Off-plan nudge** (a notice, never a block) | **Built** — W5. Fires only during plotted time, and is silenceable for the session. |
-| Excel **export** | **Built** — three sheets, real formulas, a preview that is the sheet |
-| Excel **import** | **Built** (M13) — detection, then a mapping nobody can skip, then a signed per-day variance, then a commit that refuses while anything is unmapped or unresolved. Still unproven against the client's own workbook, which is open question 6 below. |
-| Task notes | **Plain text**, capped at 2000 characters (migration 0011). The renderer is gone; the column is called `body`, because one called `markdown` is a standing invitation to put the parser back. |
-
-### A sequencing correction to the plan
-
-The roadmap places the Day view in Phase 4 (weeks 6–7) and life entries in
-Phase 5 (week 8). That order cannot work: §8.1 requires the Day view to show
-"actual project/task **or life activity**", and acceptance criteria 1, 2 and 9
-all depend on life entries existing. The Day view built without them would show
-only work and empty hours, which is not the screen being specified.
-
-**`life_area` / `life_entry`, contribution modes, and the precedence engine
-must land before or with the Day view.** They are treated here as the first
-half of Phase 4 rather than as Phase 5, which does not change the delivery date
-— it moves work earlier that Phase 4 would otherwise have blocked on.
+| App crashes with timer open | Recover the open session; ask to keep, edit, or void if duration is suspicious. |
+| App sleeps with timer open | Preserve elapsed wall time and flag the sleep interval for review. |
+| Observer crashes | Continue timers; mark capture gap; restart adapter when safe. |
+| Browser connector disconnects | Continue app-level browser observation and show connector status. |
+| Database transaction fails | Roll back fully and keep UI draft/action recoverable. |
+| Migration fails | Preserve pre-migration backup and open recovery instructions. |
+| Disk full | Stop writing safely, warn immediately, and avoid claiming capture continuity. |
+| System clock changes | Use monotonic/runtime safeguards for running display and persisted UTC boundaries; flag anomalies. |
+| Corrupt backup | Refuse restore without changing current data. |
 
 ---
 
-## Related documents
+## 20. Non-functional requirements
 
-- [`ROADMAP.md`](ROADMAP.md) — the 12-week phases and what is done against them
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — why the layers and the time model are shaped this way
-- [`ACCEPTANCE.md`](ACCEPTANCE.md) — the 16 MVP criteria and what covers each
-- [`SPEC-DEVIATIONS.md`](SPEC-DEVIATIONS.md) — departures from the source specifications, and why
+### 20.1 Offline and network
+
+- All P0 workflows function with the network adapter disabled.
+- No telemetry, analytics, crash upload, ads, remote fonts, or remote AI.
+- Browser connector communicates only with the local native host.
+
+### 20.2 Performance targets
+
+- Warm launch to usable Today: under 2 seconds on the owner's target machine.
+- Common local command feedback: under 100 ms perceived, under 300 ms committed.
+- Today and project pages with 10,000 tasks: first useful render under 1 second
+  after database open using pagination/virtualization where needed.
+- Activity day with 50,000 raw spans: summary under 1 second from maintained
+  local aggregates; timeline progressively renders.
+- Week report: under 1 second when affected daily projections are cached.
+- Month report: under 2 seconds under normal personal data volume.
+- Idle background CPU target: below 1% average outside event bursts.
+- Memory target: below 200 MB in typical Today use, subject to measurement.
+
+### 20.3 Reliability
+
+- Timer transaction survives UI reload and route changes.
+- No single minute contributes to more than one Day Ledger accounting state.
+- Backups restore to equivalent canonical totals.
+- Database migrations are forward-only, versioned, and tested.
+
+### 20.4 Security
+
+- Least-privilege Tauri capabilities.
+- UI has no arbitrary shell or filesystem access.
+- Content Security Policy blocks remote content by default.
+- Local IPC validates all inputs.
+- Exclusion/privacy filters run before observation persistence.
+- Backup/export warns when destination is not private or removable where the OS
+  makes that detectable.
+
+---
+
+## 21. Functional requirement index
+
+| ID | Priority | Requirement |
+|---|---:|---|
+| FR-TOD-001 | P0 | Open to Today with current local date selected. |
+| FR-TOD-002 | P0 | Show separate weekday planned, tracked, and completed states. |
+| FR-TOD-003 | P0 | Manage Top 3 and additional daily tasks. |
+| FR-TOD-004 | P0 | Display and edit selected-day scheduled blocks. |
+| FR-PRJ-001 | P0 | Create, edit, order, archive, and restore projects. |
+| FR-PRJ-002 | P0 | Create and manage tasks inside a project or Inbox. |
+| FR-PRJ-003 | P0 | Group/filter/sort tasks without duplicating entities. |
+| FR-PRJ-004 | P0 | Preserve history when tasks move projects. |
+| FR-TSK-001 | P0 | Store estimate, intended date, priority, notes, and project. |
+| FR-TSK-002 | P0 | Support multiple scheduled blocks and sessions per task. |
+| FR-TSK-003 | P0 | Require explicit task completion and allow reopening. |
+| FR-TMR-001 | P0 | Permit exactly one running task session. |
+| FR-TMR-002 | P0 | Recover an open session after restart. |
+| FR-FOC-001 | P0 | Track focus intervals within a running session. |
+| FR-ACT-001 | P0 | Opt-in capture of foreground application and idle boundaries. |
+| FR-ACT-002 | P0 | Display application activity by day and timeline. |
+| FR-ACT-003 | P0 | Display domain activity when local browser connector is available. |
+| FR-ACT-004 | P0 | Label intervals and create separate future source rules. |
+| FR-ACT-005 | P0 | Apply page > domain > app specificity with interval override highest. |
+| FR-ACT-006 | P0 | Filter excluded/private detail before persistence. |
+| FR-REV-001 | P0 | Review and explicitly verify task sessions. |
+| FR-REV-002 | P0 | Build a complete non-double-counted Day Ledger. |
+| FR-REV-003 | P0 | Close and reopen day review without fabricating time. |
+| FR-RPT-001 | P0 | Provide consistent Week and Month reports. |
+| FR-RPT-002 | P0 | Show completeness and pending states on all work claims. |
+| FR-RPT-003 | P0 | Drill every P0 metric into source records. |
+| FR-RPT-004 | P0 | Compare period values using explicit equivalent boundaries. |
+| FR-RPT-005 | P0 | Export visible metrics and definitions locally. |
+| FR-DAT-001 | P0 | Persist canonical data in local SQLite. |
+| FR-DAT-002 | P0 | Create, validate, and restore local backups. |
+| FR-DAT-003 | P0 | Export user-owned structured data. |
+| FR-SET-001 | P0 | Configure capture, privacy, time, and data behavior locally. |
+| FR-ACC-001 | P0 | Provide keyboard and non-color equivalents for primary actions. |
+| FR-GOL-001 | P1 | Support at-least and at-most period goals. |
+| FR-CAL-001 | P1 | Produce sample-backed estimate calibration. |
+| FR-NTF-001 | P1 | Offer local, silenceable reminders. |
+
+---
+
+## 22. Critical business invariants
+
+1. Estimate, schedule, tracked session, focus, observation, verification, and
+   completion are different records.
+2. One task can have many sessions and many scheduled blocks.
+3. Only one task session runs at once.
+4. Focus time is contained in tracked time.
+5. Observation time is evidence and never automatically verified work.
+6. Productive classification is not task assignment or verification.
+7. The user explicitly verifies sessions and completes tasks.
+8. Rule changes are prospective unless historical scope is separately chosen.
+9. Interval override outranks page, domain, and application rules.
+10. Website context and browser application context describe overlapping time
+    and are never added together.
+11. Verified work/life, private, tracked pending, observed unconfirmed, and
+    unaccounted sum to the exact local period after overlap resolution.
+12. Archived entities continue contributing to historical reports.
+13. Source edits invalidate affected review and report projections.
+14. Private/excluded detail is filtered before storage where configured.
+15. No core workflow depends on a network response.
+
+---
+
+## 23. Delivery plan
+
+### Slice 1 — Today foundation (implemented prototype)
+
+- Tauri/React shell;
+- Today week strip and allocation;
+- starter task list and schedule;
+- basic task timer, completion, and local prototype repository; and
+- core projection tests.
+
+Prototype local storage is temporary and does not satisfy production persistence.
+
+### Slice 2 — Projects and production persistence
+
+- SQLite repository and migrations;
+- project portfolio and project detail;
+- full task create/edit/move/archive flows;
+- task detail and session history;
+- schedule editing and stable timer recovery; and
+- backup foundation.
+
+Exit criterion: the owner can manage real projects for seven days without data
+loss or a parallel task system.
+
+### Slice 3 — Reports foundation
+
+- metric registry and Day Ledger engine using task/session data;
+- week/month period shell;
+- verified/pending totals, project allocation, plan variance, focus, completion,
+  completeness, and drill-down; and
+- CSV/JSON report export.
+
+Exit criterion: task and session reports reconcile exactly with source records.
+
+### Slice 4 — Activity capture and classification
+
+- Windows application/idle adapter;
+- Activity applications view and timeline;
+- local browser connector and website view;
+- Productive/Communication/Neutral/Distraction/Private labels;
+- interval overrides and app/domain/page rule management; and
+- privacy exclusions and retention.
+
+Exit criterion: at least 90% of eligible active PC time is observed during a
+controlled day and classification scope behaves predictably.
+
+### Slice 5 — Reconciliation and integrated reports
+
+- aligned Daily Review;
+- verification/edit/split/reassign flows;
+- full 24-hour Day Ledger;
+- activity/report integration;
+- conclusions, goals, and calibration; and
+- complete backup/restore equivalence.
+
+Exit criterion: seven consecutive days can be reviewed in under five minutes
+each and the week report is trusted.
+
+### Slice 6 — Polish
+
+- accessibility and keyboard completion;
+- performance at long-history scale;
+- optional local notifications;
+- print/PDF report export; and
+- installer, update policy, and recovery documentation.
+
+---
+
+## 24. End-to-end acceptance scenarios
+
+### Scenario A — Project to completed verified task
+
+1. Create project “Personal Software.”
+2. Add task “Design activity labels,” estimate 2h, intended tomorrow.
+3. Add 10:00–12:00 block.
+4. Start at 10:08, focus 10:15–10:55, stop at 11:05.
+5. Start again at 14:00 and stop at 14:40.
+6. Review both sessions, inspect activity evidence, and verify them.
+7. Complete task.
+
+Expected:
+
+- estimate remains 2h;
+- schedule remains 2h;
+- tracked and verified equal 1h 37m;
+- focus equals 40m and is not added to tracked time;
+- task has two sessions;
+- completion is explicit; and
+- project/week/month drill-down shows the same records.
+
+### Scenario B — Forgotten timer discovered through Activity
+
+1. Work in an editor and documentation website for one hour without a timer.
+2. Open Activity; editor/domain evidence is visible.
+3. Label the selected documentation interval Productive only for that interval.
+4. In Review, create a manual session assigned to a task and verify it.
+
+Expected:
+
+- weekday strip originally shows planned-untracked;
+- Productive label alone does not create task time;
+- manual session becomes tracked/verified only after user action;
+- evidence remains linked by time overlap; and
+- the exact hour is counted once.
+
+### Scenario C — Browser rule specificity
+
+1. Set browser application to Neutral.
+2. Set `github.com` to Productive.
+3. Set `youtube.com` to Distraction.
+4. Label one YouTube lecture interval Productive without creating a page rule.
+
+Expected:
+
+- GitHub is Productive;
+- YouTube is Distraction generally;
+- selected lecture interval is Productive;
+- future YouTube remains Distraction; and
+- no browser/domain durations are double-counted.
+
+### Scenario D — Incomplete week report
+
+1. Open current week with two reviewed days, one pending session, and three
+   future days.
+
+Expected:
+
+- report states partial period and 2 reviewed elapsed days;
+- verified work excludes pending time;
+- pending time is adjacent and visible;
+- future days are not treated as zero-performance failures; and
+- comparison uses equivalent elapsed period when selected.
+
+### Scenario E — Backup and restore
+
+1. Create a backup after project, task, activity, rules, and reviews exist.
+2. Restore it into a clean local profile.
+
+Expected:
+
+- source counts and canonical totals match;
+- running session is not incorrectly resumed from backup;
+- rules and privacy settings are present;
+- cached report projections can rebuild; and
+- no network is used.
+
+---
+
+## 25. Product success criteria
+
+Because Fruit has no telemetry, these are owner-observed or locally computed:
+
+- Today becomes the primary daily planning surface.
+- The user creates and maintains real projects without a parallel task manager.
+- At least 90% of eligible active PC time is observed when capture is enabled.
+- At least 80% of waking time is verified, intentionally private, or
+  deliberately accepted as unaccounted during a seven-day trial.
+- Typical daily review approaches 90 seconds and remains below five minutes.
+- Week/month totals, source drill-down, backup, and exports reconcile.
+- The weekly report produces at least one accepted change to the next plan.
+- The user trusts the record enough to keep it locally over multiple months.
+
+---
+
+## 26. Open product decisions
+
+Decisions to validate during implementation without changing the core model:
+
+1. Default raw-observation retention: 90, 180, or unlimited days.
+2. Whether page identity uses normalized path, opt-in title, or both.
+3. Default idle threshold and how sleep intervals are proposed in Review.
+4. Whether Communication is a top-level quick label or a Productive subtype in
+   the first Activity release.
+5. Which completed-task window Projects expands by default.
+6. Whether manual task sorting and priority sorting can be combined clearly.
+7. Minimum sample and cohort strategy for estimate calibration.
+8. Exact print/PDF report design and whether it is P1 or P2.
+9. Installer/update method that preserves the no-silent-network promise.
+10. Whether recurring tasks enter P1 or remain out of scope.
+
+Until decided, implementation must preserve data compatibility and avoid
+silently choosing a privacy-expansive default.
+
+---
+
+## 27. Glossary
+
+| Term | Definition |
+|---|---|
+| Estimate | Expected effort for a task. |
+| Intended date | Date the user currently expects to work on a task. |
+| Scheduled block | Planned start/end time linked to a task. |
+| Task session | Deliberately tracked actual interval for one task. |
+| Focus interval | Deep-work interval contained inside a task session. |
+| Observation | Locally captured foreground application/website evidence. |
+| Classification | Productive, Communication, Neutral, Distraction, Private, or Unclassified meaning applied to evidence. |
+| Interval override | Classification for a selected historical span only. |
+| Source rule | Prospective application/domain/page classification. |
+| Verified session | Task session explicitly accepted by the user. |
+| Tracked pending | Closed session not yet verified. |
+| Observed unconfirmed | Evidence not converted to verified work/life or private. |
+| Unaccounted | Time with no retained or confirmed explanation. |
+| Day Ledger | Non-overlapping projection accounting for the exact local day. |
+| Review completeness | Visibility into which days and intervals received user judgment. |
+| Productive observation | Evidence classified Productive; not automatically verified work. |
+| Distraction observation | Evidence classified Distraction; not a moral judgment or blocker. |
+
+---
+
+## 28. Final product acceptance statement
+
+Fruit is ready for core personal use only when the owner can, entirely offline:
+
+1. create projects and tasks;
+2. estimate, date, prioritize, and schedule them;
+3. track tasks over multiple sessions and focus intervals;
+4. observe opted-in applications and websites locally;
+5. label evidence with clearly scoped interval decisions or future rules;
+6. review and verify the day's record without double-counting;
+7. complete outcomes independently of time spent;
+8. understand week and month results with visible completeness and arithmetic;
+9. drill every important claim into source records; and
+10. back up, restore, export, and delete the data without a service account.
+
+If any report requires hidden inference, any capture bypasses consent, or any
+core workflow fails offline, the product does not yet satisfy this specification.

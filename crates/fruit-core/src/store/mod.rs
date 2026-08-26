@@ -38,6 +38,7 @@ mod search;
 mod seed;
 mod task_categories;
 mod tasks;
+mod today;
 mod timer;
 mod week;
 mod import;

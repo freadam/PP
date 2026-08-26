@@ -802,6 +802,45 @@ fn clear_activity(state: State<'_, AppState>) -> Res<i64> {
     with(&state, |s| s.clear_activity())
 }
 
+// ─── the Today workspace (ARCHITECTURE §3.0, §7.5) ──────────────────────
+
+/// The default launch route. One composed DTO, so the launch screen is a
+/// single round trip rather than six — and so the week strip, the allocation
+/// donut, the task column and the schedule cannot be built from four different
+/// reads of a database that changed between them.
+#[tauri::command]
+fn today_workspace(state: State<'_, AppState>, date: String, tz: String) -> Res<TodayWorkspace> {
+    with(&state, |s| s.today_workspace(&date, &tz))
+}
+
+/// `AddTaskToDay` — promote or demote a task within one local day's list.
+/// Never touches the task's estimate, blocks, sessions or completion history
+/// (invariant 25).
+#[tauri::command]
+fn add_task_to_day(
+    state: State<'_, AppState>,
+    task_id: String,
+    date: String,
+    section: DaySection,
+) -> Res<()> {
+    with(&state, |s| s.add_task_to_day(&task_id, &date, section))
+}
+
+#[tauri::command]
+fn remove_task_from_day(state: State<'_, AppState>, task_id: String, date: String) -> Res<()> {
+    with(&state, |s| s.remove_task_from_day(&task_id, &date))
+}
+
+#[tauri::command]
+fn reorder_day_tasks(
+    state: State<'_, AppState>,
+    date: String,
+    section: DaySection,
+    task_ids: Vec<String>,
+) -> Res<()> {
+    with(&state, |s| s.reorder_day_tasks(&date, section, &task_ids))
+}
+
 // ─── the unified day and life time (Plan Rev 3 §7, §8.1) ───────────────
 
 /// The Day view: 24 hours of one date, with the four record types resolved
@@ -1385,6 +1424,10 @@ pub fn run() {
             get_reports,
             get_reconcile_items,
             get_day,
+            today_workspace,
+            add_task_to_day,
+            remove_task_from_day,
+            reorder_day_tasks,
             get_month,
             preview_excel,
             export_excel,

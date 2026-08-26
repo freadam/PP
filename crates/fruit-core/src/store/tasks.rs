@@ -27,7 +27,7 @@ const DONE_TAIL_LIMIT: u32 = 100;
 /// The projection every task read shares. `now_param` is the 1-based index of
 /// the "now" binding, so callers with a variable number of filter parameters
 /// can put it last instead of first.
-fn task_cols(now_param: usize) -> String {
+pub(crate) fn task_cols(now_param: usize) -> String {
     format!(
         "t.id, t.project_id, t.parent_id, t.title, t.status, t.estimate_sec, t.due_date, t.due_at,
          t.priority, t.energy, t.is_rollover, t.sort_rank, t.completed_at,
@@ -47,7 +47,7 @@ fn task_cols(now_param: usize) -> String {
 }
 
 impl Store {
-    fn map_task(row: &Row) -> rusqlite::Result<TaskRow> {
+    pub(crate) fn map_task(row: &Row) -> rusqlite::Result<TaskRow> {
         Ok(TaskRow {
             id: row.get(0)?,
             project_id: row.get(1)?,
@@ -80,7 +80,7 @@ impl Store {
 
     /// One extra query for the whole page rather than one per row — the week
     /// and list queries are budgeted in §7.1 and N+1 is how those budgets die.
-    fn attach_tags(&self, rows: &mut [TaskRow]) -> Result<()> {
+    pub(crate) fn attach_tags(&self, rows: &mut [TaskRow]) -> Result<()> {
         if rows.is_empty() {
             return Ok(());
         }
