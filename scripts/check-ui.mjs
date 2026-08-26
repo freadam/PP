@@ -80,11 +80,10 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
      reason that has nothing to do with the CSS. */
   for (const [view, key] of [
     ["Today", "t"],
-    ["Day", "d"],
-    ["Planner", "l"],
     ["Projects", "p"],
     ["Activity", "a"],
     ["Reports", "r"],
+    ["Review", "v"],
     ["Settings", "s"],
   ]) {
     await page.keyboard.press("g");
@@ -148,12 +147,73 @@ const browser = await chromium.launch(EXECUTABLE ? { executablePath: EXECUTABLE 
   await ctx.close();
 }
 
+/* ─── I8: the design system's own dimensions, measured live ────────────────
+   docs/DESIGN-SYSTEM.md is the extraction this product's look comes from, and
+   its numbers are contracts: 28px controls, 48px chrome, a 30px list-row
+   minimum, 20px status pills with a 6px dot, an 8px control radius.
+
+   Measured on the rendered page rather than grepped out of the stylesheet,
+   because the failure this catches is a component that quietly opts out — a
+   hardcoded `height: 52` in a new view, say — and that never shows up as a
+   changed token. Tokens being right is what `tokens.css` already guarantees;
+   this asserts the components actually spend them. */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await ctx.newPage();
+  await page.goto(URL, { waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+
+  const measured = await page.evaluate(() => {
+    const px = (v) => Math.round(parseFloat(v) || 0);
+    const one = (sel, fn) => {
+      const el = document.querySelector(sel);
+      return el ? fn(el, getComputedStyle(el)) : null;
+    };
+    return {
+      // 28px control metric. Buttons may exceed it (a wrapped label), never fall short.
+      button: one(".btn", (el) => Math.round(el.getBoundingClientRect().height)),
+      buttonRadius: one(".btn", (_, cs) => px(cs.borderTopLeftRadius)),
+      // 48px persistent chrome baseline.
+      topbar: one(".shell .topbar, .topbar", (el) => Math.round(el.getBoundingClientRect().height)),
+      // 30px quiet column-label band.
+      listHead: one(".group-head", (el) => Math.round(el.getBoundingClientRect().height)),
+      // Every list row that opts into the row contract.
+      rowMin: (() => {
+        const rows = [...document.querySelectorAll(".today-task")];
+        return rows.length ? Math.min(...rows.map((r) => Math.round(r.getBoundingClientRect().height))) : null;
+      })(),
+      // The font the whole system is specified in.
+      fontFamily: getComputedStyle(document.body).fontFamily,
+    };
+  });
+
+  const want = (name, got, pred, expected) =>
+    check(`I8 ${name}`, got === null || pred(got), `expected ${expected}, measured ${got}`);
+
+  want("controls are at least the 28px control metric", measured.button, (v) => v >= 28, ">= 28px");
+  want("controls use the 8px control radius", measured.buttonRadius, (v) => v === 8, "8px");
+  want("persistent chrome is the 48px baseline", measured.topbar, (v) => v === 48, "48px");
+  want("list headers are the 30px band", measured.listHead, (v) => v === 30, "30px");
+  want("list rows meet the 30px row minimum", measured.rowMin, (v) => v >= 30, ">= 30px");
+  check(
+    "I8 body is set in the Inter stack",
+    /Inter/i.test(measured.fontFamily),
+    measured.fontFamily,
+  );
+
+  await ctx.close();
+}
+
 // I5: the layout holds at each breakpoint, and at 125% text scaling.
 //
 // Every view, not just the one that happens to open first: Activity's timeline
 // and Settings' widest hint lines are the two most likely places for a stray
 // pixel of horizontal scroll, and neither is the default screen.
-const VIEWS = ["Today", "Day", "Planner", "Projects", "Activity", "Reports", "Settings"];
+// PRODUCT-SPEC §5.1's six destinations. The Planner is not among them — §14
+// folds it into Today — so it is measured separately below, by the keyboard
+// route that still reaches it rather than by a rail button that no longer
+// exists.
+const VIEWS = ["Today", "Projects", "Activity", "Reports", "Review", "Settings"];
 
 // The widths are the canonical breakpoint map's edges, plus one either side of
 // the 1200px tier: the detail panel and the backlog appear exactly there, so
@@ -189,6 +249,12 @@ for (const [width, height, scale] of [
     await page.click(`button[aria-label^="${view}"]`);
     await measure(view);
   }
+  // The expanded Today mode has no rail button; `G then L` still opens it and
+  // its layout has to hold at every width like any other surface.
+  await page.keyboard.press("g");
+  await page.keyboard.press("l");
+  await page.waitForTimeout(250);
+  await measure("Planner (expanded Today)");
   // Import and Export are reached from Reports rather than the rail, and both
   // are wide tables — the exact shape that overflows first.
   for (const label of ["Import a workbook", "Export month to Excel"]) {

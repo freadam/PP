@@ -35,12 +35,12 @@ export const COMMANDS: Command[] = [
   { id: "shortcuts", title: "Shortcut sheet", group: "Global", keys: "?", run: () => app().setOverlay("shortcuts") },
   { id: "undo", title: "Undo", group: "Global", keys: "⌘Z", run: () => void app().undo() },
   { id: "go-today", title: "Go to Today", group: "Global", keys: "G then T", run: () => app().go("today") },
-  { id: "go-day", title: "Go to Day", group: "Global", keys: "G then D", run: () => app().go("day") },
-  /* PRODUCT-SPEC §5.3 names two of these letters: Today is `G then T` and
-     Projects is `G then P`. Projects therefore moves off T, and the Planner —
-     which §14 folds into Today rather than keeping as a top-level route —
-     takes L. Recorded in docs/SPEC-DEVIATIONS.md. */
-  { id: "go-planner", title: "Go to Planner", group: "Global", keys: "G then L", run: () => app().go("planner") },
+  { id: "go-review", title: "Go to Review", group: "Global", keys: "G then V", run: () => app().go("review") },
+  /* PRODUCT-SPEC §5.3 names four letters — T, P, A, R — and all four are now
+     literal. Review takes V; §5.3 does not assign it one. The Planner keeps L
+     but leaves the rail: §14 makes it the expanded Today mode rather than a
+     seventh destination, so it is reached from Today's schedule and from here. */
+  { id: "go-planner", title: "Open the full schedule canvas", group: "Global", keys: "G then L", run: () => app().go("planner") },
   { id: "go-tasks", title: "Go to Projects", group: "Global", keys: "G then P", run: () => app().go("tasks") },
   { id: "go-activity", title: "Go to Activity", group: "Global", keys: "G then A", run: () => app().go("activity") },
   { id: "go-reports", title: "Go to Reports", group: "Global", keys: "G then R", run: () => app().go("reports") },
@@ -301,7 +301,10 @@ function hasTask() {
 
 function focusCapture() {
   const { view, go } = app();
-  if (view !== "tasks") go("tasks");
+  // Today has its own capture field, and capturing there means "today" (§7.5).
+  // Jumping to Projects would both lose the date and move the user off the
+  // screen they were planning on.
+  if (view !== "tasks" && view !== "today") go("tasks");
   requestAnimationFrame(() => document.getElementById("capture-input")?.focus());
 }
 

@@ -119,7 +119,7 @@ export default function App() {
         <Sidebar />
         <main className="main">
           {view === "today" && <Today />}
-          {view === "day" && <Day />}
+          {view === "review" && <Day />}
           {view === "planner" && <Planner />}
           {view === "tasks" && <Tasks />}
           {view === "reports" && <Reports />}

@@ -34,11 +34,22 @@ import type {
   WeekView,
 } from "../lib/types";
 
-/** Today first: it is the default launch route (ARCHITECTURE §3.0, §14).
- *  Day remains the 24-hour reconciliation surface behind it. */
+/**
+ * The six destinations PRODUCT-SPEC §5.1 names, in its order.
+ *
+ * `review` is the 24-hour reconciliation surface. Its *data* keeps the Day
+ * Ledger names (`day`, `dayDate`, `loadDay`) because that is what the
+ * projection is called in ARCHITECTURE §7.4 — the route answers "what still
+ * needs my judgement", the projection answers "what did this day consist of",
+ * and they are genuinely different nouns.
+ *
+ * `planner` is no longer a top-level destination: §14 folds the timeboxing
+ * canvas into Today, and it is reached from the Today schedule's Expand
+ * control as the "expanded Today mode" that section describes.
+ */
 export type ViewName =
   | "today"
-  | "day"
+  | "review"
   | "planner"
   | "tasks"
   | "activity"
@@ -322,7 +333,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ view, overlay: null });
     if (view === "reports") void get().loadMonth();
     if (view === "activity") void get().loadActivity();
-    if (view === "day") void get().loadDay();
+    if (view === "review") void get().loadDay();
     if (view === "today") void get().loadToday();
   },
 
@@ -716,7 +727,7 @@ export const useApp = create<AppState>((set, get) => ({
     if (view === "reports") await get().loadMonth();
     if (view === "activity") await get().loadActivity();
     // The Day view reads sessions and blocks, so any mutation can change it.
-    if (view === "day") await get().loadDay();
+    if (view === "review") await get().loadDay();
     // Today reads tasks, blocks, sessions and the ledger — everything.
     if (view === "today") await get().loadToday();
   },

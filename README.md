@@ -33,6 +33,8 @@ src/                   React renderer. Holds no SQL and no business logic.
   components/DriftRail.tsx   The signature, at all three scales (§5.6)
   views/Today.tsx      The launch workspace: week strip, allocation, Top 3,
                        and the day's schedule (ARCHITECTURE §3.0, §7.5)
+docs/DESIGN-SYSTEM.md  The extraction the whole look is built from; §8 I8
+                       measures its dimensions on the rendered page
 scripts/check-ui.mjs   The UI half of §8 that a headless browser can check
 scripts/gen-icons.py   Regenerates every bundle icon from the brand mark
 ```

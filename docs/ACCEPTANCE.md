@@ -77,6 +77,9 @@ The launch screen the three product documents describe, and the wireframe draws.
 | T10 | The current-time marker appears only when viewing today (§7.6) | `today_opens_on_the_current_local_date` asserts `currentMinute` is null on any other date | ✅ |
 | T11 | Ticking, starting and plotting stay three different commands (§7.5) | Structural: the checkbox calls `set_task_status`, Start calls `start_timer`, a drop calls `schedule_block`. No path calls two. | ✅ |
 | T12 | Today stacks below 1280px with the same selected date in both columns (§18.4) | `check-ui.mjs` I5 at 960, 1130, 1200, 1280, 1490 and at 125% text | ✅ |
+| T13 | Capture from Today defaults the intended date to the selected date; capture elsewhere is Inbox with no date (§7.5) | `CaptureBar defaultDueDate`; a typed `^date` still wins. Verified end to end in the desktop app — a task typed on Today stored `due_date = today`. | ✅ |
+| T14 | Daily rank has a keyboard path, not only a drag (§7.4, §18.1) | Alt+↑/↓ on a focused row calls `ReorderDayTasks`. Verified in the desktop app: the moved row swapped rank and both rows acquired plan items. | ✅ |
+| T15 | The rail is exactly §5.1's six destinations, in its order | `check-ui.mjs` navigates all six by keyboard; the Planner is measured separately as the expanded Today mode | ✅ |
 
 
 ## Weekly goals (W) — proposed
@@ -186,6 +189,25 @@ owner per segment and only the per-app and per-label totals were wrong.
 | I6 | `prefers-reduced-motion` disables settle, drift and transitions | `check-ui.mjs` loads with `reducedMotion: "reduce"` and asserts no element has a duration > 50ms | ✅ |
 | I7 | Fonts load from the bundle, no network request | `check-ui.mjs` fails on any request outside the origin. Note the woff2 files are **not vendored** yet (see `src/assets/fonts/README.md`) — the check proves no CDN is reached, not that the bundled faces render | ✅ / partial |
 | I8 | Tray icon legible at 16px, communicates state without a badge | The mark is the drift rail as a monogram (`src-tauri/icons/`, `BrandMark`). Legibility at 16px on a real menu bar is unverified. **Open.** | ❌ |
+
+### Design system (I8) — docs/DESIGN-SYSTEM.md
+
+The look is an extraction from a real deployment, and its numbers are
+contracts rather than preferences. I8 measures them on the rendered page:
+
+| Contract | Measured |
+|---|---|
+| 28px control metric | `.btn` height ≥ 28 |
+| 8px control radius | `.btn` computed border radius = 8 |
+| 48px persistent chrome | `.topbar` height = 48 |
+| 30px list-header band | `.group-head` height = 30 |
+| 30px list-row minimum | every `.today-task` ≥ 30 |
+| Inter stack | `body` font-family contains Inter |
+
+Measured rather than grepped: the failure this catches is a component that
+quietly opts out — a hardcoded `height: 52` in a new view — which never shows
+up as a changed token. Verified to fail: setting `--r-plate` to 6px turns the
+radius row red.
 
 ## Data (D)
 

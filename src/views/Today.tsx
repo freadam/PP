@@ -28,9 +28,13 @@ import * as fmt from "../lib/format";
 import type { BlockView, DaySection, PlannedTask, WeekAllocation, WeekDayCell } from "../lib/types";
 import { Empty } from "../components/chrome";
 import { useStartTaskDrag, taskDragDuration } from "../lib/useTaskDrag";
+import { CaptureBar } from "./Tasks";
 
-/** The timeboxing canvas's vertical scale. The wireframe's rows are hours. */
-const HOUR_HEIGHT = 52;
+/* The timeboxing canvas's vertical scale is the shell's own `hourHeight`
+   (`--hour-h`, 56px, Ctrl +/- scales it and it persists). Today and the Planner
+   are two views of one canvas, so an invented constant here would mean the
+   same hour was two different heights on two screens — and would ignore a zoom
+   the user had already set. */
 const SNAP_MIN = 15;
 
 export function Today() {
@@ -298,9 +302,24 @@ function AllocationCard({ allocation }: { allocation: WeekAllocation }) {
 
 function TaskColumn() {
   const today = useApp((s) => s.today)!;
+  const reorderDay = useApp((s) => s.reorderDay);
   const [showDone, setShowDone] = useState(false);
 
   const topFull = today.topThree.length >= 3;
+
+  /* §7.4 — daily rank has a keyboard path, not only a drag. The row knows its
+     own id; only this component knows its siblings, so the move lives here and
+     the row calls it. Moving off either end is a no-op rather than a wrap:
+     wrapping makes "hold the key" unpredictable. */
+  const moveRank = (section: DaySection, taskId: string, delta: -1 | 1) => {
+    const list = section === "top" ? today.topThree : today.moreToday;
+    const ids = list.map((p) => p.task.id);
+    const from = ids.indexOf(taskId);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]!);
+    void reorderDay(section, ids);
+  };
 
   return (
     <section className="today-tasks" aria-label="Tasks for the selected day">
@@ -309,6 +328,11 @@ function TaskColumn() {
           {today.selectedDate === today.today ? "Today's tasks" : fmt.longDate(today.selectedDate)}
         </h2>
       </header>
+
+      {/* §7.5 — capture here means "this day". A task typed on Today that
+          landed in Inbox with no date would not appear on the screen it was
+          typed on, which is the one place it was obviously meant to go. */}
+      <CaptureBar defaultDueDate={today.selectedDate} />
 
       <h3 className="group-head label">
         Top 3
@@ -319,7 +343,9 @@ function TaskColumn() {
           Nothing chosen yet. Promote a task below to protect it for today.
         </p>
       ) : (
-        today.topThree.map((p) => <TaskLine key={p.task.id} planned={p} topFull={topFull} />)
+        today.topThree.map((p) => (
+          <TaskLine key={p.task.id} planned={p} topFull={topFull} onMoveRank={moveRank} />
+        ))
       )}
 
       <h3 className="group-head label">
@@ -331,7 +357,9 @@ function TaskColumn() {
           Nothing else planned. Press <span className="kbd">C</span> to capture a task.
         </p>
       ) : (
-        today.moreToday.map((p) => <TaskLine key={p.task.id} planned={p} topFull={topFull} />)
+        today.moreToday.map((p) => (
+          <TaskLine key={p.task.id} planned={p} topFull={topFull} onMoveRank={moveRank} />
+        ))
       )}
 
       {today.completedToday.length > 0 && (
@@ -379,7 +407,15 @@ function TaskColumn() {
   );
 }
 
-function TaskLine({ planned, topFull }: { planned: PlannedTask; topFull: boolean }) {
+function TaskLine({
+  planned,
+  topFull,
+  onMoveRank,
+}: {
+  planned: PlannedTask;
+  topFull: boolean;
+  onMoveRank?: (section: DaySection, taskId: string, delta: -1 | 1) => void;
+}) {
   const { task, section } = planned;
   const timer = useApp((s) => s.timer);
   const toggleTimer = useApp((s) => s.toggleTimer);
@@ -415,9 +451,18 @@ function TaskLine({ planned, topFull }: { planned: PlannedTask; topFull: boolean
         className="today-task-title"
         onPointerDown={(e) => !done && startDrag(e, task)}
         onClick={() => void openDetail(task.id)}
-        title={`${task.title} — open, or drag onto the schedule to plot ${fmt.duration(
+        /* Alt+Arrow reorders within the section. Alt, not bare arrows, so the
+           row stays scrollable and Tab-navigable — and so the shortcut cannot
+           fire while someone is only moving between rows. */
+        onKeyDown={(e) => {
+          if (!onMoveRank || !e.altKey) return;
+          if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+          e.preventDefault();
+          onMoveRank(section, task.id, e.key === "ArrowUp" ? -1 : 1);
+        }}
+        title={`${task.title} — open, drag onto the schedule to plot ${fmt.duration(
           taskDragDuration(task),
-        )}`}
+        )}, or Alt+↑/↓ to reorder`}
       >
         <span className="t">{task.title}</span>
         <span className="meta micro">
@@ -503,6 +548,7 @@ function ScheduleColumn() {
   const today = useApp((s) => s.today)!;
   const taskDrag = useApp((s) => s.taskDrag);
   const setTaskDrag = useApp((s) => s.setTaskDrag);
+  const hourHeight = useApp((s) => s.hourHeight);
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [drop, setDrop] = useState<{ startMin: number; durationMin: number } | null>(null);
@@ -518,7 +564,7 @@ function ScheduleColumn() {
     if (!el) return;
     // A few pixels of lead-in, so whatever sits at the opening hour is not
     // jammed flush against the fold and half-legible.
-    el.scrollTop = Math.max(0, (schedule.visibleDayStartMinute / 60) * HOUR_HEIGHT - 8);
+    el.scrollTop = Math.max(0, (schedule.visibleDayStartMinute / 60) * hourHeight - 8);
   }, [schedule.localDate, schedule.visibleDayStartMinute]);
 
   /* Minute-aligned, and only while the marker is on screen at all — a
@@ -542,7 +588,7 @@ function ScheduleColumn() {
   const minuteAt = (clientY: number, fine: boolean) => {
     const grid = gridRef.current;
     if (!grid) return 0;
-    const raw = ((clientY - grid.getBoundingClientRect().top) / HOUR_HEIGHT) * 60;
+    const raw = ((clientY - grid.getBoundingClientRect().top) / hourHeight) * 60;
     const snap = fine ? 5 : SNAP_MIN;
     return Math.max(0, Math.min(24 * 60 - snap, Math.round(raw / snap) * snap));
   };
@@ -583,13 +629,26 @@ function ScheduleColumn() {
           {diff > 0 ? `${fmt.duration(diff)} plotted` : "Nothing plotted"}
           {schedule.unplannedSec > 0 && ` · ${fmt.duration(schedule.unplannedSec)} unplanned`}
         </span>
+        {/* ARCHITECTURE §14 — the complete timeboxing canvas opens as an
+            expanded Today mode rather than as a second scheduling model. Same
+            blocks, same commands, more days on screen. */}
+        <button
+          className="btn btn-quiet"
+          onClick={() => {
+            useApp.getState().setAnchor(today.selectedDate);
+            useApp.getState().go("planner");
+          }}
+          title="Open the full multi-day canvas (G then L)"
+        >
+          Expand
+        </button>
       </header>
 
       <div className="today-scroll" ref={scrollRef}>
         <div
           className="today-grid"
           ref={gridRef}
-          style={{ height: 24 * HOUR_HEIGHT }}
+          style={{ height: 24 * hourHeight }}
           onPointerMove={(e) => {
             if (!taskDrag) return;
             setDrop({
@@ -603,19 +662,19 @@ function ScheduleColumn() {
           }}
         >
           {Array.from({ length: 24 }, (_, h) => (
-            <div key={h} className="today-hour" style={{ height: HOUR_HEIGHT }}>
+            <div key={h} className="today-hour" style={{ height: hourHeight }}>
               <span className="today-hour-label micro">{fmt.clock(hourMs(schedule.localDate, h))}</span>
             </div>
           ))}
 
           {schedule.blocks.map((b) => (
-            <BlockPlate key={b.block.id} block={b} />
+            <BlockPlate key={b.block.id} block={b} hourHeight={hourHeight} />
           ))}
 
           {nowMin != null && (
             <div
               className="today-now"
-              style={{ top: (nowMin / 60) * HOUR_HEIGHT }}
+              style={{ top: (nowMin / 60) * hourHeight }}
               aria-hidden="true"
             />
           )}
@@ -624,8 +683,8 @@ function ScheduleColumn() {
             <div
               className="today-drop"
               style={{
-                top: (drop.startMin / 60) * HOUR_HEIGHT,
-                height: (drop.durationMin / 60) * HOUR_HEIGHT,
+                top: (drop.startMin / 60) * hourHeight,
+                height: (drop.durationMin / 60) * hourHeight,
               }}
             >
               <span className="micro">{taskDrag.title}</span>
@@ -646,10 +705,10 @@ function hourMs(date: string, hour: number): number {
  * (§7.6), and the tracked bar underneath is the record beside the plan rather
  * than a redrawing of it.
  */
-function BlockPlate({ block }: { block: BlockView }) {
+function BlockPlate({ block, hourHeight }: { block: BlockView; hourHeight: number }) {
   const toggleTimer = useApp((s) => s.toggleTimer);
   const startMin = fmt.minutesIntoDay(block.block.startsAt);
-  const height = Math.max(18, (block.plannedSec / 3600) * HOUR_HEIGHT);
+  const height = Math.max(18, (block.plannedSec / 3600) * hourHeight);
   const filled = block.plannedSec > 0 ? Math.min(1, block.trackedSec / block.plannedSec) : 0;
 
   return (
@@ -657,7 +716,7 @@ function BlockPlate({ block }: { block: BlockView }) {
       className="today-block"
       data-drift={block.driftState}
       data-running={block.isRunning}
-      style={{ top: (startMin / 60) * HOUR_HEIGHT, height }}
+      style={{ top: (startMin / 60) * hourHeight, height }}
     >
       <span
         className="edge"

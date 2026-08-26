@@ -3530,15 +3530,23 @@ select {
   font-family: inherit;
 }
 
+/* The design system's list-row contract: 30px minimum, 7px inline padding,
+   1px gray-200 bottom border, 8px radius, gray-50 on hover *and* focus-within.
+   Focus-within matters as much as hover — the row's controls are reachable by
+   keyboard, and a row that only lights for the mouse loses the person who
+   tabbed into it. */
 .today-task {
   display: flex;
   align-items: center;
   gap: var(--s-8);
+  min-height: var(--list-head-h);
   margin: 0 var(--s-16);
-  padding: var(--s-6) var(--s-8);
+  padding: var(--s-4) var(--ds-space-2);
   border-bottom: 1px solid var(--rule);
+  border-radius: var(--r-plate);
 }
-.today-task:hover {
+.today-task:hover,
+.today-task:focus-within {
   background: var(--subtle);
 }
 .today-task[data-done="true"] .t {

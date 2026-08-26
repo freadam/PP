@@ -32,11 +32,10 @@ const NAV: { view: ViewName; label: string; key: string; icon: string }[] = [
      starting and completing work — not reading a dashboard. Day remains
      behind it as the 24-hour reconciliation table. */
   { view: "today", label: "Today", key: "T", icon: "◨" },
-  { view: "day", label: "Day", key: "D", icon: "▦" },
-  { view: "planner", label: "Planner", key: "L", icon: "▤" },
   { view: "tasks", label: "Projects", key: "P", icon: "☰" },
   { view: "activity", label: "Activity", key: "A", icon: "◷" },
   { view: "reports", label: "Reports", key: "R", icon: "◫" },
+  { view: "review", label: "Review", key: "V", icon: "▦" },
   { view: "settings", label: "Settings", key: "S", icon: "⚙" },
 ];
 
@@ -67,7 +66,7 @@ export function NavRail() {
             {item.label}
           </span>
           {/* §3.11: reconcile-due is a dot, not a notification. */}
-          {item.view === "day" && unreconciled.length > 0 && <span className="rail-dot" />}
+          {item.view === "review" && unreconciled.length > 0 && <span className="rail-dot" />}
         </button>
       ))}
     </nav>

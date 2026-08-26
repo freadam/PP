@@ -69,7 +69,16 @@ export function Tasks() {
  * The grammar itself lives in Rust: the resolution rules are where the bugs
  * are, and they need tests (§4.4, §6.9).
  */
-export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) {
+export function CaptureBar({
+  onCreated,
+  defaultDueDate = null,
+}: {
+  onCreated?: (t: TaskRow) => void;
+  /** §7.5 — capture from Today lands on the selected date; capture from
+   *  anywhere else lands in Inbox with no date. A typed `^date` always wins,
+   *  because it is an instruction and this is only a context. */
+  defaultDueDate?: string | null;
+}) {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<CapturePreview | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +129,7 @@ export function CaptureBar({ onCreated }: { onCreated?: (t: TaskRow) => void }) 
           title: preview.title,
           projectId: preview.projectId ?? inherited?.id ?? null,
           estimateSec: preview.estimateSec,
-          dueDate: preview.dueDate,
+          dueDate: preview.dueDate ?? (preview.dueAt == null ? defaultDueDate : null),
           dueAt: preview.dueAt,
           priority: preview.priority,
           tags: preview.tags,

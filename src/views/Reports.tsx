@@ -90,7 +90,7 @@ export function Reports() {
             <div className="segmented" role="group" aria-label="Horizon">
               <button
                 className="btn"
-                onClick={() => go("day")}
+                onClick={() => go("review")}
                 title="The Day screen is the day horizon"
               >
                 Day
@@ -353,7 +353,7 @@ function Findings({ month }: { month: MonthView }) {
         onClick={() => {
           if (!worst) return;
           setDayDate(worst.localDate);
-          go("day");
+          go("review");
         }}
       >
         Review source intervals

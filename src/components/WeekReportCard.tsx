@@ -205,7 +205,7 @@ export function WeekReportPanel({ date }: { date: string }) {
             style={{ justifyContent: "flex-start" }}
             onClick={() => {
               goDay(report.divergence!.localDate);
-              go("day");
+              go("review");
             }}
           >
             <span className="grow" style={{ textAlign: "left" }}>

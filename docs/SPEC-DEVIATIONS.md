@@ -234,35 +234,37 @@ them changes.
 
 ---
 
-## 12. Today is added beside Day, not in place of it
+## 12. The six destinations, and where the Planner went
 
-**ARCHITECTURE §14** lists six routes — Today, Projects, Activity, Reports,
-Review, Settings — and folds the Planner into Today rather than keeping it as a
-top-level destination.
+**Resolved.** PRODUCT-SPEC §5.1's navigation is now literal: Today, Projects,
+Activity, Reports, Review, Settings — in that order, and nothing else in the
+rail.
 
-This build adds Today as the first destination and the default launch route, and
-leaves Day and Planner where they were.
+The screen previously called **Day** is **Review**. It always was the daily
+reconciliation surface §12 describes; it carried an older name. Its *data*
+keeps the Day Ledger names (`day`, `dayDate`, `loadDay`) because that is what
+ARCHITECTURE §7.4 calls the projection: the route answers "what still needs my
+judgement", the projection answers "what did this day consist of", and those
+are different nouns.
 
-Day is this codebase's 24-hour reconciliation table: it is the surface §12 of
-the product spec calls Daily Review, under an older name. Deleting it to satisfy
-a route list would remove the reconciliation screen, not rename it. The Planner
-is the multi-day timeboxing canvas; Today now carries the single-day version of
-it, which is what §14 actually asks for ("The complete timeboxing canvas may be
-opened in an expanded Today mode"), and the multi-day canvas remains reachable
-until that expanded mode exists.
+The **Planner** left the rail rather than the codebase. §14 says the timeboxing
+canvas belongs to Today and that "the complete timeboxing canvas may be opened
+in an expanded Today mode without creating a second scheduling model" — so it
+is reached from the Expand control in Today's schedule header, and from `G then
+L`. It reads the same blocks through the same commands; only the number of days
+on screen differs. Deleting it would have removed the multi-day canvas the spec
+explicitly permits, not removed a duplicate model.
 
-The renaming is a docs-and-labels change with no domain content. It is deferred
-rather than smuggled into the change that built the workspace.
+### 12.1 Navigation letters
 
-### 12.1 The navigation letters moved
+§5.3 names four — Today `T`, Projects `P`, Activity `A`, Reports `R` — and all
+four are literal. Review takes `V`; the spec assigns it no letter. `G then D`
+still opens Review as an alias, because that was the old Day shortcut and
+muscle memory is cheap to honour. (It was previously bound to nothing at all:
+the sequence map had no `d`, so it fell through and duplicated a block.)
 
-**PRODUCT-SPEC §5.3** names two: Today is `G then T`, Projects is `G then P`.
-Both are now true. Projects therefore gave up `T`, and the Planner — which §14
-says should not be a top-level route at all — gave up `P` and took `L`.
-
-`G then D` was previously bound to nothing at all: the sequence map had no `d`,
-so it fell through to the single-key map and duplicated a block. It now opens
-Day, as its own shortcut sheet had always claimed.
+The Planner keeps `L` without a rail entry, which is what "not a top-level
+route" means in a keyboard-first app.
 
 ---
 
