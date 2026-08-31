@@ -472,12 +472,28 @@
     return out.filter((s) => s.end > s.start).sort((a, b) => a.start - b.start);
   }
 
+  /** The window title a span was showing, or the empty string. */
+  const titleOf = (span) => String((span.data && span.data.title) || '');
+
+  /**
+   * What makes two neighbouring spans "the same thing".
+   *
+   * The title is part of it, and that is a correction rather than a detail.
+   * Merging on app and domain alone collapses two adjacent stretches in the
+   * same application into one block that is then *labelled with the first
+   * title* — so a block reading "Grubby - Twitch" silently covers the minutes
+   * spent on two other tabs, and the second title is gone from every total that
+   * reads these spans. A block claims to be one unbroken stretch in one place;
+   * a different document is a different place.
+   */
+  const subjectKey = (span) => `${span.data.app}\u0000${span.domain || ''}\u0000${titleOf(span)}`;
+
   /** Merge neighbouring spans that describe the same thing. */
   function mergeAdjacent(spans) {
     const out = [];
     for (const s of spans) {
       const prev = out[out.length - 1];
-      if (prev && prev.data.app === s.data.app && prev.domain === s.domain && s.start <= prev.end) {
+      if (prev && subjectKey(prev) === subjectKey(s) && s.start <= prev.end) {
         prev.end = Math.max(prev.end, s.end);
       } else {
         out.push(Object.assign({}, s));
@@ -503,8 +519,7 @@
       const prev = out[out.length - 1];
       if (
         prev &&
-        prev.data.app === span.data.app &&
-        prev.domain === span.domain &&
+        subjectKey(prev) === subjectKey(span) &&
         span.start >= prev.end &&
         span.start - prev.end <= minMs
       ) {
@@ -652,6 +667,7 @@
       firstAt: spans.length ? spans[0].start : null,
       lastAt: spans.length ? spans[spans.length - 1].end : null,
       byApp: totalsBy(spans, (sp) => appLabel(sp.data.app)),
+      byTitle: totalsByTitle(spans),
       bySubject: totalsBySubject(spans),
       byCategory: totalsByCategory(spans, s.categories),
       byHour: byHour(spans),
@@ -668,6 +684,42 @@
     return [...totals.entries()]
       .map(([name, seconds]) => ({ name, seconds, share: shareOf(seconds, total), colour: appColour(name) }))
       .sort((a, b) => b.seconds - a.seconds || a.name.localeCompare(b.name));
+  }
+
+  /**
+   * What was actually on screen, by window title, longest first.
+   *
+   * Keyed on **application and title**, which is what ActivityWatch's own
+   * dashboard does — its desktop query is
+   * `merge_events_by_keys(events, ["app", "title"])`. Keying on the title alone
+   * would fold every window that reports no title into one row, and the two
+   * lists would disagree on the first day that contains two such windows.
+   *
+   * An empty title is kept rather than dropped: a watcher that reports no title
+   * still reports real time, and hiding it would stop the rows adding up.
+   */
+  function totalsByTitle(spans) {
+    const totals = new Map();
+    for (const s of spans) {
+      const title = titleOf(s);
+      const app = appLabel(s.data.app);
+      const key = `${app}\u0000${title}`;
+      const cur = totals.get(key) || { title, app, seconds: 0, occurrences: 0 };
+      cur.seconds += secOf(s);
+      cur.occurrences += 1;
+      totals.set(key, cur);
+    }
+    const total = totalSec(spans);
+    return [...totals.values()]
+      .map((r) => ({
+        title: r.title,
+        app: r.app,
+        colour: appColour(r.app),
+        seconds: r.seconds,
+        occurrences: r.occurrences,
+        share: shareOf(r.seconds, total),
+      }))
+      .sort((a, b) => b.seconds - a.seconds || a.title.localeCompare(b.title));
   }
 
   function totalsBySubject(spans) {
@@ -764,12 +816,20 @@
     const worked = days.filter((d) => d.observedSec > 0);
 
     const appTotals = new Map();
+    const titleTotals = new Map();
     const subjectTotals = new Map();
     const catTotals = new Map();
     const hours = new Array(24).fill(0);
 
     for (const d of days) {
       for (const row of d.byApp) appTotals.set(row.name, (appTotals.get(row.name) || 0) + row.seconds);
+      for (const row of d.byTitle) {
+        const key = `${row.app}\u0000${row.title}`;
+        const cur = titleTotals.get(key) || { title: row.title, app: row.app, seconds: 0, occurrences: 0 };
+        cur.seconds += row.seconds;
+        cur.occurrences += row.occurrences;
+        titleTotals.set(key, cur);
+      }
       for (const row of d.bySubject) {
         const k = `${row.kind} ${row.value}`;
         const cur =
@@ -824,6 +884,16 @@
       byApp: [...appTotals.entries()]
         .map(([name, seconds]) => ({ name, seconds, share: shareOf(seconds, observedSec), colour: appColour(name) }))
         .sort((a, b) => b.seconds - a.seconds || a.name.localeCompare(b.name)),
+      byTitle: [...titleTotals.values()]
+        .map((r) => ({
+          title: r.title,
+          app: r.app,
+          colour: appColour(r.app),
+          seconds: r.seconds,
+          occurrences: r.occurrences,
+          share: shareOf(r.seconds, observedSec),
+        }))
+        .sort((a, b) => b.seconds - a.seconds || a.title.localeCompare(b.title)),
       unlabelled: [...subjectTotals.values()]
         .filter((r) => r.categoryId === null)
         .sort((a, b) => b.seconds - a.seconds),
@@ -960,6 +1030,12 @@
       // Off: see DECLUTTER_MIN_SPAN_SEC.
       minSpanSec: 0,
       excludedApps: [],
+      // Applications and window titles are separate switches, as they are in
+      // Fruit. A title is the document, the ticket, the video — far more
+      // revealing than the fact that an editor was open — and someone who wants
+      // the app totals on a shared screen should not have to accept the titles
+      // with them.
+      showTitles: true,
       categories: BUILTIN_CATEGORIES.slice(),
       rules: SEED_RULES.slice(),
     };
@@ -973,6 +1049,7 @@
       hostname: s.hostname || null,
       minSpanSec: Number.isFinite(s.minSpanSec) && s.minSpanSec >= 0 ? s.minSpanSec : d.minSpanSec,
       excludedApps: Array.isArray(s.excludedApps) ? s.excludedApps : [],
+      showTitles: s.showTitles !== false,
       categories: Array.isArray(s.categories) && s.categories.length ? s.categories : d.categories,
       rules: Array.isArray(s.rules) ? s.rules : d.rules,
     };
@@ -1024,6 +1101,7 @@
     mergeAdjacent,
     applyMinSpan,
     subjectOf,
+    titleOf,
     matchRule,
     categorise,
     chooseBuckets,

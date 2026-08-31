@@ -22,7 +22,7 @@ apps/orchard/
   src/render.js        all the drawing — no arithmetic
   src/app.js           one read of state, every panel built from it
   src/tokens.css       Fruit's design system
-  test/                37 engine tests, 13 main-process tests, 27 UI checks
+  test/                45 engine tests, 13 main-process tests, 34 UI checks
 ```
 
 ## Running it
@@ -90,9 +90,13 @@ chore; "these three things took eleven hours between them" is a question people
 answer. One click labels it, and the rule applies to every day, backwards and
 forwards.
 
-**By kind of time, by application, and by hour of day.** The hour histogram
-splits a stretch across the hours it actually spent time in, so it sums to the
-total beside it.
+**By kind of time, by application, by window title, and by hour of day.** The
+titles panel is the one that names *what* rather than *which program* — the
+document, the ticket, the video. It is keyed on application and title, which is
+how ActivityWatch's own dashboard keys its list
+(`merge_events_by_keys(events, ["app", "title"])`), so the two agree row for
+row. The hour histogram splits a stretch across the hours it actually spent time
+in, so it sums to the total beside it.
 
 **Findings** — the range read back in sentences, each naming the figure it came
 from. They state facts and stop; this app does not tell you what to do about
@@ -194,6 +198,11 @@ architecture is built around that:
   ActivityWatch dashboard. Raise it to drop alt-tab noise from a long day, at
   the cost of no longer agreeing with ActivityWatch on the total.
 - **Applications to leave out entirely.**
+- **Show window titles** — on by default. Applications and window titles are
+  separate switches, as they are in Fruit: a title is the document, the ticket,
+  the video, and someone who wants the application totals on a shared screen
+  should not have to accept the titles with them. Turning it off removes the
+  panel *and* stops the timeline naming titles, so the switch is not decoration.
 - **Rules** — the full table, editable.
 
 Stored as one JSON file in the OS application-data directory. A corrupt file is
@@ -203,9 +212,9 @@ app that will not open.
 ## Testing
 
 ```bash
-node --test test/engine.test.js   # 37 — the arithmetic
+node --test test/engine.test.js   # 45 — the arithmetic
 node --test test/main.test.js     # 13 — HTTP, address validation, disk
-node test/check-ui.mjs            # 27 — the page in real Chromium
+node test/check-ui.mjs            # 34 — the page in real Chromium
 ```
 
 `engine.test.js` holds the ported transforms to the behaviour

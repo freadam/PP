@@ -222,6 +222,114 @@ test('the day reports what the filters removed rather than only the total', () =
   assert.strictEqual(day.observedSec, 3600);
 });
 
+// --- window titles ----------------------------------------------------
+
+test('two adjacent stretches in one app with different titles stay apart', () => {
+  // Merging on app alone collapsed these into one block that was then labelled
+  // with the first title, so the second title vanished from every total.
+  const day = E.buildDay(
+    DAY,
+    {
+      window: [
+        ev(iso(at(DAY, 9)), 600, { app: 'chrome.exe', title: 'Untitled - Google Chrome' }),
+        ev(iso(at(DAY, 9, 10)), 600, { app: 'chrome.exe', title: 'electron/docs - Google Chrome' }),
+      ],
+      afk: [],
+      web: [],
+    },
+    {},
+  );
+  assert.strictEqual(day.spans.length, 2);
+  assert.deepStrictEqual(
+    day.byTitle.map((r) => `${r.title} ${E.duration(r.seconds)}`),
+    ['electron/docs - Google Chrome 10m', 'Untitled - Google Chrome 10m'],
+  );
+  // The application total is unaffected: the split is a relabelling, not a
+  // change to how much time there was.
+  assert.deepStrictEqual(day.byApp.map((a) => `${a.name} ${E.duration(a.seconds)}`), ['chrome 20m']);
+});
+
+test('the same title in one app across the day is one row', () => {
+  const day = E.buildDay(
+    DAY,
+    {
+      window: [
+        ev(iso(at(DAY, 9)), 600, { app: 'code', title: 'engine.js' }),
+        ev(iso(at(DAY, 11)), 600, { app: 'code', title: 'engine.js' }),
+      ],
+      afk: [],
+      web: [],
+    },
+    {},
+  );
+  assert.strictEqual(day.byTitle.length, 1);
+  assert.strictEqual(day.byTitle[0].seconds, 1200);
+  assert.strictEqual(day.byTitle[0].occurrences, 2);
+});
+
+test('titles are keyed by application too, as ActivityWatch keys them', () => {
+  // aw-client: merge_events_by_keys(events, ["app", "title"]). Two windows that
+  // report no title are two rows, not one — which is what the dashboard shows.
+  const day = E.buildDay(
+    DAY,
+    {
+      window: [
+        ev(iso(at(DAY, 9)), 120, { app: 'explorer.exe', title: '' }),
+        ev(iso(at(DAY, 9, 2)), 60, { app: 'ClickUp.exe', title: '' }),
+      ],
+      afk: [],
+      web: [],
+    },
+    {},
+  );
+  assert.strictEqual(day.byTitle.length, 2);
+  assert.deepStrictEqual(day.byTitle.map((r) => r.app), ['explorer', 'ClickUp']);
+  assert.deepStrictEqual(day.byTitle.map((r) => r.title), ['', '']);
+});
+
+test('the title rows sum to the total, empty titles included', () => {
+  const day = E.buildDay(
+    DAY,
+    {
+      window: [
+        ev(iso(at(DAY, 9)), 600, { app: 'code', title: 'engine.js' }),
+        ev(iso(at(DAY, 9, 10)), 300, { app: 'explorer.exe', title: '' }),
+      ],
+      afk: [],
+      web: [],
+    },
+    {},
+  );
+  assert.strictEqual(day.byTitle.reduce((a, r) => a + r.seconds, 0), day.observedSec);
+  assert.strictEqual(day.byTitle.reduce((a, r) => a + r.share, 0), 1);
+});
+
+test('a range sums its titles, and a week agrees with its days', () => {
+  const sources = {
+    window: [
+      ev(iso(at(DAY, 9)), 600, { app: 'code', title: 'engine.js' }),
+      ev(iso(at('2026-09-02', 9)), 600, { app: 'code', title: 'engine.js' }),
+      ev(iso(at('2026-09-02', 11)), 300, { app: 'code', title: 'render.js' }),
+    ],
+    afk: [],
+    web: [],
+  };
+  const days = E.dateSeries(DAY, '2026-09-06').map((d) => E.buildDay(d, sources, {}));
+  const range = E.buildRange(days, E.BUILTIN_CATEGORIES);
+  assert.deepStrictEqual(
+    range.byTitle.map((r) => `${r.title} ${E.duration(r.seconds)}`),
+    ['engine.js 20m', 'render.js 5m'],
+  );
+  assert.strictEqual(range.byTitle.reduce((a, r) => a + r.seconds, 0), range.observedSec);
+});
+
+test('titles are a switch of their own, and it defaults on', () => {
+  assert.strictEqual(E.defaultSettings().showTitles, true);
+  assert.strictEqual(E.withDefaults({ showTitles: false }).showTitles, false);
+  // Absent means on, so an older settings file does not silently hide them.
+  assert.strictEqual(E.withDefaults({}).showTitles, true);
+});
+
 // --- categorisation ---------------------------------------------------
 
 test('a domain rule covers its subdomains', () => {

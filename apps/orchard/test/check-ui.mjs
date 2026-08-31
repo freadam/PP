@@ -125,6 +125,27 @@ ok('the hour histogram is drawn', (await page.locator('.hours span').count()) ==
 ok('a window title is escaped, not executed', (await page.evaluate(() => window.__XSS)) === undefined);
 ok('a markup window title is shown literally', (await body()).includes('<img src=x onerror='));
 
+console.log('\nWindow titles');
+// Panel headings are uppercased by CSS and `innerText` reflects that, so the
+// match is case-insensitive rather than asserting about the stylesheet.
+const titlesText = () =>
+  page.evaluate(() => {
+    const p = [...document.querySelectorAll('.panel')].find((x) =>
+      /^top window titles/i.test(x.innerText),
+    );
+    return p ? p.innerText : null;
+  });
+
+ok('the titles panel is drawn', (await titlesText()) !== null);
+const tt = (await titlesText()) || '';
+ok('it lists what was on screen', tt.includes('#engineering') && tt.includes('A pull request'));
+ok('each row names the application it came from', tt.includes('slack') && tt.includes('firefox'));
+ok(
+  'the longest title is first',
+  tt.indexOf('<img src=x onerror=') < tt.indexOf('#engineering'),
+  'the two-hour editor window should outrank the one-hour Slack window',
+);
+
 console.log('\nLabelling');
 // Targeted by name rather than by position: two rows can tie on time, and a
 // test that labels "whichever came first" starts asserting about the sort.
@@ -172,6 +193,28 @@ await page.getByRole('tab', { name: 'Settings' }).click();
 await page.waitForSelector('.field', { timeout: 10000 });
 ok('settings still open while the server is unreachable', (await body()).includes('Server address'));
 ok('the rule table lists the shipped rules', (await page.locator('tbody tr').count()) > 10);
+
+// Turning titles off has to remove them from the timeline as well as the panel,
+// or the switch is decoration.
+await page.evaluate(() => {
+  window.__mode = 'ok';
+});
+await page.getByRole('checkbox', { name: 'Show window titles' }).uncheck();
+await page.getByRole('button', { name: 'Save' }).click();
+await page.getByRole('tab', { name: 'Day' }).click();
+await page.waitForSelector('.timeline .span', { timeout: 10000 });
+ok('turning titles off removes the panel', (await titlesText()) === null);
+ok('and strips them from the timeline blocks', !(await body()).includes('#engineering'));
+ok('while the application totals stay', (await body()).includes('slack'));
+
+// Back on, so the checks below run against the full page.
+await page.getByRole('tab', { name: 'Settings' }).click();
+await page.waitForSelector('.field', { timeout: 10000 });
+await page.getByRole('checkbox', { name: 'Show window titles' }).check();
+await page.getByRole('button', { name: 'Save' }).click();
+await page.getByRole('tab', { name: 'Day' }).click();
+await page.waitForSelector('.timeline .span', { timeout: 10000 });
+ok('and turning them back on restores them', (await body()).includes('#engineering'));
 
 console.log('\nPresentation');
 // Back to a working Day view first. The checks below are about what is drawn,

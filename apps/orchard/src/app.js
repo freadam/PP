@@ -214,7 +214,7 @@
       UI.headline(range),
       UI.findingsPanel(range.findings),
       UI.unlabelledPanel(range.unlabelled, cats, label),
-      UI.timeline(day, cats, (span) => {
+      UI.timeline(day, cats, state.settings.showTitles, (span) => {
         // Clicking a block labels the thing it was, which is the same action
         // the list above offers — reached from wherever you noticed it.
         const subject = { kind: span.subjectKind, value: span.subjectValue };
@@ -236,6 +236,7 @@
             ? UI.splitRows(range.byApp.slice(0, 12), range.observedSec)
             : UI.empty('Nothing observed.'),
         ]),
+        state.settings.showTitles && UI.titlesPanel(range.byTitle),
         UI.hourHistogram(range.byHour),
       ]),
     ];
@@ -261,6 +262,7 @@
             ? UI.splitRows(range.byApp.slice(0, 12), range.observedSec)
             : UI.empty('Nothing observed.'),
         ]),
+        state.settings.showTitles && UI.titlesPanel(range.byTitle),
       ]),
       UI.unlabelledPanel(range.unlabelled, cats, label),
     ];
@@ -276,6 +278,7 @@
       placeholder: 'e.g. 1password, signal',
       spellcheck: 'false',
     });
+    const titles = el('input', { type: 'checkbox', checked: s.showTitles !== false });
 
     const hostOptions = [el('option', { value: '', text: 'Whichever is most recent' })].concat(
       ((state.buckets && state.buckets.hosts) || []).map((h) =>
@@ -290,6 +293,7 @@
           serverUrl: url.value.trim() || 'http://localhost:5600',
           minSpanSec: Math.max(0, parseInt(floor.value, 10) || 0),
           hostname: host.value || null,
+          showTitles: titles.checked,
           excludedApps: excluded.value
             .split(',')
             .map((x) => x.trim())
@@ -345,6 +349,12 @@
           ]),
           UI.caption(
             'Comma separated. Excluded before anything is totalled, so an app named here cannot resurface through a chart or a report.',
+          ),
+          el('label', { class: 'days-mask', style: { marginTop: '10px' } }, [
+            el('label', {}, [titles, el('span', { text: 'Show window titles' })]),
+          ]),
+          UI.caption(
+            'Applications and window titles are separate switches. A title is the document, the ticket, the video — turn this off and the titles panel goes, and the timeline names only the application.',
           ),
         ]),
       ]),

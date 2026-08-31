@@ -76,7 +76,7 @@
    * to midnight: eight empty hours at the top of every screen is eight hours of
    * nothing, and the panel is about when things happened.
    */
-  function timeline(day, categories, onPick) {
+  function timeline(day, categories, showTitles, onPick) {
     if (!day.spans.length) {
       return panel('The day', [
         empty(
@@ -134,7 +134,8 @@
       const top = y(sp.start);
       const seconds = (sp.end - sp.start) / 1000;
       const label = sp.domain || E.appLabel(sp.data.app);
-      const title = sp.data.title ? ` — ${sp.data.title}` : '';
+      // Suppressed here as well as in the panel, or the switch is cosmetic.
+      const title = showTitles && sp.data.title ? ` — ${sp.data.title}` : '';
       // A one-second visit still has to be clickable, so every block gets a
       // floor of a few pixels even where that overstates its length. The
       // duration is written on the row, which is the honest carrier.
@@ -223,6 +224,51 @@
   }
 
   // --- charts ----------------------------------------------------------
+
+  /**
+   * Top window titles — the documents, tickets and videos that were on screen.
+   *
+   * The one panel that names *what* rather than *which program*, and the most
+   * revealing thing this app draws, which is why it can be switched off
+   * independently of everything else.
+   */
+  function titlesPanel(rows, limit) {
+    if (!rows.length) return panel('Top window titles', [empty('Nothing observed in this range.')]);
+    const total = rows.reduce((a, r) => a + r.seconds, 0);
+    const shown = rows.slice(0, limit || 12);
+    return panel('Top window titles', [
+      el(
+        'div',
+        {},
+        shown.map((r) =>
+          el('div', { class: 'split-row', title: `${r.title || 'No title reported'} — ${r.app}` }, [
+            el('span', { class: 'dot', style: { background: r.colour } }),
+            el('span', { class: 'grow' }, [
+              el('span', {
+                class: 'truncate',
+                style: { display: 'block' },
+                // A window that reports no title still reports real time; the
+                // row says so rather than showing a blank line.
+                text: r.title || 'No title reported',
+              }),
+              el('span', { class: 'micro truncate', style: { display: 'block' }, text: r.app }),
+              el('span', {
+                class: 'split-bar',
+                style: { width: `${(r.seconds / Math.max(total, 1)) * 100}%`, background: r.colour },
+              }),
+            ]),
+            el('span', {
+              class: 'data',
+              style: { textAlign: 'right' },
+              text: `${E.duration(r.seconds)} · ${pct(r.share)}`,
+            }),
+          ]),
+        ),
+      ),
+      rows.length > shown.length &&
+        caption(`${rows.length - shown.length} more, not shown. The tail of a title list answers nothing.`),
+    ]);
+  }
 
   function hourHistogram(byHour) {
     const max = Math.max(1, ...byHour);
@@ -332,6 +378,7 @@
     splitRows,
     timeline,
     unlabelledPanel,
+    titlesPanel,
     hourHistogram,
     dayColumns,
     findingsPanel,
