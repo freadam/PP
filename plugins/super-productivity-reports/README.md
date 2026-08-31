@@ -33,6 +33,12 @@ cd plugins/super-productivity-reports
 npm run build          # → dist/fruit-reports-1.0.0.zip
 ```
 
+or, from the repository root:
+
+```bash
+npm run sp-plugin:build
+```
+
 In Super Productivity: **Settings → Plugins → Load plugin from file**, pick the
 ZIP, enable it. A **Fruit Reports** button appears in the header.
 

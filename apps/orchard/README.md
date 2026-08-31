@@ -27,13 +27,44 @@ apps/orchard/
 
 ## Running it
 
-ActivityWatch must be running (it listens on `http://localhost:5600`).
+Orchard has its own `package.json` and its own dependencies. It is **not** part
+of the Fruit build at the repository root, so `npm start` in the root directory
+will not find it. Either stand in this directory:
 
 ```bash
 cd apps/orchard
 npm install
 npm start
 ```
+
+or use the passthroughs from the repository root, which work from anywhere:
+
+```bash
+npm run orchard:install
+npm run orchard
+npm run orchard:test
+```
+
+ActivityWatch must be running; it listens on `http://localhost:5600`. If it is
+not, Orchard opens and says so — it never shows an empty chart in place of an
+absent server.
+
+### If your npm blocks install scripts
+
+npm can be configured to hold package install scripts for approval, and Electron
+needs its own: the `electron` package is a small wrapper whose postinstall step
+downloads the actual binary for your platform. Without it, `npm start` fails
+with `Electron failed to install correctly` or a missing `electron.exe`.
+
+When `npm install` prints `npm warn allow-scripts ... electron`, approve it:
+
+```bash
+npm approve-scripts electron
+npm install
+```
+
+This is the one package here that genuinely needs it. Nothing else in Orchard
+has an install script.
 
 ```bash
 npm test          # engine + main process + the built page in real Chromium
