@@ -1,0 +1,266 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Fruit's report layout, in Super Productivity's theme.
+
+   Not one literal colour outside the two blocks marked below. Everything
+   binds to the variables the host injects on :root, so the plugin follows
+   the user's theme — light, dark, and whichever accent they picked —
+   instead of shipping a second design system that is right on one of them.
+
+   The two exceptions are semantic, not decorative:
+     · --plot / --track   the drift encoding, which must stay distinguishable
+                          from the accent colour to mean anything
+     · --over / --under   over and under target
+   Both are derived from the host's own colours where it exposes them.
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* The drift encoding, carried over from Fruit: the plot is what you said,
+     the track is what happened. The plot is deliberately quiet — it is a
+     reference line, not a reading. */
+  --plot: color-mix(in srgb, var(--text-color, #222) 22%, transparent);
+  --track: var(--c-primary, #29a1a1);
+  --over: var(--c-warn, #e15b64);
+  --under: var(--c-primary, #29a1a1);
+  --ink-faint: var(--text-color-muted, #888);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: var(--s2, 16px);
+  font-family: var(--font-primary-stack, system-ui, sans-serif);
+  color: var(--text-color, #222);
+  background: var(--bg, transparent);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ─── layout ─────────────────────────────────────────────────────────── */
+
+.stack { display: flex; flex-direction: column; gap: var(--s2, 16px); }
+.row { display: flex; align-items: center; gap: var(--s, 8px); }
+.grow { flex: 1 1 auto; min-width: 0; }
+.wrap { flex-wrap: wrap; }
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--s2, 16px);
+  align-items: start;
+}
+
+.panel {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+  border-radius: var(--card-border-radius, 8px);
+  padding: var(--s2, 16px);
+}
+
+.panel > h3 {
+  margin: 0 0 var(--s, 8px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.panel-wide { grid-column: 1 / -1; }
+
+/* ─── type ───────────────────────────────────────────────────────────── */
+
+.display {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.caption { color: var(--ink-faint); font-size: 0.8125rem; margin: 0; }
+.micro { font-size: 0.6875rem; color: var(--ink-faint); }
+/* Figures line up in a column only if their digits are the same width. */
+.data { font-variant-numeric: tabular-nums; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── the drift rail ─────────────────────────────────────────────────── */
+/* Fruit's signature, rotated horizontal: a quiet plot line for the
+   intention, a solid track for what happened, on the same baseline so the
+   difference is the only thing you have to read. */
+
+.rail-bar {
+  position: relative;
+  display: block;
+  height: 14px;
+  width: 100%;
+  min-width: 60px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text-color, #222) 7%, transparent);
+  overflow: hidden;
+}
+
+.rail-bar .plot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--plot);
+}
+
+.rail-bar .track {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  border-radius: 2px;
+  background: var(--track);
+}
+
+/* The 1.0× reference, for the calibration rail: parity sits at the midpoint
+   so over and under read as a deflection rather than a bare length. */
+.rail-bar .parity {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--text-color, #222);
+  opacity: 0.45;
+}
+
+.bucket-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 110px;
+  align-items: center;
+  gap: var(--s, 8px);
+  padding: var(--s-half, 4px) 0;
+}
+.bucket-row[data-reportable='false'] { opacity: 0.55; }
+
+/* ─── splits ─────────────────────────────────────────────────────────── */
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) 116px;
+  align-items: center;
+  gap: var(--s, 8px);
+  padding: 3px 0;
+}
+
+.split-bar {
+  height: 6px;
+  border-radius: 3px;
+  margin-top: 3px;
+}
+
+/* ─── the day graph ──────────────────────────────────────────────────── */
+
+.day-graph {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 110px;
+  position: relative;
+}
+
+.day-col { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.day-fill { background: var(--track); border-radius: 2px 2px 0 0; min-height: 1px; }
+.day-fill[data-zero='true'] { background: color-mix(in srgb, var(--text-color, #222) 12%, transparent); }
+
+/* Drawn only across the days the target actually applies to — a target line
+   over a Sunday it was never set for is a line that lies. */
+.target-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--over);
+  pointer-events: none;
+}
+
+.day-labels {
+  display: flex;
+  gap: 3px;
+  margin-top: var(--s-half, 4px);
+}
+.day-labels span { flex: 1 1 0; text-align: center; font-size: 0.625rem; color: var(--ink-faint); }
+
+/* ─── findings ───────────────────────────────────────────────────────── */
+
+.finding {
+  border-left: 3px solid var(--plot);
+  padding: var(--s-half, 4px) 0 var(--s-half, 4px) var(--s, 8px);
+  margin-bottom: var(--s, 8px);
+}
+.finding:last-child { margin-bottom: 0; }
+.finding[data-tone='good'] { border-left-color: var(--under); }
+.finding[data-tone='watch'] { border-left-color: var(--over); }
+.finding b { display: block; font-weight: 600; }
+
+/* ─── score ──────────────────────────────────────────────────────────── */
+
+.score-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 52px;
+  align-items: baseline;
+  gap: var(--s, 8px);
+  padding: 2px 0;
+}
+.score-row .weight { color: var(--ink-faint); font-size: 0.75rem; text-align: right; }
+
+/* ─── controls ───────────────────────────────────────────────────────── */
+
+.segmented { display: inline-flex; }
+.segmented button { border-radius: 0; margin: 0; }
+.segmented button:first-child { border-radius: var(--card-border-radius, 8px) 0 0 var(--card-border-radius, 8px); }
+.segmented button:last-child { border-radius: 0 var(--card-border-radius, 8px) var(--card-border-radius, 8px) 0; }
+.segmented button[aria-pressed='true'] {
+  background: var(--c-primary, #29a1a1);
+  color: #fff;
+  border-color: var(--c-primary, #29a1a1);
+}
+
+.tabs { display: flex; gap: var(--s, 8px); border-bottom: 1px solid var(--divider-color, rgba(0,0,0,.12)); }
+.tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: var(--s, 8px) var(--s2, 16px);
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.tabs button[aria-selected='true'] { color: var(--text-color, #222); border-bottom-color: var(--c-primary, #29a1a1); }
+
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: var(--s-half, 4px) var(--s, 8px); }
+th { font-weight: 600; font-size: 0.75rem; color: var(--ink-faint); }
+tbody tr { border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08)); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+input[type='number'], input[type='text'] { width: 100%; }
+label.field { display: flex; flex-direction: column; gap: var(--s-quarter, 2px); font-size: 0.8125rem; }
+
+.days-mask { display: flex; gap: var(--s-quarter, 2px); flex-wrap: wrap; }
+.days-mask label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.empty { color: var(--ink-faint); font-size: 0.8125rem; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "fruit-reports-sp-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fruit's reports, rebuilt as a Super Productivity plugin.",
+  "type": "commonjs",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/engine.test.js && node test/check-ui.mjs"
+  }
+}

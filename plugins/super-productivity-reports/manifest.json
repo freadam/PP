@@ -1,0 +1,25 @@
+{
+  "id": "fruit-reports",
+  "name": "Fruit Reports",
+  "version": "1.0.0",
+  "manifestVersion": 1,
+  "minSupVersion": "14.0.0",
+  "description": "Fruit's reports for Super Productivity: calibration, estimated vs actual by project and week, weekly targets with pace-to-date, and a work report that reads itself back to you in sentences.",
+  "icon": "icon.svg",
+  "iFrame": true,
+  "sidePanel": false,
+  "type": "standard",
+  "assets": [],
+  "hooks": ["anyTaskUpdate", "taskComplete"],
+  "permissions": [
+    "getTasks",
+    "getArchivedTasks",
+    "getAllProjects",
+    "getAllTags",
+    "persistDataSynced",
+    "loadSyncedData",
+    "showIndexHtmlAsView",
+    "showSnack",
+    "downloadFile"
+  ]
+}

@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fruit Reports</title>
+    <!--
+      Everything is inlined because Super Productivity serves plugin UI through
+      an iframe `srcdoc`: no other file from the ZIP is reachable from this
+      page, so a <link> or a <script src> would silently resolve to nothing.
+      `build.mjs` does the inlining; edit the files under src/, not the built
+      copy in dist/.
+    -->
+    <style>/* __STYLES__ */</style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>/* __ENGINE__ */</script>
+    <script>/* __RENDER__ */</script>
+    <script>/* __APP__ */</script>
+  </body>
+</html>
