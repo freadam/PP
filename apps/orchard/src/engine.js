@@ -46,11 +46,21 @@
   const PULSETIME_SEC = 5;
 
   /**
-   * Observation shorter than this is noise rather than activity. Two minutes,
-   * carried over from Fruit: alt-tabbing to check a message is not a context
-   * switch worth a row in a day's account.
+   * A decluttering floor, **off by default**.
+   *
+   * Fruit uses two minutes: alt-tabbing to check a message is not a context
+   * switch worth a row in a day's account, and over a full working day that is
+   * the right call. It is the wrong *default* here, because Orchard's promise
+   * is to read what ActivityWatch recorded — and a first run is a short
+   * session, where a two-minute floor can discard every span there is and
+   * leave the app reporting nothing for a day the ActivityWatch dashboard
+   * reports as three minutes. An app that disagrees with its own source on the
+   * first screen has spent the trust it needs.
+   *
+   * So the floor ships off and is offered in Settings, which is where a
+   * judgement about what counts as noise belongs.
    */
-  const DEFAULT_MIN_SPAN_SEC = 120;
+  const DECLUTTER_MIN_SPAN_SEC = 120;
 
   /** Negative gaps smaller than this are rounding, and are pruned to zero. */
   const NEG_GAP_TRIM_MS = 100;
@@ -173,9 +183,29 @@
     return WEEKDAYS[(new Date(y, m - 1, d, 12).getDay() + 6) % 7];
   }
 
-  /** `6h 20m`, `45m`, `2h` — Fruit's `fmt.duration`. */
+  /**
+   * Below this, a duration is written with its seconds. Above it, seconds are
+   * noise and Fruit's `6h 20m` form is the legible one.
+   */
+  const SECONDS_BELOW = 600;
+
+  /**
+   * `6h 20m`, `45m`, `1m 15s`, `2s`.
+   *
+   * Fruit's `fmt.duration` rounds to the minute, which is right for a planner
+   * and wrong here: ActivityWatch reports a two-second visit to Explorer as
+   * `2s`, and a viewer that renders the same fact as `0m` is not reading the
+   * same data. Seconds appear only under ten minutes, so a week total is still
+   * `36h 6m` rather than a wall of digits.
+   */
   function duration(sec) {
     const s = Math.abs(Math.round(sec));
+    if (s < SECONDS_BELOW) {
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      if (m === 0) return `${r}s`;
+      return r === 0 ? `${m}m` : `${m}m ${r}s`;
+    }
     const h = Math.floor(s / 3600);
     const m = Math.round((s % 3600) / 60);
     if (h === 0) return `${m}m`;
@@ -183,9 +213,15 @@
     return `${h}h ${m}m`;
   }
 
-  /** The `{}h {:02}m` form the findings are written in. */
+  /**
+   * The `{}h {:02}m` form the findings are written in — falling back to
+   * `duration` below ten minutes, because a finding that reads "0h 02m of it,
+   * across the day" is a sentence about two minutes written as though it were
+   * about hours.
+   */
   function hm(sec) {
     const s = Math.abs(Math.round(sec));
+    if (s < SECONDS_BELOW) return duration(s);
     return `${Math.floor(s / 3600)}h ${pad(Math.floor((s % 3600) / 60))}m`;
   }
 
@@ -487,10 +523,16 @@
    * otherwise every tab in the day collapses into one row called "firefox",
    * which is the least useful label available.
    */
+  /**
+   * `value` is the rule key and is lower-cased, because rules match without
+   * regard to case. `display` is the name as the watcher reported it, so the
+   * unlabelled list and the per-application split do not print `clickup` and
+   * `ClickUp` for the same thing on the same screen.
+   */
   function subjectOf(span) {
     return span.domain
-      ? { kind: 'domain', value: span.domain }
-      : { kind: 'app', value: appLabel(span.data.app).toLowerCase() };
+      ? { kind: 'domain', value: span.domain, display: span.domain }
+      : { kind: 'app', value: appLabel(span.data.app).toLowerCase(), display: appLabel(span.data.app) };
   }
 
   /**
@@ -523,6 +565,7 @@
       return Object.assign({}, s, {
         subjectKind: subject.kind,
         subjectValue: subject.value,
+        subjectDisplay: subject.display,
         categoryId: rule ? rule.categoryId : null,
       });
     });
@@ -633,7 +676,14 @@
       const k = `${s.subjectKind} ${s.subjectValue}`;
       const cur =
         totals.get(k) ||
-        { kind: s.subjectKind, value: s.subjectValue, seconds: 0, occurrences: 0, categoryId: s.categoryId };
+        {
+          kind: s.subjectKind,
+          value: s.subjectValue,
+          display: s.subjectDisplay || s.subjectValue,
+          seconds: 0,
+          occurrences: 0,
+          categoryId: s.categoryId,
+        };
       cur.seconds += secOf(s);
       cur.occurrences += 1;
       totals.set(k, cur);
@@ -724,7 +774,14 @@
         const k = `${row.kind} ${row.value}`;
         const cur =
           subjectTotals.get(k) ||
-          { kind: row.kind, value: row.value, seconds: 0, occurrences: 0, categoryId: row.categoryId };
+          {
+            kind: row.kind,
+            value: row.value,
+            display: row.display || row.value,
+            seconds: 0,
+            occurrences: 0,
+            categoryId: row.categoryId,
+          };
         cur.seconds += row.seconds;
         cur.occurrences += row.occurrences;
         subjectTotals.set(k, cur);
@@ -900,7 +957,8 @@
     return {
       serverUrl: 'http://localhost:5600',
       hostname: null,
-      minSpanSec: DEFAULT_MIN_SPAN_SEC,
+      // Off: see DECLUTTER_MIN_SPAN_SEC.
+      minSpanSec: 0,
       excludedApps: [],
       categories: BUILTIN_CATEGORIES.slice(),
       rules: SEED_RULES.slice(),
@@ -934,7 +992,8 @@
 
   return {
     PULSETIME_SEC,
-    DEFAULT_MIN_SPAN_SEC,
+    DECLUTTER_MIN_SPAN_SEC,
+    SECONDS_BELOW,
     TYPE_WINDOW,
     TYPE_AFK,
     TYPE_WEB,

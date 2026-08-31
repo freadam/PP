@@ -449,11 +449,76 @@ test('no window bucket at all is null rather than a guess', () => {
 
 // --- formatting -------------------------------------------------------
 
-test('durations read the way Fruit writes them', () => {
+test('durations read the way Fruit writes them, and keep seconds where they matter', () => {
   assert.strictEqual(E.duration(45 * MIN), '45m');
   assert.strictEqual(E.duration(2 * HOUR), '2h');
   assert.strictEqual(E.duration(2 * HOUR + 20 * MIN), '2h 20m');
   assert.strictEqual(E.hm(2 * HOUR + 5 * MIN), '2h 05m');
+  // A finding about two minutes should not be written as though it were about
+  // hours: "0h 02m of it, across the day" is not a sentence anyone says.
+  assert.strictEqual(E.hm(142), '2m 22s');
+  // ActivityWatch reports a two-second visit as "2s". Rendering that as "0m"
+  // would be this app failing to read its own source.
+  assert.strictEqual(E.duration(2), '2s');
+  assert.strictEqual(E.duration(1), '1s');
+  assert.strictEqual(E.duration(75), '1m 15s');
+  assert.strictEqual(E.duration(142), '2m 22s');
+  // Seconds stop once they are noise rather than information.
+  assert.strictEqual(E.duration(600), '10m');
+});
+
+// --- parity with the ActivityWatch dashboard --------------------------
+
+/**
+ * A real short session, transcribed from an ActivityWatch dashboard reading
+ * `Time active: 2m 22s` with chrome 1m 15s, electron 1m 4s, explorer 2s and
+ * ClickUp 1s.
+ *
+ * Every span in it is under two minutes. With a two-minute floor on by default
+ * this whole day rounded to nothing, and the app reported 0m for a day its own
+ * source reported as 2m 22s — which is the first thing a new user sees, since a
+ * first run is a short session by definition.
+ */
+test('a short session matches what the ActivityWatch dashboard reports', () => {
+  const t = (h, m, sec) => new Date(`${DAY}T00:00:00`).getTime() + ((h * 60 + m) * 60 + (sec || 0)) * 1000;
+  const day = E.buildDay(
+    DAY,
+    {
+      window: [
+        ev(t(23, 10, 0), 75, { app: 'chrome.exe', title: 'Grubby - Twitch - Google Chrome' }),
+        ev(t(23, 11, 15), 64, { app: 'electron.exe', title: 'Orchard' }),
+        ev(t(23, 12, 19), 2, { app: 'explorer.exe', title: '' }),
+        ev(t(23, 12, 21), 1, { app: 'ClickUp.exe', title: '' }),
+      ],
+      afk: [ev(t(23, 10, 0), 142, { status: 'not-afk' })],
+      web: [],
+    },
+    E.defaultSettings(),
+  );
+
+  assert.strictEqual(day.observedSec, 142, 'the total is the dashboard total');
+  assert.strictEqual(E.duration(day.observedSec), '2m 22s');
+  assert.deepStrictEqual(
+    day.byApp.map((a) => `${a.name} ${E.duration(a.seconds)}`),
+    ['chrome 1m 15s', 'electron 1m 4s', 'explorer 2s', 'ClickUp 1s'],
+  );
+  // And the parts add to the whole, which is the property the rounding broke.
+  assert.strictEqual(day.byApp.reduce((a, x) => a + x.seconds, 0), day.observedSec);
+
+  // One screen, one spelling: the rule key is lower-cased but the name shown
+  // is the one the watcher reported.
+  const clickup = day.bySubject.find((x) => x.value === 'clickup');
+  assert.strictEqual(clickup.display, 'ClickUp');
+});
+
+test('the decluttering floor is off by default and still works when set', () => {
+  assert.strictEqual(E.defaultSettings().minSpanSec, 0);
+  const spans = [
+    { start: 0, end: 30000, data: { app: 'slack' }, domain: null },
+    { start: 30000, end: 30000 + 10 * MIN * 1000, data: { app: 'code' }, domain: null },
+  ];
+  assert.strictEqual(E.applyMinSpan(spans, 0).length, 2, 'off: nothing is dropped');
+  assert.strictEqual(E.applyMinSpan(spans, E.DECLUTTER_MIN_SPAN_SEC).length, 1, 'on: the glance goes');
 });
 
 test('an application keeps its colour between runs', () => {
@@ -472,6 +537,8 @@ test('the week starts on Monday', () => {
 test('settings survive nonsense without taking it', () => {
   const s = E.withDefaults({ serverUrl: '', minSpanSec: -5, rules: 'not an array' });
   assert.strictEqual(s.serverUrl, 'http://localhost:5600');
-  assert.strictEqual(s.minSpanSec, E.DEFAULT_MIN_SPAN_SEC);
+  assert.strictEqual(s.minSpanSec, 0);
   assert.ok(Array.isArray(s.rules));
+  // A floor the user did choose survives untouched.
+  assert.strictEqual(E.withDefaults({ minSpanSec: 120 }).minSpanSec, 120);
 });

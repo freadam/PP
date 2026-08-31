@@ -108,15 +108,37 @@ time the watcher did not record.
 | `flood` | Closes sampler gaps up to 5s, merges equal neighbours, splits an uncertain gap at the midpoint | ported from `aw_transform/flood.py` |
 | afk filter | Intersects with the not-afk periods, so a window left open while you made coffee is not two hours of work | ActivityWatch's own canonical query |
 | domains | A browser window becomes the site it was showing, split where it showed several | Orchard |
-| min-span floor | Drops stretches under two minutes, then re-joins what they interrupted | ported from Fruit's `apply_min_span` |
+| min-span floor | **Off by default.** When set, drops stretches under the floor and re-joins what they interrupted | ported from Fruit's `apply_min_span` |
 | categorise | A rule turns an app or a site into a kind of time | Fruit's `activity_rule` |
 
-Two consequences worth knowing:
+### Matching the ActivityWatch dashboard
+
+Out of the box, the totals here equal the ones ActivityWatch shows for the same
+day. A short session reading `Time active: 2m 22s` with chrome 1m 15s, electron
+1m 4s, explorer 2s and ClickUp 1s reads identically in Orchard, and
+`test/engine.test.js` pins exactly that day so it stays true.
+
+Two things had to be true for that, and both were wrong first:
+
+- **The decluttering floor ships off.** Fruit's two-minute floor is right for a
+  full working day and catastrophic as a default here — every span in a short
+  session is under two minutes, so the app reported nothing for a day its own
+  source reported as three. An app that disagrees with its source on the first
+  screen has spent the trust it needs. The floor is in Settings, where a
+  judgement about what counts as noise belongs.
+- **Durations keep their seconds below ten minutes.** ActivityWatch reports a
+  two-second visit to Explorer as `2s`; rendering that as `0m` is not reading
+  the same data. Above ten minutes seconds are noise, and Fruit's `36h 6m` form
+  returns.
+
+Where Orchard *does* differ, it is deliberate and visible: `.exe` and `.app` are
+trimmed from application names, and a browser's time becomes the site it was
+showing when a browser watcher is running.
 
 **The total is smaller than what the watcher recorded, and the app says so.**
-`rawSec` is what was captured; `observedSec` is what survived. When the gap is
-more than ten minutes, a finding names it: *"2h 00m of recorded time is not in
-these totals."* A single number cannot say that, which is why both are carried.
+`rawSec` is what was captured; `observedSec` is what survived the afk filter and
+the floor. Whenever they differ the headline carries both, so this panel can
+never appear to contradict the dashboard without explaining itself.
 
 **A parent bucket is never double-counted, and neither is a browser.** Only
 spans whose app is a known browser can be relabelled by a browser bucket —
@@ -168,8 +190,9 @@ architecture is built around that:
 - **Server address** — local only.
 - **Hostname** — which machine's buckets to read, when the server holds more
   than one.
-- **Shortest stretch to report** — two minutes by default. Set it to 0 to see
-  everything the watcher recorded.
+- **Shortest stretch to report** — zero by default, so the totals match the
+  ActivityWatch dashboard. Raise it to drop alt-tab noise from a long day, at
+  the cost of no longer agreeing with ActivityWatch on the total.
 - **Applications to leave out entirely.**
 - **Rules** — the full table, editable.
 

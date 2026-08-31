@@ -337,7 +337,7 @@
             floor,
           ]),
           UI.caption(
-            'Observation shorter than this is noise rather than activity — alt-tabbing to check a message is not a context switch worth a row in a day. Two minutes by default. Set it to 0 to see everything the watcher recorded.',
+            'Zero by default, so the totals here match what the ActivityWatch dashboard shows for the same day. Raise it — two minutes is a reasonable choice — to drop the alt-tab noise from a long day, at the cost of no longer agreeing with ActivityWatch on the total.',
           ),
           el('label', { class: 'field', style: { marginTop: '10px' } }, [
             el('span', { class: 'micro', text: 'Applications to leave out entirely' }),

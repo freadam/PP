@@ -87,34 +87,58 @@
       ]);
     }
 
-    const HOUR_PX = 68;
-    const firstHour = Math.floor((day.firstAt - day.from) / 3600000);
-    const lastHour = Math.min(24, Math.ceil((day.lastAt - day.from) / 3600000));
-    const hours = Math.max(1, lastHour - firstHour);
-    const originMs = day.from + firstHour * 3600000;
-    const y = (ms) => ((ms - originMs) / 3600000) * HOUR_PX;
+    // The axis has to fit the day it is drawing. A fixed 68px hour is right for
+    // a working day and useless for a three-minute one, where the whole session
+    // would be three pixels tall — which is how a real first run looks. So the
+    // scale and the tick interval both come from the extent.
+    const PANEL_MIN_PX = 260;
+    const PANEL_MAX_PX = 1500;
+    const extentMs = Math.max(60000, day.lastAt - day.firstAt);
+
+    // The finest tick that gives a readable number of gridlines.
+    const TICKS = [
+      [60000, 'minute'],
+      [300000, '5 minutes'],
+      [900000, 'quarter hour'],
+      [1800000, 'half hour'],
+      [3600000, 'hour'],
+      [10800000, '3 hours'],
+    ];
+    const [tickMs, TICK_WORD] = TICKS.find(([ms]) => extentMs / ms <= 14) || TICKS[TICKS.length - 1];
+
+    // Start and end on a tick boundary, so the gridlines are round numbers.
+    const originMs = Math.floor(day.firstAt / tickMs) * tickMs;
+    const endMs = Math.ceil(day.lastAt / tickMs) * tickMs;
+    const ticks = Math.max(1, Math.round((endMs - originMs) / tickMs));
+    const height = Math.min(PANEL_MAX_PX, Math.max(PANEL_MIN_PX, (extentMs / 3600000) * 68));
+    const y = (ms) => ((ms - originMs) / (endMs - originMs)) * height;
 
     const byId = new Map((categories || []).map((c) => [c.id, c]));
     const kids = [];
-    for (let h = 0; h <= hours; h++) {
-      kids.push(el('span', { class: 'hour-line', style: { top: `${h * HOUR_PX}px` } }));
-      if (h < hours) {
+    for (let t = 0; t <= ticks; t++) {
+      const top = (t / ticks) * height;
+      kids.push(el('span', { class: 'hour-line', style: { top: `${top}px` } }));
+      if (t < ticks) {
         kids.push(
           el('span', {
             class: 'hour-label',
-            style: { top: `${h * HOUR_PX + 2}px` },
-            text: `${String(firstHour + h).padStart(2, '0')}:00`,
+            style: { top: `${top + 2}px` },
+            text: E.clock(originMs + t * tickMs),
           }),
         );
       }
     }
 
-    for (const s of day.spans) {
-      const cat = byId.get(s.categoryId);
-      const top = y(s.start);
-      const height = Math.max(3, y(s.end) - top);
-      const label = s.domain || E.appLabel(s.data.app);
-      const title = s.data.title ? ` — ${s.data.title}` : '';
+    for (const sp of day.spans) {
+      const cat = byId.get(sp.categoryId);
+      const top = y(sp.start);
+      const seconds = (sp.end - sp.start) / 1000;
+      const label = sp.domain || E.appLabel(sp.data.app);
+      const title = sp.data.title ? ` — ${sp.data.title}` : '';
+      // A one-second visit still has to be clickable, so every block gets a
+      // floor of a few pixels even where that overstates its length. The
+      // duration is written on the row, which is the honest carrier.
+      const drawn = Math.max(4, y(sp.end) - top);
       kids.push(
         el('button', {
           class: 'span',
@@ -126,12 +150,12 @@
           'data-labelled': cat ? 'true' : 'false',
           style: {
             top: `${top}px`,
-            height: `${height}px`,
+            height: `${drawn}px`,
             background: cat ? cat.colour : 'var(--sunken)',
           },
-          title: `${E.clock(s.start)}–${E.clock(s.end)} · ${label}${title} · ${E.duration((s.end - s.start) / 1000)}`,
-          onClick: () => onPick && onPick(s),
-          text: height >= 14 ? `${E.clock(s.start)}  ${label}${title}` : label,
+          title: `${E.clock(sp.start)}-${E.clock(sp.end)} · ${label}${title} · ${E.duration(seconds)}`,
+          onClick: () => onPick && onPick(sp),
+          text: drawn >= 14 ? `${E.clock(sp.start)}  ${label}${title}  ·  ${E.duration(seconds)}` : label,
         }),
       );
     }
@@ -139,9 +163,9 @@
     return panel(
       'The day',
       [
-        el('div', { class: 'timeline', style: { height: `${hours * HOUR_PX}px` } }, kids),
+        el('div', { class: 'timeline', style: { height: `${height}px` } }, kids),
         caption(
-          `${E.clock(day.firstAt)} to ${E.clock(day.lastAt)}. Each block is one unbroken stretch in one place; the colour is its label. Click one to label what it was.`,
+          `${E.clock(day.firstAt)} to ${E.clock(day.lastAt)}, gridlines every ${TICK_WORD}. Each block is one unbroken stretch in one place; the colour is its label. Click one to label what it was.`,
         ),
       ],
       true,
@@ -171,7 +195,7 @@
             el('div', { class: 'unlabelled-row' }, [
               el('span', { class: 'truncate' }, [
                 el('span', { class: 'kind', text: r.kind }),
-                el('span', { text: r.value }),
+                el('span', { text: r.display || r.value }),
               ]),
               el('span', {
                 class: 'data caption',
@@ -270,16 +294,31 @@
     );
   }
 
+  /**
+   * The headline, and the one number it must never contradict.
+   *
+   * ActivityWatch's own dashboard shows a "Time active" for the same day. If
+   * this panel shows a smaller figure with no explanation, the reader's first
+   * conclusion is that one of the two is broken — and they are right to think
+   * so. Whenever a filter has removed anything, the amount and the reason are
+   * on the same line as the total, not buried in a finding further down.
+   */
   function headline(range) {
+    const dropped = Math.round(range.rawSec - range.observedSec);
+    const period =
+      range.days.length === 1
+        ? 'Time at the machine, in front of something, on this day.'
+        : `Across ${range.days.length} days, ${E.duration(range.dayLengthSec)} on an average day with anything on it.`;
+
     return panel(
       'Observed',
       [
         el('p', { class: 'display', text: E.duration(range.observedSec) }),
-        caption(
-          range.days.length === 1
-            ? 'Time at the machine, in front of something, on this day.'
-            : `Across ${range.days.length} days, ${E.duration(range.dayLengthSec)} on an average day with anything on it.`,
-        ),
+        caption(period),
+        dropped > 0 &&
+          caption(
+            `ActivityWatch recorded ${E.duration(range.rawSec)} of foreground time; ${E.duration(dropped)} of it is not counted here — time you were away from the keyboard, and any stretch below the floor set in Settings.`,
+          ),
       ],
       true,
     );
