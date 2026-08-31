@@ -95,8 +95,34 @@ function createWindow() {
     },
   });
 
-  win.once('ready-to-show', () => win.show());
+  // `show: false` avoids a white flash on a dark desktop, but it means the
+  // window exists and is invisible until the renderer paints. If anything stops
+  // that first paint, the result is a running process with nothing on screen
+  // and a terminal that looks hung — so the wait is bounded rather than
+  // indefinite, and a window that is merely slow still appears.
+  let shown = false;
+  const reveal = () => {
+    if (shown || win.isDestroyed()) return;
+    shown = true;
+    win.show();
+  };
+  win.once('ready-to-show', reveal);
+  const fallback = setTimeout(reveal, 4000);
+  win.on('closed', () => clearTimeout(fallback));
+
   win.loadFile(path.join(__dirname, '..', 'src', 'index.html'));
+
+  // A failed load would otherwise be silent: the window shows on the fallback
+  // timer with a blank page and nothing says why.
+  win.webContents.on('did-fail-load', (_e, code, description, url) => {
+    console.error(`Orchard could not load its interface (${code} ${description}) from ${url}`);
+    reveal();
+  });
+
+  // `npm start` holds the terminal until the app quits, which reads as a hang
+  // if the window is on another workspace or behind the editor. One line says
+  // the process is alive and doing what it should.
+  console.log('Orchard is running. Close the window to quit.');
 
   // Nothing in this app should ever navigate or open a window. Both are denied
   // rather than handled: a renderer that cannot navigate cannot be steered

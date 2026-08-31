@@ -49,22 +49,27 @@ ActivityWatch must be running; it listens on `http://localhost:5600`. If it is
 not, Orchard opens and says so — it never shows an empty chart in place of an
 absent server.
 
-### If your npm blocks install scripts
+`npm start` holds the terminal until you close the window. That is not a hang —
+the app prints `Orchard is running. Close the window to quit.` when it starts.
 
-npm can be configured to hold package install scripts for approval, and Electron
-needs its own: the `electron` package is a small wrapper whose postinstall step
-downloads the actual binary for your platform. Without it, `npm start` fails
-with `Electron failed to install correctly` or a missing `electron.exe`.
+### If your npm holds install scripts for approval
 
-When `npm install` prints `npm warn allow-scripts ... electron`, approve it:
+The `electron` package is a wrapper whose postinstall downloads the actual
+binary for your platform, so npm's `allowScripts` gate applies to it. It is the
+only package here with an install script.
+
+If it was genuinely blocked, `npm start` fails with `Electron failed to install
+correctly`. Any other message — including `electron.exe exited with signal
+SIGINT` — means the binary is present and ran.
+
+To approve it, run the command **inside this directory**. `npm approve-scripts`
+resolves the package against the project you are standing in, so running it at
+the repository root fails with `ENOMATCH`: the root project has no `electron`.
 
 ```bash
+cd apps/orchard
 npm approve-scripts electron
-npm install
 ```
-
-This is the one package here that genuinely needs it. Nothing else in Orchard
-has an install script.
 
 ```bash
 npm test          # engine + main process + the built page in real Chromium
