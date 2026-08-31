@@ -42,6 +42,37 @@
   const empty = (t) => el('p', { class: 'empty', text: t });
   const pct = (share) => `${Math.round(share * 100)}%`;
 
+  /**
+   * How many rows a list shows before it asks.
+   *
+   * The tail of a ranked list answers nothing — a hundred one-second entries
+   * are noise — but a list that silently stops at twelve is a list that lied
+   * about being ranked. So the cut is always visible and always reversible.
+   */
+  const DEFAULT_ROWS = 12;
+
+  /**
+   * The expander. Returns nothing when there is nothing hidden, so a short list
+   * does not carry a dead control.
+   *
+   * The count is in the label rather than in a caption beside it: "Show 34
+   * more" tells you whether it is worth pressing, and "Show more" does not.
+   */
+  function moreRow(total, shown, expanded, onToggle) {
+    if (total <= shown && !expanded) return null;
+    const hidden = total - shown;
+    return el('button', {
+      class: 'more',
+      type: 'button',
+      'aria-expanded': String(!!expanded),
+      text: expanded ? `Show fewer` : `Show ${hidden} more`,
+      onClick: onToggle,
+    });
+  }
+
+  /** The rows a list should draw, given whether it is expanded. */
+  const visibleRows = (rows, expanded) => (expanded ? rows : rows.slice(0, DEFAULT_ROWS));
+
   /** A named share of a total, drawn as a bar under its own name. */
   function splitRows(rows, total) {
     return el(
@@ -178,11 +209,13 @@
    *
    * First on the tab, because it is the only panel that asks something of you.
    */
-  function unlabelledPanel(rows, categories, onLabel) {
+  function unlabelledPanel(rows, categories, onLabel, opts) {
     if (!rows.length) {
       return panel('No label yet', [empty('Everything observed in this range carries a label. Nothing to do here.')]);
     }
+    const o = opts || {};
     const total = rows.reduce((a, r) => a + r.seconds, 0);
+    const shown = visibleRows(rows, o.expanded);
     return panel(
       'No label yet',
       [
@@ -192,7 +225,7 @@
         el(
           'div',
           {},
-          rows.slice(0, 12).map((r) =>
+          shown.map((r) =>
             el('div', { class: 'unlabelled-row' }, [
               el('span', { class: 'truncate' }, [
                 el('span', { class: 'kind', text: r.kind }),
@@ -218,6 +251,7 @@
             ]),
           ),
         ),
+        moreRow(rows.length, shown.length, o.expanded, o.onToggle),
       ],
       true,
     );
@@ -232,10 +266,11 @@
    * revealing thing this app draws, which is why it can be switched off
    * independently of everything else.
    */
-  function titlesPanel(rows, limit) {
+  function titlesPanel(rows, opts) {
     if (!rows.length) return panel('Top window titles', [empty('Nothing observed in this range.')]);
+    const o = opts || {};
     const total = rows.reduce((a, r) => a + r.seconds, 0);
-    const shown = rows.slice(0, limit || 12);
+    const shown = visibleRows(rows, o.expanded);
     return panel('Top window titles', [
       el(
         'div',
@@ -265,8 +300,7 @@
           ]),
         ),
       ),
-      rows.length > shown.length &&
-        caption(`${rows.length - shown.length} more, not shown. The tail of a title list answers nothing.`),
+      moreRow(rows.length, shown.length, o.expanded, o.onToggle),
     ]);
   }
 
@@ -376,6 +410,9 @@
     caption,
     empty,
     splitRows,
+    moreRow,
+    visibleRows,
+    DEFAULT_ROWS,
     timeline,
     unlabelledPanel,
     titlesPanel,

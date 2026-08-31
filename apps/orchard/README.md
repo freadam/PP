@@ -22,7 +22,7 @@ apps/orchard/
   src/render.js        all the drawing — no arithmetic
   src/app.js           one read of state, every panel built from it
   src/tokens.css       Fruit's design system
-  test/                45 engine tests, 13 main-process tests, 34 UI checks
+  test/                45 engine tests, 13 main-process tests, 44 UI checks
 ```
 
 ## Running it
@@ -97,6 +97,12 @@ how ActivityWatch's own dashboard keys its list
 (`merge_events_by_keys(events, ["app", "title"])`), so the two agree row for
 row. The hour histogram splits a stretch across the hours it actually spent time
 in, so it sums to the total beside it.
+
+Every ranked list draws twelve rows and then says how many it is holding back —
+`Show 8 more`, not `Show more`, so you can tell whether it is worth pressing.
+Each list expands on its own, because they are separate questions, and the state
+survives a redraw so labelling something in an expanded list does not collapse
+it again.
 
 **Findings** — the range read back in sentences, each naming the figure it came
 from. They state facts and stop; this app does not tell you what to do about
@@ -214,7 +220,7 @@ app that will not open.
 ```bash
 node --test test/engine.test.js   # 45 — the arithmetic
 node --test test/main.test.js     # 13 — HTTP, address validation, disk
-node test/check-ui.mjs            # 34 — the page in real Chromium
+node test/check-ui.mjs            # 44 — the page in real Chromium
 ```
 
 `engine.test.js` holds the ported transforms to the behaviour

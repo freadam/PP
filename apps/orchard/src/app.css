@@ -311,6 +311,29 @@
   min-height: 1px;
 }
 
+/* ─── the expander ───────────────────────────────────────────────────────
+   Full width and quiet: it belongs to the list above it rather than being a
+   control in its own right, so it reads as the bottom of the panel and not as
+   an action competing with the rows. */
+
+.more {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.more:hover {
+  background: var(--subtle);
+  color: var(--strong);
+  border-color: var(--line);
+}
+
 /* ─── findings ───────────────────────────────────────────────────────── */
 
 .finding {

@@ -61,6 +61,24 @@ function fixture() {
   };
 }
 
+/**
+ * Twenty distinct windows in one application, so every ranked list on the page
+ * is longer than it will draw. The expander cannot be checked against the day
+ * above, where nothing is hidden.
+ */
+function manyFixture() {
+  const window_ = [];
+  for (let i = 0; i < 20; i++) {
+    window_.push(ev(at(DAY, 9) + i * 5 * 60000, 5 * 60, { app: `app${String(i).padStart(2, '0')}`, title: `Window number ${i}` }));
+  }
+  return {
+    buckets: { window: 'aw-watcher-window_test', afk: 'aw-watcher-afk_test', web: [], hosts: ['test'] },
+    window: window_,
+    afk: [ev(at(DAY, 9), 3 * HOUR, { status: 'not-afk' })],
+    web: [],
+  };
+}
+
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH ?? '/opt/pw-browsers/chromium',
 });
@@ -82,10 +100,12 @@ await page.addInitScript((data) => {
       return { ok: true, settings: s };
     },
     info: async () => ({ ok: true, info: { version: 'test' } }),
-    range: async () =>
-      window.__mode === 'offline'
-        ? { ok: false, kind: 'offline', error: 'Nothing is listening at http://localhost:5600. ActivityWatch is probably not running.' }
-        : { ok: true, data: data },
+    range: async () => {
+      if (window.__mode === 'offline') {
+        return { ok: false, kind: 'offline', error: 'Nothing is listening at http://localhost:5600. ActivityWatch is probably not running.' };
+      }
+      return { ok: true, data: window.__mode === 'many' ? data.many : data.normal };
+    },
   };
   // Freeze "today" so the report is deterministic.
   const R = Date;
@@ -99,7 +119,7 @@ await page.addInitScript((data) => {
     }
   }
   window.Date = Fz;
-}, fixture());
+}, { normal: fixture(), many: manyFixture() });
 
 await page.goto(page_url, { waitUntil: 'load' });
 
@@ -285,6 +305,67 @@ ok('the window does not scroll sideways at 1180px', overflow <= 0, `${overflow}p
 await page.setViewportSize({ width: 720, height: 700 });
 const narrow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 ok('the layout holds at the minimum window width', narrow <= 1, `${narrow}px`);
+
+console.log('\nShow more');
+await page.evaluate(() => {
+  window.__mode = 'many';
+});
+await page.getByRole('button', { name: 'Today' }).click();
+await page.waitForFunction(() => document.body.innerText.includes('Window number'), null, { timeout: 10000 });
+
+const titlePanel = () =>
+  page.locator('.panel').filter({ hasText: /^Top window titles/i });
+const titleRows = () => titlePanel().locator('.split-row').count();
+
+ok('a long list draws twelve rows, not all of them', (await titleRows()) === 12);
+const moreBtn = titlePanel().getByRole('button');
+ok('and offers the rest by name', (await moreBtn.textContent()) === 'Show 8 more', await moreBtn.textContent());
+ok('the control reports its state', (await moreBtn.getAttribute('aria-expanded')) === 'false');
+
+await moreBtn.click();
+await page.waitForFunction(
+  () => {
+    const p = [...document.querySelectorAll('.panel')].find((x) => /^TOP WINDOW TITLES/i.test(x.innerText));
+    return p && p.querySelectorAll('.split-row').length === 20;
+  },
+  null,
+  { timeout: 10000 },
+);
+ok('expanding shows every row', (await titleRows()) === 20);
+ok('and the control offers the way back', (await titlePanel().getByRole('button').textContent()) === 'Show fewer');
+ok('while reporting its new state', (await titlePanel().getByRole('button').getAttribute('aria-expanded')) === 'true');
+
+await titlePanel().getByRole('button').click();
+await page.waitForFunction(
+  () => {
+    const p = [...document.querySelectorAll('.panel')].find((x) => /^TOP WINDOW TITLES/i.test(x.innerText));
+    return p && p.querySelectorAll('.split-row').length === 12;
+  },
+  null,
+  { timeout: 10000 },
+);
+ok('collapsing puts it back', (await titleRows()) === 12);
+
+// The application list and the unlabelled list had the same silent cut.
+const appPanel = page.locator('.panel').filter({ hasText: /^By application/i });
+ok('the application list offers its rest too', (await appPanel.getByRole('button').textContent()) === 'Show 8 more');
+const unlabelled = page.locator('.panel').filter({ hasText: /^No label yet/i });
+ok(
+  'and so does the unlabelled list',
+  (await unlabelled.getByRole('button').filter({ hasText: 'Show' }).count()) === 1,
+);
+
+// One list expanding must not expand the others: they are separate questions.
+await appPanel.getByRole('button').click();
+await page.waitForFunction(
+  () => {
+    const p = [...document.querySelectorAll('.panel')].find((x) => /^BY APPLICATION/i.test(x.innerText));
+    return p && p.querySelectorAll('.split-row').length === 20;
+  },
+  null,
+  { timeout: 10000 },
+);
+ok('each list expands on its own', (await titleRows()) === 12 && (await appPanel.locator('.split-row').count()) === 20);
 
 ok('no page errors', errors.length === 0, errors.join(' | '));
 

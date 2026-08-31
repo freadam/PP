@@ -40,10 +40,26 @@
     connection: 'unknown',
     error: null,
     loading: true,
+    // Which lists the user has expanded, by panel. Kept across a redraw so
+    // labelling something in an expanded list does not collapse it again.
+    expanded: {},
   };
 
   const api = () => globalThis.orchard;
   const root = () => document.getElementById('root');
+
+  /**
+   * The expander's state and handler for one list. Toggling redraws from the
+   * snapshot already in hand — expanding a list is not a reason to re-read
+   * ActivityWatch.
+   */
+  const expander = (key) => ({
+    expanded: !!state.expanded[key],
+    onToggle: () => {
+      state.expanded[key] = !state.expanded[key];
+      draw();
+    },
+  });
 
   /** The dates a tab covers. Day is one; week is Monday to Sunday; month is calendar. */
   function boundsFor(tab, date) {
@@ -213,7 +229,7 @@
     return [
       UI.headline(range),
       UI.findingsPanel(range.findings),
-      UI.unlabelledPanel(range.unlabelled, cats, label),
+      UI.unlabelledPanel(range.unlabelled, cats, label, expander('unlabelled')),
       UI.timeline(day, cats, state.settings.showTitles, (span) => {
         // Clicking a block labels the thing it was, which is the same action
         // the list above offers — reached from wherever you noticed it.
@@ -233,10 +249,17 @@
         ]),
         UI.panel('By application', [
           range.byApp.length
-            ? UI.splitRows(range.byApp.slice(0, 12), range.observedSec)
+            ? UI.splitRows(UI.visibleRows(range.byApp, state.expanded.apps), range.observedSec)
             : UI.empty('Nothing observed.'),
+          range.byApp.length &&
+            UI.moreRow(
+              range.byApp.length,
+              UI.visibleRows(range.byApp, state.expanded.apps).length,
+              state.expanded.apps,
+              expander('apps').onToggle,
+            ),
         ]),
-        state.settings.showTitles && UI.titlesPanel(range.byTitle),
+        state.settings.showTitles && UI.titlesPanel(range.byTitle, expander('titles')),
         UI.hourHistogram(range.byHour),
       ]),
     ];
@@ -259,12 +282,19 @@
         UI.hourHistogram(range.byHour),
         UI.panel('By application', [
           range.byApp.length
-            ? UI.splitRows(range.byApp.slice(0, 12), range.observedSec)
+            ? UI.splitRows(UI.visibleRows(range.byApp, state.expanded.apps), range.observedSec)
             : UI.empty('Nothing observed.'),
+          range.byApp.length &&
+            UI.moreRow(
+              range.byApp.length,
+              UI.visibleRows(range.byApp, state.expanded.apps).length,
+              state.expanded.apps,
+              expander('apps').onToggle,
+            ),
         ]),
-        state.settings.showTitles && UI.titlesPanel(range.byTitle),
+        state.settings.showTitles && UI.titlesPanel(range.byTitle, expander('titles')),
       ]),
-      UI.unlabelledPanel(range.unlabelled, cats, label),
+      UI.unlabelledPanel(range.unlabelled, cats, label, expander('unlabelled')),
     ];
   }
 
