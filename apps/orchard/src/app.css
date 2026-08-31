@@ -1,0 +1,401 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Components. Every colour here is a token from `tokens.css` — the UI check
+   fails the build on a literal, which is what keeps the two themes from
+   drifting apart one hard-coded hex at a time.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ─── frame ──────────────────────────────────────────────────────────── */
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  font-weight: 600;
+  color: var(--strong);
+  letter-spacing: 0.02em;
+  margin-right: 4px;
+}
+
+/* The connection state, always visible. An app that reads another process's
+   data has to say whether it is reading it — a stale screen that looks live is
+   the failure this badge exists to prevent. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.status .pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sunken);
+}
+
+.status[data-state='live'] {
+  color: var(--done);
+  border-color: var(--done);
+}
+.status[data-state='live'] .pip {
+  background: var(--done);
+}
+.status[data-state='offline'] {
+  color: var(--over);
+  border-color: var(--over);
+}
+.status[data-state='offline'] .pip {
+  background: var(--over);
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 6px 12px;
+  color: var(--muted);
+}
+
+.tabs button:hover {
+  background: var(--subtle);
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--strong);
+  border-bottom-color: var(--plot);
+  background: none;
+}
+
+.body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 14px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.panel > h3 {
+  margin: 0 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.panel-wide {
+  grid-column: 1 / -1;
+}
+
+.segmented {
+  display: inline-flex;
+}
+
+.segmented button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.segmented button:first-child {
+  border-radius: 5px 0 0 5px;
+  margin-left: 0;
+}
+
+.segmented button:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+/* ─── the day timeline ───────────────────────────────────────────────────
+   The day on a real time axis, at a fixed hour height, so a two-hour stretch
+   is twice the height of a one-hour stretch wherever it falls. A bar chart
+   sorted by size would be easier to read and would lose the only thing this
+   panel is for: *when*. */
+
+.timeline {
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--subtle);
+}
+
+.hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--rule);
+  pointer-events: none;
+}
+
+.hour-label {
+  position: absolute;
+  left: 4px;
+  font-size: 0.625rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.span {
+  position: absolute;
+  left: 44px;
+  right: 6px;
+  border-radius: 3px;
+  padding: 1px 6px;
+  overflow: hidden;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+  display: block;
+}
+
+/* A labelled block is a filled hue and takes the canvas colour for its text;
+   both themes are built so that pairing clears 4.5:1. */
+.span[data-labelled='true'] {
+  color: var(--ink);
+}
+
+/* An unlabelled block is the sunken fill, which needs the mid ink rather than
+   the faint one to stay legible — and an outline, so an absence still reads as
+   a block rather than as a hole in the timeline. */
+.span[data-labelled='false'] {
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* Time nothing is known about is hatched rather than left blank: an empty
+   region and a region that was genuinely idle look identical otherwise. */
+.timeline[data-empty='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 6px,
+    var(--rule) 6px,
+    var(--rule) 7px
+  );
+}
+
+/* ─── bars and splits ────────────────────────────────────────────────── */
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.split-row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) 118px;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.split-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  margin-top: 3px;
+  min-width: 2px;
+}
+
+.hours {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 92px;
+}
+
+.hours span {
+  flex: 1 1 0;
+  background: var(--track-graphic);
+  border-radius: 2px 2px 0 0;
+  min-height: 1px;
+}
+
+.hours span[data-zero='true'] {
+  background: var(--sunken);
+}
+
+.hour-axis {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.hour-axis span {
+  flex: 1 1 0;
+  text-align: center;
+  font-size: 0.5625rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.days {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 92px;
+}
+
+.days .col {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column-reverse;
+  height: 100%;
+  justify-content: flex-start;
+  gap: 1px;
+}
+
+.days .seg {
+  border-radius: 2px;
+  min-height: 1px;
+}
+
+/* ─── findings ───────────────────────────────────────────────────────── */
+
+.finding {
+  border-left: 3px solid var(--plot);
+  padding: 3px 0 3px 10px;
+  margin-bottom: 10px;
+}
+
+.finding:last-child {
+  margin-bottom: 0;
+}
+
+.finding[data-tone='good'] {
+  border-left-color: var(--done);
+}
+
+.finding[data-tone='watch'] {
+  border-left-color: var(--over);
+}
+
+.finding b {
+  display: block;
+  color: var(--strong);
+  font-weight: 600;
+}
+
+/* ─── the unlabelled panel ───────────────────────────────────────────────
+   First on the Day tab, because it is the only panel that asks something of
+   you. An empty taxonomy and a text field is a chore; "these three things
+   took eleven hours between them" is a question people answer. */
+
+.unlabelled-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--rule);
+}
+
+.unlabelled-row:first-of-type {
+  border-top: none;
+}
+
+.kind {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-right: 5px;
+}
+
+/* ─── states ─────────────────────────────────────────────────────────── */
+
+.empty {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.8125rem;
+}
+
+.notice {
+  border: 1px solid var(--over);
+  border-left-width: 3px;
+  border-radius: 5px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.notice h3 {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  color: var(--strong);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8125rem;
+}
+
+.field input,
+.field select {
+  min-width: 0;
+}

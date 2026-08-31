@@ -1,0 +1,16 @@
+{
+  "name": "orchard",
+  "productName": "Orchard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ActivityWatch, read the way Fruit reads a day.",
+  "type": "commonjs",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/engine.test.js test/main.test.js && node test/check-ui.mjs"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

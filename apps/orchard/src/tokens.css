@@ -1,0 +1,331 @@
+/* ══════════════════════════════════════════════════════════════════════
+   Orchard design system — carried over from Fruit's `styles/tokens.css`.
+
+   The system is neutral-first. Gray establishes hierarchy, borders, hover
+   fills and controls. Chromatic colour is reserved for status, charts and
+   the one axis below that carries meaning.
+
+   Three layers, in order:
+
+     1. PRIMITIVES  — raw ramps. Private to this file.
+     2. SEMANTICS   — --surface, --paper, --line … what components ask for.
+                      Only these may be referenced outside this file, so the
+                      theme can be remapped without rewriting a component.
+     3. BASE        — element defaults and the shared utility classes.
+
+   Rule, carried over with the tokens: do not duplicate raw palette values
+   inside components; bind component variants to semantic roles. The UI
+   check enforces it — no literal colour may appear outside this file.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. PRIMITIVES ──────────────────────────────────────────────────── */
+
+:root {
+  --gray-50: #f8f8f8;
+  --gray-100: #f3f3f3;
+  --gray-200: #ededed;
+  --gray-300: #e2e2e2;
+  --gray-400: #c7c7c7;
+  --gray-500: #999999;
+  --gray-700: #525252;
+  --gray-800: #383838;
+  --gray-900: #171717;
+
+  /* Status hues, each with a surface and a text value. The text values are
+     the ones measured against white; the surfaces are their tints. */
+  --blue-surface: #f0f8ff;
+  --blue-text: #0f5f9e;
+  --green-surface: #f0fbf4;
+  --green-text: #1a7f45;
+  --yellow-surface: #fffbf0;
+  --yellow-text: #8c5600;
+  --orange-surface: #fff5f0;
+  --orange-text: #bd3e0c;
+  --red-surface: #fff0f0;
+  --red-text: #b52a2a;
+  --purple-surface: #f9f0ff;
+  --purple-text: #6e399d;
+  --pink-surface: #fff7fc;
+  --pink-text: #9c2671;
+  --cyan-surface: #f5fbfc;
+  --cyan-text: #267a94;
+}
+
+/* ─── 2. SEMANTICS — light is the default, this system is light-first ── */
+
+:root,
+:root[data-theme='light'] {
+  /* Surfaces, back to front. The canvas is white, not gray: get that the
+     wrong way round and the whole control layer disappears, because a
+     gray-100 button on a gray-50 page is invisible. */
+  --ink: #ffffff;          /* application canvas */
+  --surface: #ffffff;      /* panels, cards, chrome */
+  --subtle: var(--gray-50);      /* hover, quiet inset regions */
+  --raised: var(--gray-100);     /* control fill, header bands */
+  --raised-hover: var(--gray-300);
+  --raised-active: var(--gray-400);
+  --sunken: var(--gray-200);     /* pressed fill, empty track */
+  --line: var(--gray-300);       /* input and panel borders */
+  --rule: var(--gray-200);       /* dividers and table borders */
+
+  /* Ink, in three tiers. */
+  --strong: var(--gray-900);
+  --paper: var(--gray-800);
+  --muted: var(--gray-700);
+  --faint: #6b6b6b;  /* NOT gray-500: that measures 2.8:1 on white, and this
+                        is the value that clears 4.5:1 for a 13px label. */
+
+  /* ─── The drift axis ─────────────────────────────────────────────────
+     Fruit's one piece of chromatic meaning, kept because this app reports
+     against the same ideas: cool is the reference, warm is the record.
+       plot  ← blue     the reference line, an informational claim
+       track ← yellow   the record, "this is what it cost"
+       over  ← orange   overrun, medium severity, not an alarm
+       done  ← green    finished, on pace
+     Red stays out of the axis entirely and is reserved for destructive
+     actions. Overrun is a continuation, not a failure, and colouring it red
+     would teach the user to fear the column that exists to be trusted. */
+  --plot: var(--blue-text);
+  --track: var(--yellow-text);
+  /* Amber has two values because the remediation only applies to one: a 3px
+     trace or a bar fill is a graphical object needing 3:1, not 4.5:1, and
+     #ab6e05 clears that while still reading as amber rather than as the dark
+     brown that #8c5600 becomes at bar scale. */
+  --track-graphic: #ab6e05;
+  --over: var(--orange-text);
+  --done: var(--done-text, var(--green-text));
+  --danger: var(--red-text);
+  --danger-surface: var(--red-surface);
+
+  --focus-ring: #007be0;
+  --shadow-menu: 0 12px 24px rgb(23 23 23 / 0.14);
+
+  color-scheme: light;
+}
+
+/* ─── Dark ───────────────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #0f0f0f;
+    --surface: #1a1a1a;
+    --subtle: #232323;
+    --raised: #2b2b2b;
+    --raised-hover: #3d3d3d;
+    --raised-active: #525252;
+    --sunken: #232323;
+    --line: #3d3d3d;
+    --rule: #2b2b2b;
+
+    --strong: #f5f5f5;
+    --paper: #d4d4d4;
+    --muted: #b0b0b0;
+    --faint: #999999;
+
+    /* The status hues are re-lightened rather than reused: the light-mode
+       values are chosen against white and are unreadable on #0f0f0f. */
+    --blue-text: #6cb6f5;
+    --green-text: #5fca8b;
+    --yellow-text: #e0b341;
+    --orange-text: #f08b5f;
+    --red-text: #f07171;
+    --purple-text: #c39cf0;
+    --pink-text: #ef8bc4;
+    --cyan-text: #63c5df;
+
+    --track-graphic: #d9a441;
+    --focus-ring: #65b9fc;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --ink: #0f0f0f;
+  --surface: #1a1a1a;
+  --subtle: #232323;
+  --raised: #2b2b2b;
+  --raised-hover: #3d3d3d;
+  --raised-active: #525252;
+  --sunken: #232323;
+  --line: #3d3d3d;
+  --rule: #2b2b2b;
+
+  --strong: #f5f5f5;
+  --paper: #d4d4d4;
+  --muted: #b0b0b0;
+  --faint: #999999;
+
+  --blue-text: #6cb6f5;
+  --green-text: #5fca8b;
+  --yellow-text: #e0b341;
+  --orange-text: #f08b5f;
+  --red-text: #f07171;
+  --purple-text: #c39cf0;
+  --pink-text: #ef8bc4;
+  --cyan-text: #63c5df;
+
+  --track-graphic: #d9a441;
+  --focus-ring: #65b9fc;
+
+  color-scheme: dark;
+}
+
+/* ─── The application ramp ───────────────────────────────────────────────
+   Eight hues, assigned to an application by stable hash so it keeps its
+   colour from one day to the next. Bound to the status tokens rather than to
+   fresh values, so the ramp re-lightens with the theme automatically. */
+
+:root {
+  --app-1: var(--cyan-text);
+  --app-2: var(--purple-text);
+  --app-3: var(--pink-text);
+  --app-4: var(--blue-text);
+  --app-5: var(--green-text);
+  --app-6: var(--yellow-text);
+  --app-7: var(--orange-text);
+  --app-8: var(--red-text);
+}
+
+/* ─── 3. BASE ────────────────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'InterVariable', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  color: var(--strong);
+  font-weight: 600;
+}
+
+/* Figures line up in a column only if their digits are the same width. Any
+   numeral that changes between renders carries this. */
+.data,
+.display,
+th.num,
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.display {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--strong);
+}
+
+.caption {
+  margin: 0;
+  color: var(--faint);
+  font-size: 0.8125rem;
+}
+
+.micro {
+  font-size: 0.6875rem;
+  color: var(--faint);
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+button,
+select,
+input {
+  font: inherit;
+  color: var(--paper);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 4px 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--raised-hover);
+}
+
+button[aria-pressed='true'],
+button[aria-selected='true'] {
+  background: var(--raised-active);
+  color: var(--strong);
+}
+
+select,
+input {
+  background: var(--surface);
+}
+
+/* Visible focus on every interactive element, in both themes. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 5px 8px;
+}
+
+th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+tbody tr {
+  border-top: 1px solid var(--rule);
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

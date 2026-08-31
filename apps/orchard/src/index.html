@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      A second Content-Security-Policy, matching the header the main process
+      sets. The header is the one that is enforced when the app runs; this one
+      makes the same promise when the file is opened directly — by the UI
+      check, or by anyone reading the source — so the two cannot drift.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Orchard</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="engine.js"></script>
+    <script src="render.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
