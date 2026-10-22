@@ -30,6 +30,8 @@ namespace GASDemo
         public float Radius = 0.5f;
         public float HealthBarHeight = 2.3f;
         public bool DestroyOnDeath = true;
+        [Tooltip("Never displaced: ignores knockback and overlap pushes (training dummies).")]
+        public bool Anchored;
         public Color BodyColor = Color.gray;
 
         /// <summary>World-space point abilities aim at (mouse for the hero, target for AI).</summary>
@@ -151,12 +153,13 @@ namespace GASDemo
 
         public void ApplyKnockback(Vector3 direction, float strength)
         {
-            if (isDead) return;
+            if (isDead || Anchored) return;
             externalVelocity = Targeting.Flat(direction).normalized * strength;
         }
 
         void ResolveOverlaps()
         {
+            if (Anchored) return;
             foreach (var other in Targeting.All)
             {
                 if (other == this || !other.IsAlive) continue;

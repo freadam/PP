@@ -35,18 +35,7 @@ namespace GASDemo
 
             var hero = content.SpawnHero(Vector3.zero);
 
-            var cam = Camera.main;
-            if (cam == null)
-            {
-                var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
-                cam = camGo.AddComponent<Camera>();
-            }
-            cam.fieldOfView = 45f;
-            cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.06f, 0.06f, 0.09f);
-            var follow = cam.GetComponent<TopDownCamera>();
-            if (follow == null) follow = cam.gameObject.AddComponent<TopDownCamera>();
-            follow.Target = hero.transform;
+            SetupCamera(hero.transform);
 
             var director = worldRoot.AddComponent<WaveDirector>();
             director.Content = content;
@@ -66,7 +55,23 @@ namespace GASDemo
             BuildWorld();
         }
 
-        static void BuildArena()
+        internal static void SetupCamera(Transform target)
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
+                cam = camGo.AddComponent<Camera>();
+            }
+            cam.fieldOfView = 45f;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.06f, 0.06f, 0.09f);
+            var follow = cam.GetComponent<TopDownCamera>();
+            if (follow == null) follow = cam.gameObject.AddComponent<TopDownCamera>();
+            follow.Target = target;
+        }
+
+        internal static void BuildArena()
         {
             float r = CharacterBase.ArenaRadius;
             var floor = Fx.Primitive(PrimitiveType.Cylinder, new Vector3(0f, -0.1f, 0f), new Vector3(r * 2f + 1f, 0.1f, r * 2f + 1f), new Color(0.2f, 0.21f, 0.25f));
@@ -84,7 +89,7 @@ namespace GASDemo
             }
         }
 
-        static void EnsureLight()
+        internal static void EnsureLight()
         {
             if (Object.FindFirstObjectByType<Light>() != null) return;
             // Not parented to the world root: it must survive restarts (the old one is still alive during rebuild).

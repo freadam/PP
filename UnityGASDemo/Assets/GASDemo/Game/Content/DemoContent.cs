@@ -349,6 +349,17 @@ namespace GASDemo
             return enemy;
         }
 
+        /// <summary>A stationary capsule with no brain and no abilities — a target for testing the hero's kit.</summary>
+        public CharacterBase SpawnDummy(Vector3 position, string label, float maxHealth, float armor, Color color)
+        {
+            var dummy = CreateCharacter("Dummy_" + label, position, Team.Monsters, color, 1.1f, false);
+            dummy.DisplayName = label;
+            dummy.Anchored = true;
+            dummy.InitializeStats(new CharacterStats { MaxHealth = maxHealth, Armor = armor, MoveSpeed = 0.5f });
+            dummy.gameObject.AddComponent<TrainingDummy>();
+            return dummy;
+        }
+
         static CharacterBase CreateCharacter(string name, Vector3 position, Team team, Color color, float scale, bool isHero)
         {
             var go = new GameObject(name);

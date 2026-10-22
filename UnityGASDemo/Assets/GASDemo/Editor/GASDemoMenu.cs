@@ -12,15 +12,20 @@ namespace GASDemo.Editor
         const string ContentFolder = "Assets/GASDemo/Content";
 
         [MenuItem("Tools/GAS Demo/Create Demo Scene")]
-        public static void CreateDemoScene()
+        public static void CreateDemoScene() => CreateScene<DemoBootstrap>("GASDemo");
+
+        [MenuItem("Tools/GAS Demo/Create Ability Sandbox Scene")]
+        public static void CreateSandboxScene() => CreateScene<SandboxBootstrap>("GASDemo_Sandbox");
+
+        static void CreateScene<T>(string sceneName) where T : MonoBehaviour
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            new GameObject("GASDemo").AddComponent<DemoBootstrap>();
+            new GameObject(sceneName).AddComponent<T>();
 
             Directory.CreateDirectory(SceneFolder);
-            string path = SceneFolder + "/GASDemo.unity";
+            string path = $"{SceneFolder}/{sceneName}.unity";
             EditorSceneManager.SaveScene(scene, path);
             AssetDatabase.Refresh();
             Debug.Log($"[GAS Demo] Scene created at {path}. Press Play.");

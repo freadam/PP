@@ -17,6 +17,25 @@ prefabs or project setup.
 To drop the demo into an existing project, copy `Assets/GASDemo/`. It works with the built-in pipeline and
 with URP, and with the legacy Input Manager or the Input System package.
 
+### Ability sandbox
+
+Choose **Tools → GAS Demo → Create Ability Sandbox Scene**, then press Play. You get the hero and a range of
+stationary capsule dummies. There are no waves and nothing attacks you. Each dummy shows its last hit, total
+damage, hit count and DPS, and heals back to full after 3 seconds without taking damage.
+
+| Dummy | Use it to test |
+|---|---|
+| Line A/B/C | Combo cone width, Mystic Shot, Tumble-empowered hits |
+| Pack 1–5 (cluster) | Frost Field ticks and slow, Shockwave stun |
+| Armored (150) | Physical vs. magic damage against armor |
+| Fragile (60 HP, respawns) | On-kill effects (Bloodthirst) |
+| Far | Mystic Shot range from the start position |
+
+Dummies are `Anchored`: knockback and pushes don't move them.
+
+Cheats: **F2** refill and reset cooldowns · **F3** toggle free casts · **F4 / F5** toggle the Ignite / Bloodthirst
+passives · **F6** rank up all abilities (wraps back to 1) · **F7** stun every dummy for 2s · **F1** GAS debug panel.
+
 ### Controls
 
 | Input | Ability | Inspired by |
